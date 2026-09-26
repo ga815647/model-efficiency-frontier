@@ -47,11 +47,13 @@ def _locator(locator):
         raise ResultError('invalid_source_locator')
     if set(locator) == {'commit', 'path'}:
         path = locator['path']
-        parts = path.split('/') if type(path) is str else []
+        if type(path) is not str:
+            raise ResultError('invalid_source_locator')
+        parts = path.split('/')
         published = (_RESULT_PATH.fullmatch(path) is not None and
                      _UUID.fullmatch(parts[1]) is not None and
                      re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*-[1-9][0-9]*', parts[2]) is not None)
-        archived = type(path) is str and _RUN_PATH.fullmatch(path) is not None
+        archived = _RUN_PATH.fullmatch(path) is not None
         if (not _nonempty(locator['commit']) or not _SHA.fullmatch(locator['commit']) or
                 not (archived or published)):
             raise ResultError('invalid_source_locator')
@@ -241,6 +243,9 @@ def validate_envelope(envelope: dict) -> dict:
                          version_status=envelope['version_status'], cost_basis=envelope['cost_basis'],
                          source_dates=envelope['source_dates'], source_locator=envelope['source_snapshot'],
                          caveats=envelope['caveats']))
+        pinned = set(envelope['source_snapshot']) == {'commit', 'path'}
+        if pinned != (envelope['operation'] == 'recompute'):
+            raise ResultError('operation_source_mismatch')
         params = envelope['parameters']
         if (type(params) is not dict or set(params) !=
                 {'gpt_factor', 'grok_factor', 'min_score', 'min_score_reason', 'max_cost'}

@@ -29,6 +29,11 @@ PROVENANCE = {
 }
 
 
+def recompute_data():
+    return dict(request_data(), operation='recompute',
+                source_snapshot=PROVENANCE['source_locator'])
+
+
 class ResultTests(unittest.TestCase):
     def test_snapshot_projection_uses_same_calculation(self):
         payload, report = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
@@ -43,6 +48,8 @@ class ResultTests(unittest.TestCase):
             ('GPT-6 Sol high AA-public published-price', 42.8215513642985),
             ('GPT-6 Luna low AA-public published-price', 20.9225480080866)])
         self.assertIn(payload['picks']['strong']['identity'], report)
+        for label, key in (('攻堅', 'strong'), ('平衡', 'middle'), ('省錢', 'cheap')):
+            self.assertIn(f'- {label}：{payload["picks"][key]["identity"]}（S=', report)
         self.assertEqual(payload['version_status'], 'inferred')
         self.assertEqual([r['status'] for r in payload['ladder']], ['final'] * 16)
         self.assertEqual({r['status'] for r in payload['candidate_statuses']}, {'final', 'cut', 'excluded'})
@@ -62,7 +69,7 @@ class ResultTests(unittest.TestCase):
                 if subset:
                     payload, _ = calculate_snapshot(file, PARAMETERS, PROVENANCE)
                     self.assertEqual(payload['picks'], {'strong': None, 'middle': None, 'cheap': None})
-                    env = make_envelope(request_data(), dict(request_commit_sha='b'*40,
+                    env = make_envelope(recompute_data(), dict(request_commit_sha='b'*40,
                         run_id='123', run_attempt=1, run_url='https://github.com/example/actions/runs/123'),
                         calculation=payload, errors=[])
                     self.assertEqual(env['status'], 'success')
@@ -89,7 +96,7 @@ class ResultTests(unittest.TestCase):
 
     def test_envelope_success_and_failure_correlation(self):
         calc, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
-        request = request_data()
+        request = recompute_data()
         execution = {'request_commit_sha': 'b' * 40, 'run_id': '9753', 'run_attempt': 2,
                      'run_url': 'https://github.com/example/actions/runs/9753'}
         success = make_envelope(request, execution, calculation=calc, errors=[])
@@ -106,9 +113,26 @@ class ResultTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_envelope(dict(failed, picks=calc['picks']))
 
+    def test_operation_requires_matching_success_locator(self):
+        calc, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
+        execution = dict(request_commit_sha='b' * 40, run_id='9753', run_attempt=2,
+                         run_url='https://github.com/example/actions/runs/9753')
+        acquired = {'kind': 'acquired', 'path': 'snapshot/candidates.csv',
+                    'sha256': hashlib.sha256(SNAPSHOT.read_bytes()).hexdigest()}
+        refresh = make_envelope(request_data(), execution,
+                                calculation=dict(calc, source_snapshot=acquired), errors=[])
+        self.assertEqual(refresh['source_snapshot'], acquired)
+        recompute_request = recompute_data()
+        recompute = make_envelope(recompute_request, execution, calculation=calc, errors=[])
+        self.assertEqual(recompute['source_snapshot'], PROVENANCE['source_locator'])
+        for envelope in (dict(refresh, source_snapshot=PROVENANCE['source_locator']),
+                         dict(recompute, source_snapshot=acquired)):
+            with self.subTest(operation=envelope['operation']), self.assertRaises(ValueError):
+                validate_envelope(envelope)
+
     def test_envelope_rejects_hollow_success_and_inconsistent_rows(self):
         calc, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
-        base = make_envelope(request_data(), dict(request_commit_sha='b' * 40, run_id='9753',
+        base = make_envelope(recompute_data(), dict(request_commit_sha='b' * 40, run_id='9753',
                              run_attempt=2, run_url='https://github.com/example/actions/runs/9753'),
                              calculation=calc, errors=[])
         mutations = (
@@ -152,6 +176,8 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(payload['source_snapshot'], acquired['source_locator'])
         for bad in ({'commit': 'oops', 'path': PROVENANCE['source_locator']['path']},
                     {'commit': 'a' * 40, 'path': '../secret.csv'},
+                    {'commit': 'a' * 40, 'path': None},
+                    {'commit': 'a' * 40, 'path': 42},
                     {'commit': 'a' * 40, 'path': 'results/not-a-uuid/123-1/snapshot/candidates.csv'},
                     {'kind': 'acquired', 'path': 'snapshot/candidates.csv', 'sha256': '0' * 64}):
             with self.subTest(locator=bad), self.assertRaises(ValueError):
@@ -175,7 +201,7 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(payload['picks'], dict.fromkeys(('strong', 'middle', 'cheap')))
         self.assertEqual(sum(r['is_grok'] for r in payload['candidate_statuses']), 9)
         self.assertEqual(sum(r['is_contributor'] for r in payload['candidate_statuses']), 2)
-        env = make_envelope(dict(request_data(), parameters=params),
+        env = make_envelope(dict(recompute_data(), parameters=params),
                             dict(request_commit_sha='b'*40, run_id='123', run_attempt=1,
                                  run_url='https://github.com/example/actions/runs/123'),
                             calculation=payload, errors=[])

@@ -24,3 +24,9 @@
 - Family flags `is_grok` / `is_contributor` are projected from the same `ladder_extra` predicates used by adjustment/Markdown, not derived anew from HTML strings. HTML uses the payload's actual factor parameters, renders acquired SHA-256 appropriately, and marks status sections by family for parity checks. Archived provenance caveat wording is source context, not rewritten as a fresh measurement claim.
 - Fix-round red: `python3 -m unittest discover -s tests -p 'test_bridge_*.py' -q` → 26 tests, 12 failures / 2 errors (missing locator/hash/flags/structural validation and fixed-factor HTML). After fixes scoped → 26 tests, OK. New tests cover malicious/hollow envelopes, malformed error objects, varied factors and exact 3-card/ladder/family contents, acquired hash, dates/locator/version semantics, all-filtered and all-Claude successes.
 - Final verification: `python3 -m unittest discover -s tests -p 'test_bridge_*.py' -q` → 26 tests, OK; `python3 -m unittest discover -s tests -v` → 75 tests, OK.
+
+## Review fix round 2
+
+- Successful envelope operation and locator now agree: `refresh` requires acquired `{kind,path,sha256}`; `recompute` requires pinned `{commit,path}`. This check belongs to the success envelope boundary because `calculate_snapshot` has no operation argument. Failure envelopes remain able to report malformed requests.
+- Pinned locator path type is checked before either regex is called, raising `ResultError(ValueError)` for null/numeric paths. Added tests for both operation/locator mismatches, malformed path types, and all three Markdown pick lines (labels and identities).
+- Red: `python3 -m unittest discover -s tests -p test_bridge_result.py -v` → 9 tests, 2 failures / 2 errors. Green: same command → 9 tests, OK. No full-suite repeat requested for this scoped validation correction.
