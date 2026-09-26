@@ -182,6 +182,26 @@ class RefreshSourcesTest(unittest.TestCase):
             self.assertTrue((Path(temp) / 'snapshot/evidence/missing_candidates.json').exists())
             self.assertFalse((Path(temp) / 'snapshot/candidates.csv').exists())
 
+    def test_previous_contributor_effort_loss_records_three_pass_pending_evidence(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            with self.assertRaises(SourceError) as caught:
+                refresh_snapshot(dest, previous={'slugs': [], 'contributor_efforts': ['high']},
+                                 fetch=data.__getitem__)
+            self.assertEqual(caught.exception.code, 'missing_candidate')
+            missing = json.loads((dest / 'evidence/missing_candidates.json').read_text())
+            self.assertEqual(len(missing), 1)
+            row = missing[0]
+            self.assertEqual(row['pricing_plan'], 'Contributor')
+            self.assertEqual(row['effort'], 'high')
+            self.assertIn('high', str(caught.exception))
+            for key in ('local_snapshot_search', 'leaderboard_source_check',
+                        'model_and_index_check', 'effort_id_disambiguation'):
+                self.assertIn(key, row)
+            self.assertIn('pending', row['model_and_index_check'].lower())
+            self.assertFalse((dest / 'candidates.csv').exists())
+
     def test_prior_paid_model_losing_cost_key_blocks_publication(self):
         archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}

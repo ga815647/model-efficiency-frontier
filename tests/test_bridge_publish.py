@@ -313,3 +313,50 @@ class PublishTests(unittest.TestCase):
         tip = git(self.remote, 'rev-parse', 'refs/heads/results')
         self.assertIn(f'results/{env["request_id"]}/300-1/result.json', git(self.remote, 'ls-tree', '-r', '--name-only', tip))
         self.assertIn(f'results/{env["request_id"]}/301-1/result.json', git(self.remote, 'ls-tree', '-r', '--name-only', tip))
+
+    def test_retries_remote_advance_between_ls_remote_and_fetch(self):
+        from bridge import publish
+        first, env = self.output(run='310')
+        second, _ = self.output(run='311')
+        seed, _ = self.output(run='309')
+        publish_result(seed, remote=str(self.remote))
+        original = publish._git
+        raced = []
+
+        def advance(repo, *args, **kwargs):
+            if args[0] == 'fetch' and not raced:
+                raced.append(True)
+                publish_result(second, remote=str(self.remote))
+            return original(repo, *args, **kwargs)
+
+        with patch.object(publish, '_git', side_effect=advance):
+            publish_result(first, remote=str(self.remote))
+        self.assertEqual(len(raced), 1)
+        tip = git(self.remote, 'rev-parse', 'refs/heads/results')
+        for run in ('310', '311'):
+            self.assertIn(f'results/{env["request_id"]}/{run}-1/result.json',
+                          git(self.remote, 'ls-tree', '-r', '--name-only', tip))
+
+    def test_fetch_race_uses_same_three_attempt_budget(self):
+        from bridge import publish
+        output, _ = self.output(run='312')
+        original = publish._git
+        fetches = []
+
+        def mismatched_fetch(repo, *args, **kwargs):
+            if args[0] == 'fetch':
+                fetches.append(True)
+                result = original(repo, *args, **kwargs)
+                # Return a valid fetch, then simulate an advanced remote tip via rev-parse.
+                return result
+            if args[:2] == ('rev-parse', 'FETCH_HEAD'):
+                return subprocess.CompletedProcess([], 0, b'0' * 40 + b'\n', b'')
+            return original(repo, *args, **kwargs)
+
+        # Initialize a real remote branch so each attempt actually fetches.
+        seed, _ = self.output(run='313')
+        publish_result(seed, remote=str(self.remote))
+        with patch.object(publish, '_git', side_effect=mismatched_fetch):
+            with self.assertRaisesRegex(PublishError, 'concurrent_publication_retry_exhausted'):
+                publish_result(output, remote=str(self.remote))
+        self.assertEqual(len(fetches), 3)

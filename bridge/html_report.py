@@ -42,7 +42,8 @@ def render_html(calculation: dict) -> str:
             f'<div class="muted">Score {_num(r["score"])} · Cost_orig ${_num(r["cost_orig"],4)}'
             f' · ×{_text(r["factor"])} · CP_adj {_num(r["cp_adj"])} · GRADE {_text(r["grade"])}</div>'
             f'<p>{_text(r["reason"])}{(" → " + _text(r["winner"])) if r["winner"] else ""}</p>'
-            f'<small>來源：{_text(r["source_url"])} · {_text(r["source_date"])}<br>{_text(r["notes"])}</small></li>' for r in selected)
+            f'<small>來源：{_text(r["source_url"])} · {_text(r["source_date"])}</small>'
+            f'<details><summary>原始註記</summary><small>{_text(r["notes"])}</small></details></li>' for r in selected)
         return f'<section class="panel" data-family="{family}"><h2>{name} 狀態 <span class="count">{len(selected)}</span></h2><ul class="states">{items}</ul></section>'
     meta = (f'{_text(calculation["benchmark"])} · {_text(calculation["benchmark_version"])}'
             f' ({_text(calculation["version_status"])}) · {_text(calculation["cost_basis"])}')
@@ -66,6 +67,7 @@ main {{ max-width:1120px; margin:auto; padding:clamp(16px,4vw,48px); }} h1 {{ fo
 .card {{ padding:20px; min-width:0; }} .card strong {{ display:block; font-size:1.08rem; margin:12px 0; overflow-wrap:anywhere; }} .card span,.muted,small {{ color:var(--muted); }}
 .panel {{ padding:clamp(16px,3vw,28px); margin:18px 0; }} .table-wrap {{ overflow-x:auto; }} table {{ border-collapse:collapse; width:100%; min-width:690px; }} th {{ color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; text-align:left; }} th,td {{ border-bottom:1px solid var(--line); padding:12px 10px; vertical-align:top; }} tbody tr:last-child td {{ border:0; }} td:not(.model) {{ white-space:nowrap; font-variant-numeric:tabular-nums; }} .model strong,.model small {{ display:block; overflow-wrap:anywhere; }} .rank {{ color:var(--accent); font-weight:bold; }}
 .states {{ list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }} .states li {{ border:1px solid var(--line); border-radius:10px; padding:14px; min-width:0; overflow-wrap:anywhere; }} .states p {{ margin:.3rem 0; }} .states small {{ display:block; }} .badge {{ display:inline-block; color:var(--accent); background:#e8f4f1; border-radius:20px; padding:1px 8px; font-size:.75rem; }} .count {{ color:var(--accent); }} .source {{ overflow-wrap:anywhere; }}
+.states details {{ margin-top:.45rem; }} .states summary {{ cursor:pointer; color:var(--accent); }} .states details small {{ margin-top:.35rem; }}
 @media(max-width:720px) {{ .cards,.states {{ grid-template-columns:1fr; }} .card {{ padding:16px; }} main {{ padding:16px; }} }}
 </style></head><body><main>
 <header><div class="eyebrow">MODEL EFFICIENCY FRONTIER · PERSONAL SCENARIO</div><h1>模型效率前線</h1><p class="intro">Score 降序 · 原價與情境係數分列 · Claude 僅比較，不列推薦</p><p class="intro">{meta}</p></header>

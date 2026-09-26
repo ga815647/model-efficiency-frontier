@@ -46,6 +46,23 @@ class HTMLTests(unittest.TestCase):
         self.assertNotIn(evil, page)
         self.assertIn(html.escape(evil), page)
 
+    def test_verbose_status_notes_are_collapsed_but_essential_status_visible(self):
+        page = render_html(self.payload)
+        for family in ('grok', 'contributor'):
+            section = page.split(f'data-family="{family}"', 1)[1].split('</section>', 1)[0]
+            rows = [r for r in self.payload['candidate_statuses'] if r['is_' + family]]
+            self.assertEqual(section.count('<details'), len(rows))
+            self.assertEqual(section.count('<summary>原始註記</summary>'), len(rows))
+            for row in rows:
+                card = next(s for s in section.split('<li>')[1:] if
+                            f'<strong>{html.escape(row["identity"], quote=True)}</strong>' in s)
+                visible, collapsed = card.split('<details>', 1)
+                for key in ('identity', 'status', 'source_url', 'source_date'):
+                    self.assertIn(html.escape(str(row[key]), quote=True), visible)
+                self.assertIn('Cost_orig', visible)
+                self.assertIn('CP_adj', visible)
+                self.assertIn(html.escape(row['notes'], quote=True), collapsed)
+
     def test_cards_table_and_states_match_payload_with_override_factors(self):
         class Sections(HTMLParser):
             def __init__(self):

@@ -285,7 +285,12 @@ def publish_result(output: Path, *, remote: str, branch: str = 'results') -> str
             _git(repo, 'init', '-q')
             _git(repo, 'config', 'user.name', 'Chat result publisher')
             _git(repo, 'config', 'user.email', 'chat-results@users.noreply.github.com')
-            tip = _tip(repo, remote, branch, env)
+            try:
+                tip = _tip(repo, remote, branch, env)
+            except PublishError as exc:
+                if str(exc) == 'remote_tip_changed_during_fetch':
+                    continue
+                raise
             if tip:
                 _git(repo, 'checkout', '-q', '-B', branch, tip)
             else:

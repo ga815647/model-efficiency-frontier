@@ -237,8 +237,27 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
                      'notes': notes, 'ttft_s': '', 'time_per_task_s': ''})
         contributors.append({'slug': slug, 'effort': effort, 'standard_components': parts,
                              'derived_cost': str(derived), 'formula': notes})
-    if prev_efforts - {r['effort'] for r in contributors}:
-        raise SourceError('missing_candidate', MUSE, 'previous Contributor effort lost')
+    lost_efforts = sorted(prev_efforts - {r['effort'] for r in contributors})
+    if lost_efforts:
+        # An effort is a previous plan identity, not proof that its exact slug
+        # disappeared. Save what the acquired pages actually show and leave
+        # source-page/ID disambiguation explicitly pending human review.
+        _json(evidence / 'missing_candidates.json', [
+            {'identity': f'Muse Spark 1.3 {effort} Meta Contributor',
+             'pricing_plan': 'Contributor', 'effort': effort,
+             'local_snapshot_search': 'present in approved previous Contributor effort inventory',
+             'leaderboard_source_check': {
+                 'status': 'observed_current_page_not_exhaustive',
+                 'same_family': [{'slug': r['slug'], 'name': r['name'],
+                                  'paid_public': r['slug'] in included}
+                                 for r in records if r['slug'].startswith('muse-spark-1-3')]},
+             'model_and_index_check': 'pending: model page and index search for exact Contributor identity/effort not verified',
+             'effort_id_disambiguation': {
+                 'status': 'pending_manual_review_do_not_substitute',
+                 'release_page_slugs': sorted(muse),
+                 'current_contributor_efforts': sorted(r['effort'] for r in contributors)}}
+            for effort in lost_efforts])
+        raise SourceError('missing_candidate', MUSE, 'previous Contributor efforts lost: ' + ','.join(lost_efforts))
     _json(evidence / 'source_map.json', {'source_by_slug': included, 'excluded': excluded,
                                          'contributor': contributors, 'inventory': {'slugs': sorted(included),
                                                                                   'contributor_efforts': sorted(r['effort'] for r in contributors)}})

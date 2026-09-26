@@ -32,6 +32,12 @@ class RequestTests(unittest.TestCase):
         with self.assertRaises(RequestError):
             validate(r)
 
+    def test_boolean_min_score_is_not_a_number(self):
+        r = request_data()
+        r['parameters']['min_score'] = True
+        with self.assertRaises(RequestError):
+            validate(r)
+
     def test_decode_rejects_duplicate_keys_at_any_depth(self):
         for text in ('{"a":1,"a":2}', '{"parameters":{"x":1,"x":2}}'):
             with self.subTest(text=text), self.assertRaises(RequestError):
