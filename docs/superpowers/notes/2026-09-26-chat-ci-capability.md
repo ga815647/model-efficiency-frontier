@@ -58,3 +58,19 @@ OpenCode 另外以 gh 唯讀取得 ziping 的 `.github/workflows/chatgpt-executi
 - Git 完整 Chat instructions 與 Project 薄型 bootstrap；尚未建立、貼上或驗收。
 - 機器可讀結果及 Markdown 階梯從同一次計算生成；Chat 只解讀，不另算 picks。
 - Notion 在 Chat→CI→結果讀回驗收後退出日常同步，舊頁保留為歷史。
+
+## 通用 skill 補強評估結果
+
+2026-09-26：依使用者同意，對未修改的 chatgpt-project-sync 做五個 fresh-session 假設情境測試，涵蓋缺 dispatch 但有 push bridge、工具可見與跨端證據分層、按業務能力盤點、各種 SHA／run 關聯、部分證據與授權邊界。五個情境皆符合預期，未觀察到需要新增規則的 baseline failure，因此沒有修改 skill；無 post-edit green、無 skill commit/push，也未安裝或驗證 ChatGPT Project settings。
+
+測試是情境應用檢查，不是每一情境五次重複的統計比較，也不能證明所有未來情境均會遵循。完整 prompts／逐字輸出／評估暫存於 `/tmp/opencode/chat-sync-skill-tests/`。本輪結論是保留既有 skill，具體傳輸契約留在本專案規格；先前建議補強並未直接視為必須改寫。
+
+### 更正：跨 session 可發現性缺口與修復
+
+使用者指出：前述測試把情境帶給代理，沒有測到下一個專案能否找到本輪能力紀錄。新測試限制 fresh-session 只從已安裝 sync skill、全域 connectors.md 及其相關連結開始找；不直接提供本專案筆記。
+
+- RED（ses_f219551e8ffe3as1u3u6Ma07L3）：原紀錄只有 Neon／Function，代理回覆「沒有找到上次 GitHub 能力探測的紀錄」，需要再向使用者詢問紀錄位置。證實跨專案檢索缺口，並非 push bridge 推理能力不足。
+- 修復：在 `/home/chatdev-oc/.config/opencode/connectors.md` 新增帶日期的 Chat GitHub 工具／參數／證據等級表與本文件定位，保留其他服務紀錄；已安裝 `chatgpt-project-sync/SKILL.md` 改為先讀紀錄，要求將使用者回報持久化，新增 session/repo 不單獨觸發重驗，只補 access／授權／本案端到端缺口。缺 dispatch 先查 push bridge；具體私人 repo 仍只在私人紀錄。
+- GREEN（ses_f219475d9ffeEUn4AYQD5UqCXE）：相同 fresh-session 任務找到五項具體工具／參數，正確區分讀取實測與写入工具可見，回覆「不必再貼一輪 GitHub 工具探測」；只詢問該新專案的定位與寫入授權。這個測試的新專案定位刻意未提供；本專案定位／設計授權已記錄，不再重問。
+
+此結果取代上節「不改 skill」決定。屬一次跨 session 檢索回歸測試，不是五次重複統計測試；沒有執行任何 GitHub 寫入，也不代表 ChatGPT settings 已安裝。Skill 及全域 connector 檔案在 repo 外、非 Git 管理；本專案保存變更摘要與測試證據。
