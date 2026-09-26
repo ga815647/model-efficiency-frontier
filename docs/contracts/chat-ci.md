@@ -1,0 +1,50 @@
+# Chat → CI 契約（schema v1；2026-09-26）
+
+此文件描述**本地實作**，不是遠端／Chat Project 已安裝證明。私人目標 `ga815647/model-efficiency-frontier`；產品 `main`，發佈 `results`；不得同步或恢復已移往用戶垃圾桶父頁的 Notion 頁，不部署網站。`bridge/request.py`、`bridge/result.py`、`bridge/runner.py`、`bridge/publish.py` 和 `.github/workflows/chat-execution.yml` 是精確欄位與驗證的實作來源。
+
+## 工具與三個固定版本
+
+下列是**使用者提供的 2026-09-26 ChatGPT 端證據**：在另一私人庫實測 `mcp__GitHub__fetch_file(repository_full_name, path, ref, encoding="utf-8")` 完整讀取（不傳 start/end_line）、`mcp__GitHub__fetch(url="https://api.github.com/repos/{owner}/{repo}/commits/{ref}")` 解析 commit、`mcp__GitHub__fetch` GET `/repos/{owner}/{repo}/actions/runs` 與 `/actions/runs/{run_id}`。`mcp__GitHub__create_branch(repository_full_name, branch_name, sha)`、`mcp__GitHub__create_file(repository_full_name, path, content, message, branch)` 僅工具可見，**未在本庫實測寫入**；前者 `sha` 與 `base_ref` 二選一，後者 `content` 是 UTF-8 字串、回傳 `result.commit_sha`。無 workflow_dispatch 或任意 REST POST；`mcp__GitHub__fetch_commit_workflow_runs(repo_full_name, commit_sha)` 僅 PR-triggered 第一頁，不用來找一般 push run。GET-only `fetch` 不能寫入。新私人庫 access、push、讀回仍需 Task 8 驗證。
+
+每次對話任務 GET `/commits/main` 的 `sha` 得**產品 commit**；以該 SHA 完整讀 `chatgpt-instructions.md`、本契約及必要規則。同一任務不在讀到一半改用新 main。`fetch_file` 回傳 `sha` 是 **blob SHA**，不是產品／請求／發佈 commit。`request_commit_sha` 來自 create_file 的 `result.commit_sha` 或 GET 分支 HEAD；結果的 commit 須另 GET `/commits/results` 或查該 run 發佈摘要取得並固定。三者不能互換。
+
+## 請求與使用者意圖
+
+查既有結果只讀，不發 CI；只有明確刷新來源（`refresh`）或對固定快照重算（`recompute`）才提交。因用戶明確要求單次請求而非日常手動 Actions，不以手動按鈕替代缺失的 Git write。係數未另指定時 `gpt_factor=18`、`grok_factor=16`；Contributor 仍 ×1。無全域 floor：新刷新缺 `min_score` 時提案數字、**請使用者確認理由**，不能偷用 0；重算缺 floor 時可從選定的**已驗證來源成功 envelope**明示繼承其 `parameters.min_score` 和 `min_score_reason`，歷史 CSV 無相鄰 envelope 或無法驗證時請用戶確認。`max_cost` 未指定用 `null`；它限制調整後成本。EPS 由產品規則決定，不是請求欄位。
+
+`decode_request(text)` 拒絕重複 JSON key、NaN/Infinity；`validate_request(request, *, branch, parent_sha, changed_paths)` 要求下列**精確**欄位（未知／缺欄拒絕）：
+
+| operation | 根欄位 | 額外欄位 |
+| --- | --- | --- |
+| `refresh` | `schema_version: 1`, `request_id`, `created_at`, `product_sha`, `operation`, `parameters` | 不許 `source_snapshot` |
+| `recompute` | 同上 | `source_snapshot: {"commit":"<40-hex>","path":"..."}` |
+
+`request_id` 是 canonical lower-case UUIDv4；`created_at` 是帶時區 ISO8601 秒（可小數秒；`Z` 或 ±HH:MM）；`product_sha` 是 40-hex commit。`parameters` **恰好**五欄：`gpt_factor`、`grok_factor` 有限正數；`min_score` 有限非負數；`min_score_reason` 非空白字串；`max_cost` 為 null 或有限正數。布林非數字。`source_snapshot.path` 僅 `runs/<segment>/candidates.csv` 或 `results/<uuid>/<run_id>-<attempt>/snapshot/candidates.csv`；對應 `commit` 必須固定，禁止 URL、跳脫、symlink 與未授權 Git 歷史。results 快照必須在同一固定 commit 的相鄰 `result.json` 為**成功 refresh**，路徑 request/run/attempt 和 CSV SHA-256 與 acquired locator 相符，version/inventory 證據亦須過檢。已歸檔 `runs/` 來源目前僅 runner 明確核准 `runs/2026-09-26-general-grok16/candidates.csv` 與其證據；別的歷史檔即使符合語法也不能承諾可重算。
+
+以下**僅示意 JSON**，UUID、兩個 SHA 和 snapshot commit 必須替換為真實固定值；不是已提交的 production 請求：
+
+```json
+{
+  "schema_version": 1,
+  "request_id": "c49aef65-50dd-4fc2-b2f2-8ecccf4ff24d",
+  "created_at": "2026-09-26T12:00:00+00:00",
+  "product_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "operation": "recompute",
+  "parameters": {"gpt_factor": 18, "grok_factor": 16, "min_score": 0, "min_score_reason": "用戶確認全候選情境比較", "max_cost": null},
+  "source_snapshot": {"commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "path": "runs/2026-09-26-general-grok16/candidates.csv"}
+}
+```
+
+建立唯一 `efficiency-run/<request_id>`：`create_branch(..., sha=product_sha)`；GET `/commits/efficiency-run/<request_id>` 驗 HEAD 為 product SHA，然後 `create_file(..., path="bridge/requests/<request_id>.json", content=<JSON字串>, message=<說明>, branch=<該分支>)`。只新增該檔；新 commit 唯一 parent 必等於 `product_sha`，diff 僅 `A bridge/requests/<request_id>.json`。請求分支 push 觸發 Actions；不用建立第二個 request 來「催」一次執行。若 create_file 回應遺失，先以**原分支及精確 path**讀回，GET 分支 HEAD/commit，核對 JSON bytes/identity、parent 與 sole added path；一致則採用已存在 commit 繼續查 run，不一致停止並報衝突。確認未提交且仍指向原 product SHA、原 path 不存在才可用**同一** ID/path 重試；不能盲目重試或用新的 ID 隱藏未知結果。
+
+## 查 run、固定發佈與讀回
+
+查 `/actions/runs?event=push&head_sha=<request_commit_sha>`（依 GitHub API 實際支援的篩選，否則分頁列表逐筆篩）並查 `/actions/runs/{run_id}`；要求 `event=push`、`head_sha=request_commit_sha`、`head_branch=efficiency-run/<request_id>`，核對 `run_id` 和 `run_attempt`。不要使用 PR-only helper、單看「最新」run、或以 request ID 字串搜尋冒充關聯。未完成則在可用工具預算內有限次查詢，不能承諾背景通知；保留 ID／run URL 供下次續查。
+
+結果在 `results` 分支 `results/<request_id>/<run_id>-<attempt>/result.json`；若 transport 身分無效且 request_id=null，診斷位置是 `results/invalid-<request_commit_sha>/<run_id>-<attempt>/result.json`，**永非成功 pick**。完成 run 從 job summary 的 publication SHA 或 GET `/commits/results` 取得**發佈 commit**，只以其固定 ref 讀特定 result；即使 results 又前進也不得把另一 attempt 的「最新」當本次。讀 `latest-success.json` 可發現既有成功結果，但須以其 `result_path` 與 metadata 再讀回驗證；`latest-refresh.json` 僅刷新成功。pointer 不是當次 run 成功的證據。若發佈失敗、檔案未見、SHA 不可固定，回報不可用，不拿舊 success 填補。
+
+成功 envelope 由 `validate_envelope` 檢查：`schema_version`, `operation`, `status="success"`, `request_id`, `request_commit_sha`, `product_sha`, `created_at`, `run_id`, `run_attempt`, `run_url`, `source_snapshot`, `parameters`, `source_dates`, `errors=[]`, `benchmark`, `benchmark_version`, `version_status` (`explicit`/`inferred`), `cost_basis`, `eps` (`score`,`cp`), `caveats`, `candidate_count`, `ladder`, `picks`, `candidate_statuses`。每個 candidate row 含 `identity`, `model`, `effort`, `score`, `cost_orig`, `cost_adj`, `cp_orig`, `cp_adj`, `factor`, `grade`, `status`, `reason`, `winner`, `source_url`, `source_date`, `notes`, `is_grok`, `is_contributor`；status `final`/`cut`/`excluded`，`picks` keys `strong`/`middle`/`cheap`（可 null）。驗 `request_id`、request commit、product SHA、operation、parameters、run_id/attempt 與**提交的 JSON 和查到的 run**逐項一致；refresh `source_snapshot={"kind":"acquired","path":"snapshot/candidates.csv","sha256":"<64-hex>"}`，同發佈 commit 讀相鄰 CSV 原始 bytes 計算 SHA-256 比對，並查相鄰 `snapshot/evidence/version.json` 和 `snapshot/evidence/source_map.json`。完整 fresh 來源證據另含 `snapshot/evidence/sources.json`、公開排行榜／release 原頁、`meta_pricing.html`、`meta_pricing.json`、`snapshot/run-notes.md`；涉及 Contributor 時核對當次官方有效 Standard/Contributor 費率、有效 plan／訓練條款、cache-write 假設、同版成本組件與 GRADE-B caveat。若有 `api_diagnostic.json`／`api_envelopes.json`，認證 API 版本獨立陳述，不混公開候選；缺檔不能聲稱 API 已收集。recompute 的 `{commit,path}` 必與 request 相同，固定來源 commit 讀其 CSV 和證據核對，不把 Git blob SHA 當 CSV SHA-256。哈希比對是 acquired 成功宣稱的驗收檢查，不是所有 Git instructions 讀取的全球門檻。不得把 API v4.3 重標為推定公開 v4.3.2。
+
+`status="failed"` 有 `errors: [{code,message},...]`，無 ladder/picks/benchmark 等成功欄位；允許 `request_id=null`（無效 transport 診斷）、`operation/created_at/parameters/source_snapshot` 不完整。先保留 `request_commit_sha`、run URL、錯誤碼與具體缺口，不對無效診斷身分套成功關聯規則，也絕不使用舊 picks。Actions 成功 + envelope 不完整／身份錯誤亦**不可交付**；Actions 失敗時即使有 envelope 只報失敗。
+
+成功同一次計算輸出 `report.md`、`report.html`（自包含單檔）與 JSON。HTML 在該 run 的 Actions artifact `report-<request_id>-<run_id>-<attempt>` 可下載，且 Git `results/<request_id>/<run_id>-<attempt>/report.html` 為耐久路徑；它不是公開 Pages 或網站。Chat 附件能力未驗證，不承諾直接在對話附檔；若無法直接附加，提供對應 Actions run/artifact 下載入口或固定 Git 檔定位，私人庫需授權登入。不要在 Notion 同步。
