@@ -9,7 +9,6 @@ MUSE = 'https://artificialanalysis.ai/models/releases/muse-spark-1-3'
 RELEASE_SLUGS = {GROK: ('grok-4-7-high', 'grok-4-7'),
                  MUSE: ('muse-spark-1-3-xhigh', 'muse-spark-1-3')}
 FLIGHT = re.compile(r'self\.__next_f\.push\(\[\d+,\s*("(?:\\.|[^"\\])*")\]\)')
-OBJECT = re.compile(r'\{(?:"id":"[^"]+",)?"slug":')
 
 
 class SourceError(ValueError):
@@ -26,17 +25,49 @@ def _objects(html, url):
             chunk = json.loads(match[1])
         except ValueError as exc:
             raise SourceError('markup_drift', url, 'invalid flight string') from exc
-        for item in OBJECT.finditer(chunk):
-            try:
-                record, _ = decoder.raw_decode(chunk, item.start())
-            except ValueError as exc:
-                # Every slug-shaped object in the decoded flight stream must
-                # be valid JSON. We cannot prove a malformed one is unrelated
-                # to the model sweep, regardless of key order/field distance.
-                raise SourceError('model_markup_drift', url, 'undecodable slug object') from exc
-            if isinstance(record, dict) and 'slug' in record:
-                found = True
-                yield record
+        # Lex one pass through the decoded flight payload. Track direct object
+        # keys rather than requiring slug at any particular position; do not
+        # inspect braces/keys inside quoted JSON strings. Decode only objects
+        # with a direct slug key, avoiding reparsing every nested site object.
+        stack = []  # [opening offset, has_direct_slug]
+        index = 0
+        while index < len(chunk):
+            char = chunk[index]
+            if char == '"':
+                start = index
+                index += 1
+                while index < len(chunk):
+                    if chunk[index] == '\\':
+                        index += 2
+                    elif chunk[index] == '"':
+                        index += 1
+                        break
+                    else:
+                        index += 1
+                next_index = index
+                while next_index < len(chunk) and chunk[next_index].isspace():
+                    next_index += 1
+                if stack and next_index < len(chunk) and chunk[next_index] == ':':
+                    token = chunk[start:index]
+                    if token == '"slug"' or ('\\' in token and json.loads(token) == 'slug'):
+                        stack[-1][1] = True
+                continue
+            if char == '{':
+                stack.append([index, False])
+            elif char == '}' and stack:
+                start, has_slug = stack.pop()
+                if has_slug:
+                    try:
+                        record, consumed = decoder.raw_decode(chunk[start:index+1])
+                        if consumed != index + 1 - start or not isinstance(record, dict) or 'slug' not in record:
+                            raise ValueError('invalid slug object')
+                    except ValueError as exc:
+                        raise SourceError('model_markup_drift', url, 'undecodable slug object') from exc
+                    found = True
+                    yield record
+            index += 1
+        if any(has_slug for _, has_slug in stack):
+            raise SourceError('model_markup_drift', url, 'unterminated slug object')
     if not found:
         raise SourceError('markup_drift', url, 'no JSON flight slug records')
 

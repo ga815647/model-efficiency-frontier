@@ -64,6 +64,21 @@ class RefreshSourcesTest(unittest.TestCase):
                 parse_leaderboard(html)
             self.assertEqual(caught.exception.code, 'model_markup_drift')
 
+    def test_name_first_model_record_is_not_lost(self):
+        base = {'name': 'New Model (high)', 'slug': 'new-model-high', 'shortName': 'New Model',
+                'modelCreatorName': 'New Creator', 'intelligenceIndex': 42.125,
+                'intelligenceIndexIsEstimated': False, 'intelligenceIndexCostPerTask': 0.275}
+        good = '<script>self.__next_f.push([1,' + json.dumps(json.dumps(base)) + '])</script>'
+        parsed = parse_leaderboard(good)
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]['slug'], 'new-model-high')
+        self.assertEqual(parsed[0]['cost_per_task'], Decimal('0.275'))
+        bad = json.dumps(base).replace('"intelligenceIndex": 42.125', '"intelligenceIndex": oops')
+        malformed = '<script>self.__next_f.push([1,' + json.dumps(bad) + '])</script>'
+        with self.assertRaises(SourceError) as caught:
+            parse_leaderboard(malformed)
+        self.assertEqual(caught.exception.code, 'model_markup_drift')
+
     def test_effort_and_checkpoint_identity(self):
         self.assertEqual(_model_effort("DeepSeek R1 (Jan '25)", 'deepseek-r1-0120'),
                          ("DeepSeek R1 (Jan '25)", 'unspecified', 'deepseek-r1-0120'))
