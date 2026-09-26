@@ -303,7 +303,112 @@ def execute_request(request: dict, *, execution: dict, repository: Path,
     return envelope
 
 
+def verify_transport(repo: Path, *, event_sha: str, ref_name: str, run_id: str,
+                     run_attempt: int, output: Path, product_sha_file: Path,
+                     github_output: Path | None = None) -> bool:
+    """Bootstrap gate: inspect the authenticated push commit, never its checkout."""
+    output = Path(output)
+    product_sha_file = Path(product_sha_file)
+    product_sha_file.unlink(missing_ok=True)
+    parent = None
+    try:
+        if type(event_sha) is not str or not SHA.fullmatch(event_sha):
+            raise RunnerError('invalid_event_sha')
+        _commit(repo, event_sha)
+        parents = _git(repo, 'rev-list', '--parents', '-n', '1', event_sha).decode().split()
+        if len(parents) != 2:
+            raise RunnerError('invalid_request_parents')
+        parent = parents[1]
+        main_sha = _git(repo, 'rev-parse', 'HEAD').decode().strip()
+        if not _ancestor(repo, parent, main_sha):
+            raise RunnerError('product_not_on_main')
+        identity = ref_name.removeprefix('efficiency-run/') if ref_name.startswith('efficiency-run/') else ''
+        if not UUID.fullmatch(identity):
+            raise RunnerError('invalid_event_ref')
+        request_path = 'bridge/requests/' + identity + '.json'
+        changes = _git(repo, 'diff-tree', '--no-commit-id', '--name-status', '-r', event_sha).decode().splitlines()
+        if changes != ['A\t' + request_path]:
+            raise RunnerError('invalid_changed_paths')
+        request_bytes = _read(repo, event_sha, request_path)
+        request = decode_request(request_bytes.decode('utf-8'))
+        validate_request(request, branch=ref_name, parent_sha=parent,
+                         changed_paths=[('A', request_path)])
+        # An atomic handoff; no JSON-derived paths are used by the workflow.
+        _atomic(product_sha_file.parent / 'request.json', request_bytes)
+        _atomic(product_sha_file, (parent + '\n').encode('ascii'))
+        if github_output is not None:
+            with Path(github_output).open('a') as stream:
+                stream.write('product_sha=' + parent + '\noperation=' + request['operation'] +
+                             '\nrequest_id=' + request['request_id'] + '\n')
+        return True
+    except Exception as exc:
+        (product_sha_file.parent / 'request.json').unlink(missing_ok=True)
+        write_diagnostic_failure(output, event_sha=event_sha, ref_name=ref_name,
+                                 product_sha=parent, run_id=run_id, run_attempt=run_attempt,
+                                 code=str(exc).split(':', 1)[0] or 'transport_failed')
+        return False
+
+
+def write_diagnostic_failure(output: Path, *, event_sha: str, ref_name: str,
+                             product_sha: str | None, run_id: str, run_attempt: int,
+                             code: str) -> None:
+    identity = ref_name.removeprefix('efficiency-run/') if ref_name.startswith('efficiency-run/') else ''
+    request = dict(operation=None, request_id=identity if UUID.fullmatch(identity) else None,
+                   product_sha=product_sha if product_sha and SHA.fullmatch(product_sha) else '0' * 40,
+                   created_at=None, source_snapshot=None, parameters=None)
+    execution = dict(request_commit_sha=event_sha if SHA.fullmatch(event_sha) else '0' * 40,
+                     run_id=run_id, run_attempt=run_attempt,
+                     run_url=os.environ.get('GITHUB_RUN_URL') or
+                     f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'unknown/unknown')}/actions/runs/{run_id}")
+    envelope = make_envelope(request, execution, calculation=None,
+                             errors=[{'code': code, 'message': code}])
+    _atomic(Path(output) / 'result.json',
+            (json.dumps(envelope, ensure_ascii=False, indent=2) + '\n').encode())
+
+
 def main(argv=None):
+    if argv is None:
+        import sys
+        argv = sys.argv[1:]
+    if argv and argv[0] == 'verify-transport':
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--repository', type=Path, required=True)
+        parser.add_argument('--event-sha', required=True)
+        parser.add_argument('--ref-name', required=True)
+        parser.add_argument('--run-id', required=True)
+        parser.add_argument('--run-attempt', type=int, required=True)
+        parser.add_argument('--output', type=Path, required=True)
+        parser.add_argument('--product-sha-file', type=Path, required=True)
+        parser.add_argument('--github-output', type=Path)
+        args = parser.parse_args(argv[1:])
+        return 0 if verify_transport(args.repository, event_sha=args.event_sha,
+                                      ref_name=args.ref_name, run_id=args.run_id,
+                                      run_attempt=args.run_attempt, output=args.output,
+                                      product_sha_file=args.product_sha_file,
+                                      github_output=args.github_output) else 1
+    if argv and argv[0] == 'assert-success':
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--output', type=Path, required=True)
+        args = parser.parse_args(argv[1:])
+        try:
+            result = validate_envelope(json.loads((args.output / 'result.json').read_text()))
+            return 0 if result['status'] == 'success' else 1
+        except (OSError, ValueError):
+            return 1
+    if argv and argv[0] == 'diagnostic-failure':
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--event-sha', required=True)
+        parser.add_argument('--ref-name', required=True)
+        parser.add_argument('--product-sha-file', type=Path, required=True)
+        parser.add_argument('--run-id', required=True)
+        parser.add_argument('--run-attempt', type=int, required=True)
+        parser.add_argument('--output', type=Path, required=True)
+        args = parser.parse_args(argv[1:])
+        write_diagnostic_failure(args.output, event_sha=args.event_sha, ref_name=args.ref_name,
+                                 product_sha=args.product_sha_file.read_text().strip(),
+                                 run_id=args.run_id, run_attempt=args.run_attempt,
+                                 code='runner_interrupted')
+        return 0
     parser = argparse.ArgumentParser()
     parser.add_argument('--request', required=True)
     parser.add_argument('--event-sha', required=True)
