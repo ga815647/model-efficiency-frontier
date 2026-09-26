@@ -3,6 +3,14 @@
 > 狀態：design 已在 chat 逐段 present，用戶回覆「可」批准（2026-09-26）。
 > 2026-09-26 用戶修訂：Notion 只展示番外篇，原版退出展示；GPT 不再霸榜時再回看原版。
 > 定位：番外篇個人估算；本地 `ladder-extra.md` 為番外篇來源，現有 Notion 頁改以番外篇為主。
+> 2026-09-26 新批准擴充（以下原 GPT-only 設計保留作歷史）：加入 Grok ×16 使用者指定情境，並批准同 benchmark_version 新鮮資料 run、`--min-score 0` 全候選情境比較（須寫理由）；資料抓取／Notion 發布不屬本次 renderer 實作。
+
+## 最新擴充：雙 family 係數（覆蓋下方 GPT-only 敘述）
+
+- GPT `--factor 18 --prefix GPT-` 原介面、預設與約 18.9 個人實測→保守 18 的來源保持。`--grok-factor 16` 新預設只作用於 identity 以獨立 `Grok` 詞起首的行（忽略大小寫；`Grok 4.7` / `Grok-4.7` 可，`Pre-Grok` / `Grokish` 不可）；16 是**用戶指定情境，非實測**。兩個係數都必須 finite 且 >0。Contributor 定價行永遠 ×1；最多匹配一種係數，不複乘。
+- 原 CSV 的 `cost_per_task` 不動，`_cost_orig` 存原價，`_cost=cost_orig/該行係數`；原價 GRADE 不升格。全付費行在同一 benchmark、version、basis 內重算 frozen frontier；階梯永遠 Score 降序。每行展示真實有效係數（GPT ×18 / Grok ×16 / ×1，覆寫參數時用實際值），全 Grok 行另列完整狀態（含 excluded top 5 之外的 high/xhigh），與 Contributor 狀態並存。
+- 報表只從來源檔讀取 `checked_date`、notes、URL；renderer 不抓資料，也不聲稱來源是舊或新抓取。`--min-score 0` 可用於新同版本完整候選 run，比較理由必記錄；不混 benchmark 版本。$20+$59（預設 $79）僅是 GPT 訂閱組合比較基準；非 GPT 省錢 pick 可算 API 原價月花費，但不得拿 $79 判斷是否續訂 Grok。
+- 舊版下述 `×18?` 單欄和「非 GPT 成本不變」、「非新 AA 研究 run」以及所有只涵蓋 GPT 的公式已被本節覆蓋；正式 `ladder.md`、frozen `compute_frontier.py`、退役 `recommend.py`、既有 run 快照仍不得修改。新快照採集與 Notion 同步另行處理，不由此腳本觸發。
 
 ## 0. 決策 log（用戶確認，不可擅改）
 

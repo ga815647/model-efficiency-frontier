@@ -1,0 +1,71 @@
+{
+  "checked_date": "2026-09-26",
+  "benchmark_version_visible_on_pages": "AA-Intelligence-Index-v4.3.2",
+  "warning": "Public page version differs from authenticated API envelope v4.3; never join in one run without verified consistent benchmark version.",
+  "records": [
+    {
+      "model": "Grok 4.7 (high)",
+      "score": 46.3321770885625,
+      "cost_per_task": {
+        "total": 2.726106691786027,
+        "input": 2.3306978852971905,
+        "nonCacheInput": 0.0329267365019411,
+        "cacheRead": 1.0800845370203476,
+        "cacheWrite": 1.2176866117749017,
+        "output": 0.3954088064888365,
+        "reasoning": 0.27979983164976163,
+        "answer": 0.1156089748390749
+      },
+      "source_url": "https://artificialanalysis.ai/models/releases/grok-4-7",
+      "source_field": "embedded Next.js flight intelligenceIndex + intelligenceIndexCostPerTask.cost"
+    },
+    {
+      "model": "Grok 4.7 (xhigh)",
+      "score": 46.4465506302286,
+      "cost_per_task": {
+        "total": 3.738325952106939,
+        "input": 3.254957763735755,
+        "nonCacheInput": 0.03279156256543316,
+        "cacheRead": 1.5328336728452165,
+        "cacheWrite": 1.6893325283251048,
+        "output": 0.4833681883711849,
+        "reasoning": 0.3512617988476435,
+        "answer": 0.13210638952354134
+      },
+      "source_url": "https://artificialanalysis.ai/models/releases/grok-4-7",
+      "source_field": "embedded Next.js flight intelligenceIndex + intelligenceIndexCostPerTask.cost"
+    },
+    {
+      "model": "Muse Spark 1.3 (xhigh)",
+      "score": 45.0732966922226,
+      "cost_per_task": {
+        "total": 1.3677936514692752,
+        "input": 1.1361136556121443,
+        "nonCacheInput": 0.022424631305992284,
+        "cacheRead": 0.7053631760294088,
+        "cacheWrite": 0.40832584827674323,
+        "output": 0.23167999585713062,
+        "reasoning": 0.13826752296182798,
+        "answer": 0.09341247289530265
+      },
+      "source_url": "https://artificialanalysis.ai/models/releases/muse-spark-1-3",
+      "source_field": "embedded Next.js flight intelligenceIndex + intelligenceIndexCostPerTask.cost"
+    },
+    {
+      "model": "Muse Spark 1.3 (max)",
+      "score": 48.0923107719685,
+      "cost_per_task": {
+        "total": 1.6048932100125866,
+        "input": 1.3490425400961017,
+        "nonCacheInput": 0.022484332141925304,
+        "cacheRead": 0.8431508870964701,
+        "cacheWrite": 0.4834073208577061,
+        "output": 0.25585066991648475,
+        "reasoning": 0.14503519838306006,
+        "answer": 0.11081547153342473
+      },
+      "source_url": "https://artificialanalysis.ai/models/releases/muse-spark-1-3",
+      "source_field": "embedded Next.js flight intelligenceIndex + intelligenceIndexCostPerTask.cost"
+    }
+  ]
+}

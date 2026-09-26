@@ -1,10 +1,13 @@
 # model-efficiency-frontier — workspace 規約
 
+> 最新展示 SSOT：`runs/2026-09-26-general-grok16/ladder-extra.md`（2026-09-26 公開頁 **推定 v4.3.2**，GPT ×18／Grok ×16；資料與版本限制見同目錄 `run-notes.md`；唯一 Notion 頁 `3e539f3f-a67c-810a-9eca-f2de2c0fe1a5` 標題更新為「模型效率前線｜番外篇 GPT×18／Grok×16（2026-09-26 快照）」）。原有 v5 ladder／番外篇快照封存不可改；認證 API v4.3 另外留存，不能混入本次公開 v4.3.2 情境。頂層 `README.md` 為入口。
+
 > 定位：這裡存的是**狀態**（每次研究的日期、價格快照、證據、frontier 結果）。
 > 流程方法未來穩定後再抽成 skill；本檔是目前唯一的事實來源，流程改了先改這裡。
 
 ## 1. 已確認的設計（2026-09-17，用戶確認）
 
+- **2026-09-26 番外篇 GPT/Grok 雙 family 情境（最新批准）**：只改 `scripts/ladder_extra.py` 顯示／情境層。GPT- 仍以用戶個人約 18.9 倍實測保守取 ×18（`--factor`、`--prefix` 舊介面保留）；Grok 模型名稱以不分大小寫、起首獨立 `Grok` 詞匹配（如 `Grok 4.7`、`Grok-4.7`），採 `--grok-factor` 預設 ×16，**此 16 是用戶指定情境，不是個人或 AA 實測**。每行最多一個係數，Contributor 行無論 family 均 ×1；原價、GRADE 與輸入快照不變，按 adjusted cost 重跑 frozen 數學，仍 Score 降序展示。Grok high/xhigh 包括被排除者須完整報狀態。$20+$59=$79 只屬 GPT 訂閱組合，非 GPT 省錢 pick 不得以此推論 Grok 續訂；renderer 不抓資料，顯示來源快照日期而非假稱當天抓取。新同版本 fresh run 可用 `--min-score 0` 作全候選情境比較，需附理由；資料取得、發布及 Notion 同步為獨立步驟，不因 renderer 變更而自動進行。詳見 `docs/superpowers/specs/2026-09-26-ladder-extra-design.md`。
 - **2026-09-26 番外篇係數最新修訂（覆蓋下條原 18.9 計算係數）**：用戶要求較保守，GPT- 前綴行現以 `cost_adj=cost_orig/18`、`CP_adj=CP_orig×18` 全候選重比；預設、測試、輸出、Notion 公式一律用 18。來源仍是用戶個人實測約 18.9 倍，18 是保守取整，**不是**實測 18，更非 AA 實測。原 run 快照及原版 ladder 不改。
 - **2026-09-26 番外篇最新排序修訂（覆蓋舊 CP_adj 展示排序）**：用戶要求階梯表按 Score 降序（強→弱），本地生成結果與既有 Notion 表均如此展示，編號 1 起由最強排至最弱；CP_adj 僅為效率欄而非排序鍵。frozen 演算法本來即由高分往低分找 CP_adj 新高，不改數學／×18／Contributor 參戰／非 Claude 三 picks；Claude 可列於比較表首行但不推薦。
 - **2026-09-26 番外篇展示修訂（展示政策仍有效；原 18.9 計算係數已由上條覆蓋）**：用戶決定 Notion 只展示番外篇，原版退出展示，GPT 不再霸榜時再回看。允許新增 `scripts/ladder_extra.py` 生成 `runs/<run>/ladder-extra.md`：GPT- 前綴行採保守係數 CP×18，全候選重比；原價與 CP_adj 分欄，標明係數來源、公式及 $20+$59 組合。既有 Notion 頁 `3e539f3f-a67c-810a-9eca-f2de2c0fe1a5` 改標題並整頁換成番外篇。本地原版快照留存供日後回看。此為個人使用情境估算，不冒充 AA 實測成本；frozen 數學與 no-Claude 推薦規則維持。詳見 `docs/superpowers/specs/2026-09-26-ladder-extra-design.md`。
@@ -118,7 +121,7 @@
 - `runs/<run>/frontier.md`：~~該次輸出（含單一合併 frontier + 能力五級矩陣 + dominated sample + verbatim 腳本輸出）~~【RETIRED 2026-09-24：不再產出；舊 runs 歸檔保留、不刪除】。
 - ~~`runs/<run>/recommend.md`：該次推薦矩陣（`recommend.py` 輸出存檔）【2026-09-24：唯一 sanctioned run 輸出】。~~【RETIRED 2026-09-24：不再產出；舊 runs 歸檔保留、不刪除。】
 - `runs/<run>/ladder.md`：該次輸出（`ladder.py` 生成：階梯表＋cut 名單＋配置驗證節＋dominated sample；生成後只 eyeball、不手改）。
-- Notion 正式頁（2026-09-25 用戶指定，唯一對外呈現；重產 ladder 後必同步改寫）：`模型效率前線｜Ladder 10階 2026-09-24`，page_id `3e539f3f-a67c-810a-9eca-f2de2c0fe1a5`，URL `https://app.notion.com/p/3e539f3fa67c810a9ecaf2de2c0fe1a5?pvs=204`；維護方式＝`notion-update-page` `replace_content` 整頁換新＋`update_properties` 換標題（內容＝當版 ladder.md 精簡版：header＋10 階表＋cuts＋B-caveat＋配置驗證＋來源；SSOT 仍是本地 `ladder.md`）。
+- Notion 正式頁（2026-09-25 舊 ladder 展示，**2026-09-26 已由番外篇取代**）：唯一對外頁 page_id `3e539f3f-a67c-810a-9eca-f2de2c0fe1a5`，URL `https://app.notion.com/p/3e539f3fa67c810a9ecaf2de2c0fe1a5?pvs=204`；現標題 `模型效率前線｜番外篇 GPT×18／Grok×16（2026-09-26 快照）`，展示以 `runs/2026-09-26-general-grok16/ladder-extra.md` 為 SSOT 的精簡版（16 階 Score 降序、全 9 Grok 狀態、Contributor、cuts、B caveat、來源與推定版本限制）；同步須先 fetch 再 `replace_content` 與 `update_properties`，不得刪除子頁。舊 10 階與 `ladder.md` 只作歷史本地存檔，不再作 Notion 最新展示。
 - `runs/<run>/free-sidecar.md`：free/quota 側表（如有）。
 
 ## 6. 待用戶定的預設值

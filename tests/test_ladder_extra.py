@@ -70,7 +70,7 @@ class AdjustmentTests(unittest.TestCase):
                     adjust_rows([dict(identity="GPT-X", score=score,
                                       cost_per_task=cost)], float(factor))
 
-    def test_real_snapshot_gpt_only_is_adjusted(self):
+    def test_real_snapshot_family_factors_keep_original_cost(self):
         path = Path(__file__).resolve().parents[1] / "runs/2026-09-24-general-v5/candidates.csv"
         rows = extra.load_rows(path)
         adjusted = adjust_rows(rows)
@@ -81,8 +81,36 @@ class AdjustmentTests(unittest.TestCase):
                 if r["identity"].startswith("GPT-"):
                     self.assertAlmostEqual(r["_score"] / r["_cost"],
                                            r["_cp_orig"] * 18, delta=1e-6)
+                elif r["identity"].lower().startswith("grok "):
+                    self.assertAlmostEqual(r["_score"] / r["_cost"],
+                                           r["_cp_orig"] * 16, delta=1e-6)
                 else:
                     self.assertEqual(r["_cost"], r["_cost_orig"])
+
+    def test_mixed_family_adjustment_uses_one_factor_and_exempts_contributor(self):
+        rows = [candidate("GPT-6 Sol", 36, 18), candidate("gRoK-4.7 high", 32, 16),
+                candidate("Grok 4.7 xhigh", 48, 16), candidate("Grokish", 20, 16),
+                candidate("Pre-Grok 4.7", 20, 16), candidate("Other", 20, 16),
+                dict(candidate("Grok 4.7 Contributor", 20, 16), pricing_plan="Contributor"),
+                dict(candidate("GPT-6 Contributor", 20, 18), pricing_plan="Contributor")]
+        got = adjust_rows(rows)
+        self.assertEqual([r["_cost"] for r in got],
+                         [1, 1, 1, 16, 16, 16, 16, 18])
+        self.assertEqual([r["_factor"] for r in got], [18, 16, 16, 1, 1, 1, 1, 1])
+        self.assertEqual(got[1]["_cp_orig"], 2)
+        self.assertEqual(got[1]["_score"] / got[1]["_cost"], 32)
+        self.assertEqual(rows[1]["cost_per_task"], "16")
+
+    def test_custom_grok_factor_and_gpt_override_do_not_compound(self):
+        rows = [candidate("GPT-Grok", 36, 36), candidate("Grok-4.7", 36, 36)]
+        got = adjust_rows(rows, factor=3, grok_factor=4)
+        self.assertEqual([r["_cost"] for r in got], [12, 9])
+        self.assertEqual([r["_factor"] for r in got], [3, 4])
+
+    def test_invalid_grok_factor_rejected_by_library(self):
+        for factor in (0, -1, float("nan"), float("inf"), float("-inf")):
+            with self.subTest(factor=factor), self.assertRaises(ValueError):
+                adjust_rows([], grok_factor=factor)
 
 
 def candidate(identity, score, cost, benchmark="General", version="v1", basis="api"):
@@ -220,7 +248,10 @@ class InputAndComputationTests(unittest.TestCase):
         base = ["--input", "snapshot.csv", "--min-score", "0"]
         got = extra.parse_args(base)
         self.assertEqual((got.factor, got.prefix, got.subscription_total), (18, "GPT-", 79))
+        self.assertEqual(got.grok_factor, 16)
         for flag, value in (("--factor", "0"), ("--factor", "nan"),
+                            ("--grok-factor", "0"), ("--grok-factor", "nan"),
+                            ("--grok-factor", "inf"), ("--grok-factor", "-1"),
                             ("--min-score", "inf"), ("--max-cost", "0"),
                             ("--eps-score", "nan"), ("--eps-cp", "inf"),
                             ("--monthly-tasks", "-1"),
@@ -298,8 +329,8 @@ class DecisionTests(unittest.TestCase):
             result = run_cli("--input", source, "--min-score", "0", "--factor", "3")
             self.assertEqual(result.returncode, 0, result.stderr)
             text = (source.parent / "ladder-extra.md").read_text(encoding="utf-8")
-            self.assertIn("| Identity | ×3? | GRADE |", text)
-            self.assertNotIn("| Identity | ×18? | GRADE |", text)
+            self.assertIn("| Identity | 情境係數 | GRADE |", text)
+            self.assertIn("| GPT-One | GPT ×3 |", text)
             self.assertIn("CP_orig、CP_adj 由原始未四捨五入的 Score 與 Cost_orig 計算，表中數字僅供顯示時取整", text)
 
     def test_contributor_exclusion_visible_beyond_top_five(self):
@@ -325,6 +356,66 @@ class DecisionTests(unittest.TestCase):
             self.assertIn("CP_adj no new high", text)
             self.assertIn("CP_adj", text)
             self.assertNotIn("CP no new high", text)
+
+    def test_grok_status_includes_excluded_high_and_xhigh_beyond_sample(self):
+        rows = [candidate("GPT-Head", 60, 2)]
+        rows += [candidate(f"Other-{n}", 55-n, 8) for n in range(7)]
+        rows += [candidate("Grok 4.7 high", 30, 16),
+                 candidate("Grok 4.7 xhigh", 29, 16)]
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "input.csv"
+            write_candidates(source, rows)
+            result = run_cli("--input", source, "--min-score", "0")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = (source.parent / "ladder-extra.md").read_text()
+            status = text.split("## Grok 狀態", 1)[1].split("### B-caveat", 1)[0]
+            self.assertIn("Grok 4.7 high（S=30, Cost_orig=$16.0000, CP_orig=1.88, CP_adj=30.00", status)
+            self.assertIn("Grok 4.7 xhigh（S=29, Cost_orig=$16.0000", status)
+            self.assertIn("excluded：CP_adj no new high", status)
+
+    def test_mixed_family_score_order_and_grok_scenario_provenance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "input.csv"
+            rows = [candidate("GPT-Top", 50, 180), candidate("grok-4.7 high", 45, 16),
+                    candidate("Other Contributor", 40, 0.4)]
+            for row in rows:
+                row["checked_date"] = "2026-09-26"
+            write_candidates(source, rows)
+            result = run_cli("--input", source, "--min-score", "0")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = (source.parent / "ladder-extra.md").read_text()
+            table = text.split("## 階梯表：", 1)[1].split("### Cut 名單", 1)[0]
+            self.assertLess(table.index("GPT-Top"), table.index("grok-4.7 high"))
+            self.assertIn("| grok-4.7 high | Grok ×16 |", table)
+            self.assertIn("| Other Contributor | ×1 |", table)
+            self.assertIn("Grok ×16", text)
+            self.assertIn("使用者指定情境", text)
+            self.assertIn("非實測", text)
+            self.assertIn("來源快照日期（checked_date）：2026-09-26", text)
+            self.assertNotIn("未重新抓取 AA", text)
+
+    def test_non_gpt_cheapest_does_not_recommend_grok_subscription_from_79(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "input.csv"
+            write_candidates(source, [candidate("Grok 4.7 high", 50, 16)])
+            result = run_cli("--input", source, "--min-score", "0", "--monthly-tasks", "100")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            api = (source.parent / "ladder-extra.md").read_text().split("## 外部 API 試算", 1)[1]
+            self.assertIn("$79 僅適用 GPT", api)
+            self.assertNotIn("續訂閱", api)
+            self.assertNotIn("開外部API", api)
+
+    def test_override_labels_follow_effective_factors_in_caveat(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "input.csv"
+            write_candidates(source, [candidate("GPT-Top", 50, 100),
+                                      candidate("Grok 4.7", 40, 16)])
+            result = run_cli("--input", source, "--min-score", "0",
+                             "--factor", "3", "--grok-factor", "4")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = (source.parent / "ladder-extra.md").read_text()
+            self.assertIn("GPT ×3 / Grok ×4 調整", text)
+            self.assertNotIn("GPT ×18 / Grok ×16 調整", text)
 
     def test_render_header_order_picks_and_undecided_api(self):
         rows = [candidate("Claude Opus", 60, 2),

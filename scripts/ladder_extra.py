@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Personal ×18 conservative scenario; original input and ladder stay intact.
+"""Personal GPT ×18 / user-specified Grok ×16 scenario; source stays intact.
 
 Public interfaces for the renderer:
   parse_args(argv=None) -> argparse.Namespace
   load_rows(path) -> list[dict] (raw CSV strings, required columns checked)
-  adjust_rows(rows, factor=18, prefix="GPT-") -> new paid rows with
-      _score, _cost_orig, _cp_orig, _cost; originals stay unchanged.
+  adjust_rows(rows, factor=18, prefix="GPT-", grok_factor=16) -> new paid
+      rows with _score, _cost_orig, _cp_orig, _cost, _factor; originals unchanged.
   compute_groups(rows, args) -> dict[(benchmark, version, basis), dict] with
       kept: [(row, reason)], final: [row], cuts: {drop: winner},
       excluded: [(row, reason)]. Input rows must be from adjust_rows;
@@ -33,6 +33,7 @@ def parse_args(argv=None):
     p.add_argument("--output")
     p.add_argument("--factor", type=float, default=18)
     p.add_argument("--prefix", default="GPT-")
+    p.add_argument("--grok-factor", type=float, default=16)
     p.add_argument("--min-score", type=float, required=True)
     p.add_argument("--min-score-reason")
     p.add_argument("--max-cost", type=float)
@@ -41,7 +42,8 @@ def parse_args(argv=None):
     p.add_argument("--monthly-tasks", type=float)
     p.add_argument("--subscription-total", type=float, default=79)
     args = p.parse_args(argv)
-    for field, minimum in (("factor", "positive"), ("min_score", "finite"),
+    for field, minimum in (("factor", "positive"), ("grok_factor", "positive"),
+                           ("min_score", "finite"),
                            ("max_cost", "positive"), ("eps_score", "positive"),
                            ("eps_cp", "nonnegative"), ("monthly_tasks", "nonnegative"),
                            ("subscription_total", "positive")):
@@ -78,10 +80,16 @@ def load_rows(path):
         return rows
 
 
-def adjust_rows(rows, factor=18, prefix="GPT-"):
+def _grok(row):
+    return bool(re.match(r"^grok(?:$|[^a-z0-9])", row["identity"], re.IGNORECASE))
+
+
+def adjust_rows(rows, factor=18, prefix="GPT-", grok_factor=16):
     """Build independent paid-row copies with original and scenario costs."""
     if not math.isfinite(factor) or factor <= 0:
         raise ValueError("factor must be finite and positive")
+    if not math.isfinite(grok_factor) or grok_factor <= 0:
+        raise ValueError("grok_factor must be finite and positive")
     result = []
     for source in rows:
         if str(source.get("is_free") or "").strip().lower() in ("true", "1", "yes", "y"):
@@ -97,13 +105,18 @@ def adjust_rows(rows, factor=18, prefix="GPT-"):
         if cf.is_free_row(source):
             continue
         r = dict(source)
-        cost_adj = c / factor if r["identity"].startswith(prefix) else c
+        # Contributor remains at its documented original price, even if its
+        # model name happens to belong to a scenario family.
+        applied = (1 if _contributor(r) else factor if r["identity"].startswith(prefix)
+                   else grok_factor if _grok(r) else 1)
+        cost_adj = c / applied
         cp_orig = s / c
         cp_adj = s / cost_adj if cost_adj else float("inf")
         if not (math.isfinite(cost_adj) and cost_adj > 0
                 and math.isfinite(cp_orig) and math.isfinite(cp_adj)):
             raise ValueError(f"invalid adjusted cost/CP: {r['identity']}")
-        r.update(_score=s, _cost_orig=c, _cp_orig=cp_orig, _cost=cost_adj)
+        r.update(_score=s, _cost_orig=c, _cp_orig=cp_orig, _cost=cost_adj,
+                 _factor=applied)
         result.append(r)
     return result
 
@@ -229,7 +242,14 @@ def _safe(value):
 
 def _contributor(row):
     return ("contributor" in (row.get("pricing_plan") or "").lower()
-            or "contributor" in row["identity"].lower())
+             or "contributor" in row["identity"].lower())
+
+
+def _scenario_label(row, args):
+    if row["_factor"] == 1:
+        return "×1"
+    return (f"GPT ×{args.factor:g}" if row["identity"].startswith(args.prefix)
+            else f"Grok ×{args.grok_factor:g}")
 
 
 def _stat(row):
@@ -252,17 +272,17 @@ def render(groups, rows, args):
     urls = sorted(aa_urls or all_urls)
     pricing_urls = sorted(all_urls - set(urls))
     reason = args.min_score_reason or (
-        "同一來源快照全候選比較，沿用原版 floor=0；非新 AA 研究 run"
-        if args.min_score == 0 else "使用者指定門檻；沿用來源快照，未另提供門檻理由")
+        "同版本候選全量情境比較，floor=0；實際來源日期以快照欄位為準"
+        if args.min_score == 0 else "使用者指定門檻；未另提供門檻理由")
     out = ["# 番外篇 / 個人實測係數估算；Notion 主展示（非官方 AA 成本）",
            f"- 原因：ChatGPT 訂閱用好用滿，個人實測約 18.9 倍 API 用量；預設保守取整採 ×18（本次 ×{args.factor:g}），並非實測 18，也非 AA 實測。",
-            f"- 細節：factor={args.factor:g}（預設 ×18；原始實測約 18.9），prefix={_safe(args.prefix)}；$20+$59 組合（預設合計 $79）；匹配前綴的行 cost_adj=cost_orig/{args.factor:g}、CP_adj=CP_orig×{args.factor:g}；N 用滿水位由使用者指定。",
+             f"- 細節：factor={args.factor:g}（GPT 預設 ×18；原始實測約 18.9），prefix={_safe(args.prefix)}；grok-factor={args.grok_factor:g}（Grok 預設 ×16：使用者指定情境，非實測、非 AA 實測）；GPT 訂閱 $20+$59 組合（預設合計 $79）；各家匹配行 cost_adj=cost_orig/該行係數、CP_adj=CP_orig×該行係數，其他及 Contributor ×1；N 用滿水位由使用者指定。",
             "- CP_orig、CP_adj 由原始未四捨五入的 Score 與 Cost_orig 計算，表中數字僅供顯示時取整。",
            f"- 不進正式表：正式表 `{Path(args.input).parent / 'ladder.md'}` 保持原狀；此為獨立情境估算。",
-           f"- 來源快照日期（checked_date）：{', '.join(source_dates) if source_dates else '未提供'}；生成日期：{date.today().isoformat()}；來源檔：`{args.input}`。來源日期不等於生成日期，未重新抓取 AA 或定價。",
+            f"- 來源快照日期（checked_date）：{', '.join(source_dates) if source_dates else '未提供'}；生成日期：{date.today().isoformat()}；來源檔：`{args.input}`。生成報表不執行抓取；資料取得日期以輸入快照及其 notes 為準。",
            f"- benchmark 來源 URL：{', '.join(urls) if urls else '未提供（空快照）'}",
            f"- min-score={args.min_score:g}（floor 理由：{_safe(reason)}）；max-cost={args.max_cost if args.max_cost is not None else 'none'}（以情境 cost_adj 比較）；eps_score={args.eps_score:g}（規約預設，AA CI 未公布沿用）；eps_cp={args.eps_cp * 100:g}%（固定成本側容忍度）。",
-           "- privacy：純註記（2026-09-24 取消分桶；不過濾付費行）。GRADE A/B 為原價證據等級，×18 僅個人情境估算，不升格為 AA 實測或 GRADE-B。",
+            f"- privacy：純註記（2026-09-24 取消分桶；不過濾付費行）。GRADE A/B 為原價證據等級，GPT ×{args.factor:g} 與 Grok ×{args.grok_factor:g} 皆為情境估算，不升格為 AA 實測或 GRADE-B。",
            "- `AA-median Free` 是 AA API 資料的 provider/plan 標記（跨 provider median），不是零成本 API 或可免費取得相同服務的推論；只有明確 is_free=true/yes/1/y 的行不進數字運算。",
             "- 算法按 Score 由高到低建立 CP_adj 新高與連帶去重；下表按 Score 由高到低展示（強→弱），CP_adj 為效率欄而非排序鍵。",
            ""]
@@ -279,14 +299,13 @@ def render(groups, rows, args):
         candidates = {r["identity"]: r for r, _ in result["kept"] + excluded}
         display = sorted(final, key=lambda r: (-r["_score"], r["_cost"]))
         out += [f"## 階梯表：{_safe(bench)} @ {_safe(version)} | basis={_safe(basis)} (n={len(final)}；Score 降序)",
-                 f"| # | Score | Cost_orig | CP_orig | CP_adj | Identity | ×{args.factor:g}? | GRADE | 註記 |",
+                  "| # | Score | Cost_orig | CP_orig | CP_adj | Identity | 情境係數 | GRADE | 註記 |",
                 "|---|---|---|---|---|---|---|---|---|"]
         for i, r in enumerate(display, 1):
-            is_adjusted = r["identity"].startswith(args.prefix)
             note = _safe(r.get("notes"))
-            if is_adjusted:
-                note += f"；情境：cost_adj=Cost_orig/{args.factor:g}, CP_adj=CP_orig×{args.factor:g}"
-            out.append(f"| {i} | {r['_score']:g} | ${r['_cost_orig']:.4f} | {r['_cp_orig']:.2f} | {r['_cp']:.2f} | {_safe(r['identity'])} | {'✓' if is_adjusted else '—'} | {grade_of(r)} | {note} |")
+            if r["_factor"] != 1:
+                note += f"；情境：cost_adj=Cost_orig/{r['_factor']:g}, CP_adj=CP_orig×{r['_factor']:g}"
+            out.append(f"| {i} | {r['_score']:g} | ${r['_cost_orig']:.4f} | {r['_cp_orig']:.2f} | {r['_cp']:.2f} | {_safe(r['identity'])} | {_scenario_label(r, args)} | {grade_of(r)} | {note} |")
         out.append("")
         out.append(f"### Cut 名單（{len(cuts)}）")
         for dropped, winner in cuts.items():
@@ -316,11 +335,27 @@ def render(groups, rows, args):
             out.append("- 無 Contributor 行")
         out.append("")
 
+        out.append("## Grok 狀態（所有此組 Grok，包含 excluded；Contributor 原價不調整）")
+        groks = [r for r in candidates.values() if _grok(r)]
+        for r in groks:
+            identity = r["identity"]
+            exclusion = next((why for e, why in excluded if e is r), None)
+            if identity in cuts:
+                status = f"cut → 同帶贏家 {_safe(cuts[identity])}"
+            elif exclusion is not None:
+                status = f"excluded：{_safe(_reason(exclusion))}"
+            else:
+                status = "保留階梯" if r in final else "未進最終階梯"
+            out.append(f"- {_safe(identity)}（{_stat(r)}；{_scenario_label(r, args)}；GRADE {grade_of(r)}）：{status}；原價依據：{_safe(r.get('notes')) or '未提供'}")
+        if not groks:
+            out.append("- 無 Grok 行")
+        out.append("")
+
         b_rows = [r for r in candidates.values() if grade_of(r) == "B"]
         if b_rows:
-            out += ["### B-caveat（原價證據等級，不是 ×18 的等級）",
+            out += ["### B-caveat（原價證據等級，不是情境係數的等級）",
                     "- GRADE-B 推導原價照常參戰，包括保留、決定 cut、或 CP_adj 新高而擋下其他行；其公式與假設見 notes。"
-                    " 個人 ×18 調整另行標示，不冒充 AA 實測。",
+                     f" GPT ×{args.factor:g} / Grok ×{args.grok_factor:g} 調整另行標示，不冒充 AA 實測。",
                     f"- 此組 B 行：{', '.join(_safe(r['identity']) for r in b_rows)}", ""]
 
         pickable = [r for r in final if not _is_claude(r["identity"])]
@@ -333,9 +368,17 @@ def render(groups, rows, args):
                 _pick("平衡", middle), _pick("省錢", cheap), "",
                 "## 外部 API 試算（僅情境；不影響階梯）",
                 "- N 是每月 benchmark 等價任務量，不是一般聊天次數；每項 API 成本以省錢 pick 的 Cost_orig 而非 cost_adj 計。",
-                f"- 訂閱組合 $20+$59（此處比較總額 ${args.subscription_total:g}）。已付訂閱的增量決策不同，不能無條件建議新購／續訂。"]
+                 f"- 訂閱組合 $20+$59（總額 ${args.subscription_total:g}，$79 僅適用 GPT 訂閱組合假設，非 Grok 訂閱價格）。已付訂閱的增量決策不同，不能無條件建議新購／續訂。"]
         if cheap is None or basis != "api":
             out.append("- 從缺（無非 Claude API basis 省錢 pick 可作 API 價格比較）。")
+        elif not cheap["identity"].startswith(args.prefix) or _contributor(cheap):
+            monthly_api = (args.monthly_tasks * cheap["_cost_orig"]
+                           if args.monthly_tasks is not None else None)
+            if monthly_api is not None and not math.isfinite(monthly_api):
+                raise ValueError("monthly API cost overflow: N × Cost_orig must be finite")
+            estimate = (f"N × ${cheap['_cost_orig']:g}" if monthly_api is None else
+                        f"{args.monthly_tasks:g} × ${cheap['_cost_orig']:g} = ${monthly_api:g}")
+            out.append(f"- {_safe(cheap['identity'])}：API 原價試算 {estimate}；非 GPT 訂閱組合，無對應訂閱價格，不以 ${args.subscription_total:g} 判定續訂或開 API。")
         else:
             out.append(f"- {_safe(cheap['identity'])}：{api_comparison(cheap['_cost_orig'], args.monthly_tasks, args.subscription_total)}")
         out.append("")
@@ -355,7 +398,7 @@ def main(argv=None):
                     or official.exists() and os.path.samefile(destination, official))):
             raise ValueError(f"output is protected (source CSV or official ladder.md): {destination}")
         raw = load_rows(source)
-        paid = adjust_rows(raw, args.factor, args.prefix)
+        paid = adjust_rows(raw, args.factor, args.prefix, args.grok_factor)
         text = render(compute_groups(paid, args), paid, args)
         destination.write_text(text, encoding="utf-8")
     except (ValueError, OSError) as exc:

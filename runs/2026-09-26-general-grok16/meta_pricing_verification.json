@@ -1,0 +1,51 @@
+{
+  "source_url": "https://dev.meta.ai/docs/pricing-rate-limits",
+  "checked_date": "2026-09-26",
+  "page_verified_strings": [
+    "muse-spark-1.3-contributor",
+    "$0.002",
+    "$0.10",
+    "$0.20",
+    "$0.15",
+    "$1.25",
+    "$4.25",
+    "3,000",
+    "4,000,000",
+    "100",
+    "3,000,000"
+  ],
+  "models": {
+    "Standard": [
+      "muse-spark-1.3",
+      "muse-spark-1.2",
+      "muse-spark-1.1"
+    ],
+    "Contributor": [
+      "muse-spark-1.3-contributor",
+      "muse-spark-1.2-contributor"
+    ]
+  },
+  "USD_per_1M_tokens": {
+    "Standard": {
+      "cached_input": 0.15,
+      "input": 1.25,
+      "output": 4.25
+    },
+    "Contributor": {
+      "cached_input": 0.002,
+      "input": 0.1,
+      "output": 0.2
+    }
+  },
+  "rate_limits_per_team": {
+    "Standard": {
+      "RPM": 3000,
+      "TPM": 4000000
+    },
+    "Contributor": {
+      "RPM": 100,
+      "TPM": 3000000
+    }
+  },
+  "training_note": "Contributor tier permits use of prompts and completions to train future Meta models; Standard says not used to train. No privacy buckets; notes only."
+}
