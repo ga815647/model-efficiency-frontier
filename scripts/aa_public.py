@@ -29,7 +29,14 @@ def _objects(html, url):
         for item in OBJECT.finditer(chunk):
             try:
                 record, _ = decoder.raw_decode(chunk, item.start())
-            except ValueError:
+            except ValueError as exc:
+                # Other site payloads contain slugs (releases/evaluations).
+                # A model prefix has slug/name/shortName in the same object;
+                # malformed model JSON must not turn into a smaller sweep.
+                prefix = chunk[item.start():item.start()+500]
+                if re.match(r'\{(?:"id":"[^"]+",)?"slug":"[^"]+","name":"', prefix) and (
+                        '"shortName"' in prefix or '"modelCreatorName"' in prefix):
+                    raise SourceError('model_markup_drift', url, 'undecodable model object') from exc
                 continue
             if isinstance(record, dict) and 'slug' in record:
                 found = True
@@ -55,14 +62,21 @@ def _unique(records, url):
 def parse_leaderboard(html: str) -> list[dict]:
     records = []
     for obj in _objects(html, LEADERBOARD):
-        if 'intelligenceIndexCostPerTask' not in obj or 'name' not in obj:
+        markers = {'shortName', 'modelCreatorName', 'priceClass',
+                   'intelligenceIndexIsEstimated', 'intelligenceIndexCostPerTask'}
+        if len(markers.intersection(obj)) < 2:
             continue
+        # AA intentionally omits the cost key for hundreds of scored models.
+        # Keep them as explicit missing-cost sidecar records, not false absence.
+        required = {'slug', 'name', 'intelligenceIndex', 'intelligenceIndexIsEstimated', 'modelCreatorName'}
+        if not required.issubset(obj):
+            raise SourceError('model_shape_drift', LEADERBOARD, str(obj.get('slug')))
         if not isinstance(obj['name'], str) or not isinstance(obj.get('intelligenceIndexIsEstimated'), bool):
             raise SourceError('invalid_measurement', LEADERBOARD, str(obj.get('slug')))
         records.append({'slug': obj['slug'], 'name': obj['name'],
                         'creator': obj.get('modelCreatorName'),
                         'score': obj.get('intelligenceIndex'),
-                        'cost_per_task': obj['intelligenceIndexCostPerTask'],
+                        'cost_per_task': obj.get('intelligenceIndexCostPerTask'),
                         'is_estimated': obj.get('intelligenceIndexIsEstimated'),
                         'deprecated': obj.get('deprecated'),
                         'price1m_input': obj.get('price1mInputTokens'),
@@ -80,9 +94,16 @@ def parse_release(html: str, url: str) -> dict:
     selected = set(RELEASE_SLUGS[url])
     records = []
     for obj in _objects(html, url):
-        if obj['slug'] not in selected or not isinstance(obj.get('intelligenceIndexCostPerTask'), dict):
+        if obj['slug'] not in selected or 'id' not in obj:
             continue
-        cost = obj['intelligenceIndexCostPerTask'].get('cost', {})
+        structure = obj.get('intelligenceIndexCostPerTask')
+        if not isinstance(structure, dict) or not isinstance(structure.get('cost'), dict):
+            raise SourceError('release_shape_drift', url, obj['slug'])
+        cost = structure['cost']
+        if not isinstance(obj.get('intelligenceIndex'), (int, Decimal)) or any(
+                not isinstance(cost.get(field), (int, Decimal)) for field in
+                ('total', 'nonCacheInput', 'cacheRead', 'cacheWrite', 'output')):
+            raise SourceError('release_shape_drift', url, obj['slug'])
         records.append({'slug': obj['slug'], 'score': obj.get('intelligenceIndex'),
                         'cost_per_task': cost.get('total'), 'components': cost})
     return {'url': url, 'declared_version': versions.pop(), 'records': _unique(records, url)}

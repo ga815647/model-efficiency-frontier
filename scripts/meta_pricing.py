@@ -50,8 +50,19 @@ def parse_meta_pricing(html: str) -> dict:
             raise SourceError('pricing_markup', URL, f'{plan} heading missing')
         end = re.search(r'<h[23]\b', html[start.end():], re.I)
         sections[plan] = html[start.end():start.end()+end.start()] if end else html[start.end():]
-    if 'muse-spark-1.3-contributor' not in sections['Contributor'] or 'muse-spark-1.3' not in sections['Standard']:
-        raise SourceError('model_missing', URL, 'model plan availability')
+    available = {}
+    for plan, section in sections.items():
+        before_table = section.split('<table', 1)[0]
+        model_line = re.search(r'<p\b[^>]*>\s*Models:\s*(.*?)</p>', before_table, re.S | re.I)
+        if not model_line:
+            raise SourceError('model_missing', URL, plan + ' active model list missing')
+        available[plan] = re.findall(r'<code\b[^>]*>\s*([^<]+)\s*</code>', model_line[1], re.I)
+    if ('muse-spark-1.3-contributor' not in available['Contributor'] or
+            'muse-spark-1.3' not in available['Standard']):
+        raise SourceError('model_missing', URL, 'active model plan availability')
+    contributor_terms = unescape(re.sub(r'<[^>]+>', ' ', sections['Contributor'].split('<table', 1)[0]))
+    if 'permission to use your prompts and completions to train future Meta models' not in contributor_terms:
+        raise SourceError('training_terms_missing', URL, 'Contributor active training terms missing')
     rates = {}
     for plan, section in sections.items():
         rows = _table(section)
@@ -75,9 +86,9 @@ def parse_meta_pricing(html: str) -> dict:
             for row in parser.rows[1:]:
                 if len(row) == 3 and row[0] in rates and all(re.fullmatch(r'[\d,]+', x) for x in row[1:]):
                     limits[row[0]] = {'RPM': int(row[1].replace(',', '')), 'TPM': int(row[2].replace(',', ''))}
-    if set(limits) != set(rates) or 'prompts and completions to train future Meta models' not in unescape(re.sub(r'<[^>]+>', ' ', html)):
+    if set(limits) != set(rates):
         raise SourceError('pricing_missing', URL, 'rate limits or training terms missing')
-    return {'source_url': URL, 'models': {'Standard': ['muse-spark-1.3'], 'Contributor': ['muse-spark-1.3-contributor']},
+    return {'source_url': URL, 'models': available,
             'USD_per_1M_tokens': rates, 'rate_limits_per_team': limits,
             'training_note': 'Contributor permits prompts/completions for training; Standard does not. Notes only, no filtering.'}
 

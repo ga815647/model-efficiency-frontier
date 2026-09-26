@@ -1,4 +1,5 @@
 import json
+import csv
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -8,6 +9,7 @@ from pathlib import Path
 from scripts.aa_public import SourceError, parse_leaderboard, parse_release, corroborate_version
 from scripts.meta_pricing import parse_meta_pricing, rescale_contributor
 from scripts.refresh_snapshot import refresh_snapshot, _diagnostic
+from scripts.refresh_snapshot import _model_effort
 
 ROOT = Path(__file__).resolve().parents[1]
 FIX = ROOT / 'tests/fixtures/refresh'
@@ -25,6 +27,43 @@ class RefreshSourcesTest(unittest.TestCase):
         self.assertEqual(result['benchmark_version'], 'AA-Intelligence-Index-v4.3.2')
         self.assertEqual(len(result['crosschecks']), 4)
         self.assertEqual(next(r for r in rows if r['slug'] == 'grok-4-7-high')['score'], Decimal('46.3321770885625'))
+
+    def test_raw_markup_missing_required_model_fields_fails(self):
+        html = (FIX / 'leader.html').read_text()
+        for original, replacement in (('name\\":\\"Grok 4.7 (high)', 'name_REMOVED\\":\\"Grok 4.7 (high)'),
+                                      ('intelligenceIndexIsEstimated\\":false',
+                                       'intelligenceIndexIsEstimated_REMOVED\\":false')):
+            self.assertIn(original, html)
+            with self.subTest(original=original), self.assertRaises(SourceError):
+                parse_leaderboard(html.replace(original, replacement, 1))
+        release = (FIX / 'muse.html').read_text()
+        self.assertIn('intelligenceIndexCostPerTask\\":{\\"cost\\":', release)
+        with self.assertRaises(SourceError):
+            parse_release(release.replace('intelligenceIndexCostPerTask\\":{\\"cost\\":',
+                                          'intelligenceIndexCostPerTask\\":{\\"changedCost\\":', 1), URLS['muse'])
+        # A missing cost key is legitimate on this page, but must survive as
+        # explicit missing-cost evidence (and fail inventory if formerly paid).
+        missing_cost = parse_leaderboard(html.replace('intelligenceIndexCostPerTask\\":2.726106691786027',
+                                                      'intelligenceIndexCostPerTask_REMOVED\\":2.726106691786027', 1))
+        self.assertIsNone(next(r for r in missing_cost if r['slug'] == 'grok-4-7-high')['cost_per_task'])
+
+    def test_malformed_model_object_does_not_silently_disappear(self):
+        html = (FIX / 'leader.html').read_text()
+        # Corrupt a model object's JSON value without altering unrelated site slug payloads.
+        self.assertIn('intelligenceIndexCostPerTask\\":2.726106691786027', html)
+        with self.assertRaises(SourceError):
+            parse_leaderboard(html.replace('intelligenceIndexCostPerTask\\":2.726106691786027',
+                                           'intelligenceIndexCostPerTask\\":oops', 1))
+
+    def test_effort_and_checkpoint_identity(self):
+        self.assertEqual(_model_effort("DeepSeek R1 (Jan '25)", 'deepseek-r1-0120'),
+                         ("DeepSeek R1 (Jan '25)", 'unspecified', 'deepseek-r1-0120'))
+        self.assertEqual(_model_effort('Qwen3.8 Max (0902)', 'qwen3-8-max'),
+                         ('Qwen3.8 Max (0902)', 'unspecified', 'qwen3-8-max'))
+        self.assertEqual(_model_effort('Grok 4.7 (high)', 'grok-4-7-high'),
+                         ('Grok 4.7', 'high', 'grok-4-7-high'))
+        with self.assertRaises(SourceError):
+            _model_effort('Unknown (unreviewed suffix)', 'unknown-suffix')
 
     def test_conflicting_duplicate_and_markup(self):
         html = (FIX / 'leader.html').read_text()
@@ -86,6 +125,19 @@ class RefreshSourcesTest(unittest.TestCase):
         cost = rescale_contributor(components, prices['USD_per_1M_tokens'])
         self.assertLess(abs(cost - Decimal('0.05476746875401318370823529412')), Decimal('1e-25'))
 
+    def test_meta_historical_mentions_cannot_satisfy_active_plan_or_terms(self):
+        html = (FIX / 'meta.html').read_text()
+        self.assertIn('muse-spark-1.3-contributor', html)
+        # Keep historical mentions in a footer; active labelled list must still fail.
+        dropped = html.replace('Models: <code', 'Models: <code', 1).replace(
+            'muse-spark-1.3-contributor</code>', 'retired-contributor</code>', 1)
+        with self.assertRaises(SourceError):
+            parse_meta_pricing(dropped + '<footer>muse-spark-1.3-contributor</footer>')
+        without_terms = html.replace('permission to use your prompts and completions to train future Meta models',
+                                     'without permission to train', 1)
+        with self.assertRaises(SourceError):
+            parse_meta_pricing(without_terms + '<footer>permission to use your prompts and completions to train future Meta models</footer>')
+
     def test_missing_previous_candidate_blocks(self):
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
         with tempfile.TemporaryDirectory() as temp:
@@ -95,6 +147,20 @@ class RefreshSourcesTest(unittest.TestCase):
             self.assertTrue((Path(temp) / 'snapshot/evidence/missing_candidates.json').exists())
             self.assertFalse((Path(temp) / 'snapshot/candidates.csv').exists())
 
+    def test_prior_paid_model_losing_cost_key_blocks_publication(self):
+        archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        data[URLS['leader']] = data[URLS['leader']].replace(
+            b'intelligenceIndexCostPerTask\\":0.4637245706928438',
+            b'intelligenceIndexCostPerTask_REMOVED\\":0.4637245706928438', 1)
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            with self.assertRaises(SourceError) as caught:
+                refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
+            self.assertEqual(caught.exception.code, 'missing_candidate')
+            self.assertTrue((dest / 'evidence/missing_candidates.json').exists())
+            self.assertFalse((dest / 'candidates.csv').exists())
+
     def test_fresh_fixture_provenance(self):
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
         with tempfile.TemporaryDirectory() as temp:
@@ -103,6 +169,20 @@ class RefreshSourcesTest(unittest.TestCase):
             self.assertEqual(result['version_status'], 'inferred')
             self.assertEqual(result['source_locator']['kind'], 'acquired')
             self.assertTrue((dest / 'candidates.csv').exists())
+
+    def test_archived_source_map_is_valid_previous_inventory(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
+            with (dest / 'candidates.csv').open() as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(len(rows), 155)
+            self.assertEqual(len([r for r in rows if r['effort'] in ("Jan '25", '0902', 'June 2026')]), 0)
+            self.assertTrue(all(r['model_version'] for r in rows))
+            excluded = json.loads((dest / 'free-sidecar.json').read_text())['excluded_non_paid_or_unusable']
+            self.assertTrue(any(row['reason'] == 'missing_score_or_cost' for row in excluded))
 
 
 if __name__ == '__main__':

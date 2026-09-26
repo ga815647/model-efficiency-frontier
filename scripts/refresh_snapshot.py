@@ -45,9 +45,31 @@ def _json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, default=str) + '\n')
 
 
-def _model_effort(name):
+def _model_effort(name, slug):
+    """Only documented reasoning labels become effort; slug pins checkpoint/variant.
+
+    Dates/versions are *not* reasoning levels; keep their visible qualifier in
+    model as well as the slug in model_version. Unknown qualifiers fail closed.
+    """
     match = re.fullmatch(r'(.*?)\s*\(([^()]*)\)', name)
-    return (match.group(1).strip(), match.group(2).strip()) if match else (name.strip(), 'unspecified')
+    if not match:
+        return name.strip(), 'unspecified', slug
+    base, qualifier = match.group(1).strip(), match.group(2).strip()
+    label = qualifier.lower()
+    direct = {'off', 'low', 'medium', 'high', 'xhigh', 'max', 'reasoning', 'non-reasoning'}
+    if label in direct:
+        return base, label, slug
+    effort = re.fullmatch(r'(?:adaptive )?reasoning, (max|xhigh|high|medium|low) effort(?:, .+)?', label)
+    if not effort:
+        effort = re.fullmatch(r'(max|xhigh|high|medium|low) effort(?:, .+)?', label)
+    if not effort:
+        effort = re.fullmatch(r'(max|xhigh|high|medium|low), based on .+', label)
+    if effort:
+        return base, effort.group(1), slug
+    if re.fullmatch(r'(?:[A-Za-z]+\s+)?(?:\d{2,4}|\d{4}-\d{2}(?:-\d{2})?|\d{4})', qualifier) or re.fullmatch(
+            r"[A-Za-z]+\s+'\d{2}", qualifier):
+        return name.strip(), 'unspecified', slug
+    raise SourceError('effort_ambiguous', LEADERBOARD, slug)
 
 
 def _previous_slugs(previous):
@@ -61,7 +83,18 @@ def _previous_slugs(previous):
     if 'inventory' in previous:
         return _previous_slugs(previous['inventory'])
     if 'source_by_slug' in previous:
-        return set(previous['source_by_slug']), {r['effort'] for r in previous.get('contributor', [])}
+        efforts = set()
+        for row in previous.get('contributor', []):
+            if 'effort' in row:
+                efforts.add(row['effort'])
+            elif 'model' in row:
+                _, effort, _ = _model_effort(row['model'], 'previous-contributor')
+                if effort == 'unspecified':
+                    raise SourceError('previous_inventory_missing', MUSE, 'Contributor effort unspecified')
+                efforts.add(effort)
+            else:
+                raise SourceError('previous_inventory_missing', MUSE, 'Contributor identity missing')
+        return set(previous['source_by_slug']), efforts
     if 'slugs' in previous:
         return set(previous['slugs']), set(previous.get('contributor_efforts', []))
     if 'candidates' in previous:
@@ -147,12 +180,12 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
             continue
         if any(not Decimal(str(n)).is_finite() for n in (score, cost)) or Decimal(str(cost)) < 0:
             raise SourceError('invalid_measurement', LEADERBOARD, item['slug'])
-        model, effort = _model_effort(item['name'])
+        model, effort, checkpoint = _model_effort(item['name'], item['slug'])
         included[item['slug']] = {'source_url': LEADERBOARD, 'checked_date': today,
                                   'score': score, 'cost_per_task': cost}
         rows.append({'identity': f'{model} {effort} AA-public published-price',
                      'model': model, 'effort': effort, 'provider': 'AA-public (first-party/median)',
-                     'pricing_plan': 'published-price', 'model_version': '',
+                     'pricing_plan': 'published-price', 'model_version': checkpoint,
                      'benchmark': 'AA-Intelligence-Index', 'benchmark_version': version['benchmark_version'],
                      'score': str(score), 'cost_per_task': str(cost), 'cost_basis': 'api',
                      'privacy': '', 'is_free': 'false', 'evidence_url': LEADERBOARD,
@@ -180,7 +213,7 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
                   r['slug'] in included]
     for item in candidates:
         slug = item['slug']
-        model, effort = _model_effort(item['name'])
+        model, effort, checkpoint = _model_effort(item['name'], slug)
         if slug not in muse:
             raise SourceError('components_missing', MUSE, slug)
         parts = muse[slug]['components']
@@ -196,7 +229,7 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
                  'training allowed, limits note only. B caveat required when decisive.')
         rows.append({'identity': f'{model} {effort} Meta Contributor', 'model': model,
                      'effort': effort, 'provider': 'Meta', 'pricing_plan': 'Contributor',
-                     'model_version': '2026-09-02', 'benchmark': 'AA-Intelligence-Index',
+                     'model_version': checkpoint + '@2026-09-02', 'benchmark': 'AA-Intelligence-Index',
                      'benchmark_version': version['benchmark_version'], 'score': str(item['score']),
                      'cost_per_task': str(derived), 'cost_basis': 'api', 'privacy': 'training permitted',
                      'is_free': 'false', 'evidence_url': MUSE, 'checked_date': today,
