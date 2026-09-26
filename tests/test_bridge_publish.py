@@ -9,6 +9,7 @@ from unittest.mock import patch
 from bridge.result import calculate_snapshot, make_envelope
 from bridge.publish import PublishError, choose_latest, publish_result
 from bridge.runner import _previous
+from bridge.runner import execute_request
 from test_bridge_request import request_data
 from test_bridge_result import SNAPSHOT, PARAMETERS, PROVENANCE
 
@@ -81,6 +82,89 @@ class PublishTests(unittest.TestCase):
         (dest / 'report.md').write_text('# Report\n')
         (dest / 'report.html').write_text('<!doctype html><title>Report</title>')
         return dest, harness
+
+    def test_keyed_refresh_runner_publishes_api_body_for_success_and_diagnostic_failure(self):
+        from test_refresh_sources import FIX, URLS
+        repo = self.base / 'product'
+        repo.mkdir()
+        git(repo, 'init', '-q')
+        git(repo, 'config', 'user.name', 'Tester')
+        git(repo, 'config', 'user.email', 'test@example.com')
+        archive = repo / 'runs/2026-09-26-general-grok16'
+        archive.mkdir(parents=True)
+        (archive / 'public_candidate_source_map.json').write_text(json.dumps({
+            'inventory': {'slugs': [], 'contributor_efforts': []}}))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'product')
+        product = git(repo, 'rev-parse', 'HEAD')
+        request = dict(request_data(), product_sha=product)
+        path = repo / 'bridge/requests' / (request['request_id'] + '.json')
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(request))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'request')
+        event = git(repo, 'rev-parse', 'HEAD')
+        pages = {URLS[name]: (FIX / name).with_suffix('.html').read_bytes() for name in URLS}
+
+        class Response:
+            def __init__(self, version, size):
+                self.body = json.dumps({'intelligence_index_version': version,
+                                        'data': [{'model': 'API-only'}] * size}).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+            def read(self, *args):
+                return self.body
+
+        for run, responses, status in (
+            ('301', [Response('4.3', 1)], 'success'),
+            ('302', [Response('4.3', 200), Response('4.3.1', 1)], 'failed'),
+        ):
+            with self.subTest(run=run):
+                output = self.base / ('keyed-' + run)
+                execution = {'request_commit_sha': event, 'product_sha': product,
+                             'branch': 'efficiency-run/' + request['request_id'],
+                             'run_id': run, 'run_attempt': 1,
+                             'run_url': 'https://github.com/example/actions/runs/' + run}
+                with patch.dict('os.environ', {'AA_API_KEY': 'test-key'}), patch(
+                        'scripts.refresh_snapshot.urllib.request.urlopen', side_effect=responses):
+                    result = execute_request(request, execution=execution, repository=repo,
+                                             output=output, fetch=pages.__getitem__)
+                self.assertEqual(result['status'], status)
+                evidence = output / 'snapshot/evidence/api_envelopes.json'
+                self.assertTrue(evidence.exists())
+                self.assertNotIn(b'test-key', evidence.read_bytes())
+                tip = publish_result(output, remote=str(self.remote))
+                target = f'results/{request["request_id"]}/{run}-1'
+                published = git(self.remote, 'show', f'{tip}:{target}/snapshot/evidence/api_envelopes.json')
+                self.assertEqual(json.loads(published), json.loads(evidence.read_text()))
+                self.assertEqual(json.loads(git(self.remote, 'show', f'{tip}:{target}/result.json'))['status'], status)
+                if status == 'failed':
+                    self.assertEqual(result['errors'][0]['code'], 'api_version_drift')
+                    self.assertFalse((output / 'report.html').exists())
+                    self.assertEqual(self.pointer('latest-success.json')['run_id'], '301')
+                    self.assertEqual(self.pointer('latest-refresh.json')['run_id'], '301')
+                else:
+                    self.assertTrue((output / 'report.html').exists())
+                    self.assertEqual(self.pointer('latest-refresh.json')['run_id'], '301')
+
+    def test_api_evidence_rejects_header_payload_and_non_envelopes(self):
+        output, _ = self.output(status='failed')
+        evidence = output / 'snapshot/evidence'
+        evidence.mkdir(parents=True)
+        for pages in ({'headers': {'x-api-key': 'secret'}},
+                      [{'intelligence_index_version': '4.3', 'data': [],
+                        'request_headers': {'authorization': 'secret'}}],
+                      [{'intelligence_index_version': '4.3',
+                        'data': [{'headers': {'x-api-key': 'secret'}}]}],
+                      [{'intelligence_index_version': '4.3', 'data': 'not a list'}]):
+            (evidence / 'api_envelopes.json').write_text(json.dumps(pages))
+            with self.subTest(pages=pages), self.assertRaises(PublishError):
+                publish_result(output, remote=str(self.remote))
 
     def test_incomplete_refresh_inventory_rejected_before_any_pointer(self):
         output, _ = self.output(operation='refresh')

@@ -24,9 +24,10 @@ _UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 _RUN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*\Z')
 _BRANCH = re.compile(r'[A-Za-z0-9][A-Za-z0-9._/-]*\Z')
 _EVIDENCE = {'leaderboard.html', 'grok_release.html', 'muse_release.html',
-             'meta_pricing.html', 'sources.json', 'leaderboard_records.json',
-             'releases.json', 'version.json', 'meta_pricing.json',
-             'missing_candidates.json', 'source_map.json', 'api_diagnostic.json'}
+              'meta_pricing.html', 'sources.json', 'leaderboard_records.json',
+              'releases.json', 'version.json', 'meta_pricing.json',
+              'missing_candidates.json', 'source_map.json', 'api_diagnostic.json',
+              'api_envelopes.json'}
 _FILES = {'result.json', 'report.md', 'report.html', 'snapshot/candidates.csv',
           'snapshot/free-sidecar.json', 'snapshot/run-notes.md'} | {
               'snapshot/evidence/' + name for name in _EVIDENCE}
@@ -47,6 +48,34 @@ def _json(data):
                           parse_constant=lambda _: (_ for _ in ()).throw(PublishError('nonfinite_json')))
     except (UnicodeError, ValueError) as exc:
         raise PublishError('invalid_json') from exc
+
+
+def _api_response_bodies(data):
+    """Only bounded API response envelopes, never captured request/response headers."""
+    pages = _json(data)
+    if type(pages) is not list or not 1 <= len(pages) <= 20:
+        raise PublishError('invalid_api_evidence')
+
+    def no_headers(value):
+        if type(value) is dict:
+            if any(key.lower() in {'headers', 'request_headers', 'response_headers',
+                                   'authorization', 'x-api-key', 'cookie', 'set-cookie'}
+                   for key in value):
+                raise PublishError('api_evidence_contains_headers')
+            for child in value.values():
+                no_headers(child)
+        elif type(value) is list:
+            for child in value:
+                no_headers(child)
+
+    no_headers(pages)
+    if any(type(page) is not dict or
+           type(page.get('intelligence_index_version')) is not str or
+           not page['intelligence_index_version'].strip() or
+           type(page.get('data')) is not list or len(page['data']) > 200
+           for page in pages):
+        raise PublishError('invalid_api_evidence')
+    return pages
 
 
 def _date(value):
@@ -118,6 +147,18 @@ def _output_files(output):
     if 'result.json' not in files:
         raise PublishError('missing_result')
     envelope = validate_envelope(_json(files['result.json']))
+    if 'snapshot/evidence/api_envelopes.json' in files:
+        pages = _api_response_bodies(files['snapshot/evidence/api_envelopes.json'])
+        if envelope['status'] == 'success':
+            if envelope['operation'] != 'refresh' or 'snapshot/evidence/api_diagnostic.json' not in files:
+                raise PublishError('unexpected_api_evidence')
+            diagnostic = _json(files['snapshot/evidence/api_diagnostic.json'])
+            versions = {page['intelligence_index_version'] for page in pages}
+            if (type(diagnostic) is not dict or diagnostic.get('status') != 'collected_separately'
+                    or diagnostic.get('mixed_into_public_rows') is not False
+                    or versions != {diagnostic.get('envelope_version')}
+                    or diagnostic.get('public_version') != envelope['benchmark_version']):
+                raise PublishError('invalid_api_diagnostic')
     request_id, run_id, attempt = (envelope[k] for k in ('request_id', 'run_id', 'run_attempt'))
     if (type(run_id) is not str or not _RUN.fullmatch(run_id) or run_id in ('.', '..') or
             request_id is not None and (type(request_id) is not str or not _UUID.fullmatch(request_id)) or

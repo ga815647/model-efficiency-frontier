@@ -24,3 +24,9 @@ python3 -m bridge.runner assert-success --output ../output
 
 - Real temporary Git history: single-file request passes; code change rejected before product checkout; malformed request JSON publishes a failure correlated to event/ref, never the JSON's claimed ID; parent outside current main rejected; a later branch-tip commit cannot replace event SHA.
 - Interrupted runner diagnostic uses the verified handoff identity. A failed result remains nonzero with `assert-success` after successful local bare-Git publication. Full suite: `python3 -m unittest discover -s tests -v` (126 tests passed). No network Git writes or live Actions run in Task 6; remote acceptance belongs to Task 8.
+
+## Round 1 review correction — keyed refresh evidence
+
+- The optional AA API diagnostic writes `snapshot/evidence/api_envelopes.json` when `AA_API_KEY` is present. `bridge/publish.py` now permits that exact evidence path only; it parses the response bodies as 1–20 JSON envelope pages with a nonempty `intelligence_index_version` and up to 200 `data` entries each, and rejects header/credential-shaped fields anywhere in the body. Successful keyed refresh additionally requires `api_diagnostic.json` to identify the single separate API version and the public version without mixing rows; failed refresh may retain the diagnostic body even when API versions drift.
+- End-to-end local boundary test: `execute_request` with real fixture public pages and stubbed API response bytes, then `publish_result` to a temporary bare Git remote. Both keyed success and post-diagnostic version-drift failure publish the exact API response bodies; the failed run does not move latest pointers. Invalid envelopes/header-bearing bodies are rejected. No actual key, network request, or external remote Git write was used.
+- Verification after correction: focused publisher suite 14/14 and full suite `python3 -m unittest discover -s tests -v` 128/128 passed.
