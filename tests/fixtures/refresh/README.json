@@ -1,0 +1,26 @@
+{
+  "retrieved_date": "2026-09-26",
+  "method": "Exact contiguous HTML substrings from read-only GET response; no values edited. Leader/release contain an original complete script tag with escaped Next.js flight JSON; release has an original version text span. Meta is an original contiguous section from Standard heading through rate-limit table. Complete multi-MB pages deliberately not committed.",
+  "fragments": {
+    "leader": {
+      "url": "https://artificialanalysis.ai/leaderboards/models",
+      "sha256": "f0b69947ef3bbdab68c01cc1cb48fdc58ace762686d8c50d3198df005b7c2103",
+      "bytes": 948872
+    },
+    "grok": {
+      "url": "https://artificialanalysis.ai/models/releases/grok-4-7",
+      "sha256": "3da4ffa4ff2df8f4c3120ba1ef76fb1dc06dd5b45e2142188a8c6642273aad7a",
+      "bytes": 127283
+    },
+    "muse": {
+      "url": "https://artificialanalysis.ai/models/releases/muse-spark-1-3",
+      "sha256": "7ebfebedee09fe47c067840d55211c4bf05fe6ca86d72493ced9ac7f9b391798",
+      "bytes": 127283
+    },
+    "meta": {
+      "url": "https://dev.meta.ai/docs/pricing-rate-limits",
+      "sha256": "15df589002a5a4ee67faaee0635b27e560df1876ac35d4c66580c204671e3dd2",
+      "bytes": 26100
+    }
+  }
+}
