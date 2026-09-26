@@ -55,6 +55,15 @@ class RefreshSourcesTest(unittest.TestCase):
             parse_leaderboard(html.replace('intelligenceIndexCostPerTask\\":2.726106691786027',
                                            'intelligenceIndexCostPerTask\\":oops', 1))
 
+    def test_reordered_or_distant_model_marker_cannot_hide_broken_json(self):
+        for raw in ('{"slug":"new-model","creator":"X","name":"New","shortName":"New","score":oops}',
+                    '{"slug":"new-model","creator":"' + 'x' * 600 + '","name":"New",'
+                    '"shortName":"New","intelligenceIndexCostPerTask":oops}'):
+            html = '<script>self.__next_f.push([1,' + json.dumps(raw) + '])</script>'
+            with self.subTest(raw=raw[:70]), self.assertRaises(SourceError) as caught:
+                parse_leaderboard(html)
+            self.assertEqual(caught.exception.code, 'model_markup_drift')
+
     def test_effort_and_checkpoint_identity(self):
         self.assertEqual(_model_effort("DeepSeek R1 (Jan '25)", 'deepseek-r1-0120'),
                          ("DeepSeek R1 (Jan '25)", 'unspecified', 'deepseek-r1-0120'))
@@ -137,6 +146,17 @@ class RefreshSourcesTest(unittest.TestCase):
                                      'without permission to train', 1)
         with self.assertRaises(SourceError):
             parse_meta_pricing(without_terms + '<footer>permission to use your prompts and completions to train future Meta models</footer>')
+
+    def test_meta_active_plan_terms_require_positive_exact_meaning(self):
+        html = (FIX / 'meta.html').read_text()
+        contributor_negated = html.replace('permission to use your prompts and completions to train future Meta models',
+                                           'WITHOUT permission to use your prompts and completions to train future Meta models', 1)
+        standard_changed = html.replace('your prompts and completions are not used to train Meta models',
+                                        'your prompts and completions may be used to train Meta models', 1)
+        for altered in (contributor_negated, standard_changed):
+            self.assertNotEqual(altered, html)
+            with self.subTest(altered=altered != html), self.assertRaises(SourceError):
+                parse_meta_pricing(altered)
 
     def test_missing_previous_candidate_blocks(self):
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}

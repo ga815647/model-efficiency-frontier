@@ -30,14 +30,10 @@ def _objects(html, url):
             try:
                 record, _ = decoder.raw_decode(chunk, item.start())
             except ValueError as exc:
-                # Other site payloads contain slugs (releases/evaluations).
-                # A model prefix has slug/name/shortName in the same object;
-                # malformed model JSON must not turn into a smaller sweep.
-                prefix = chunk[item.start():item.start()+500]
-                if re.match(r'\{(?:"id":"[^"]+",)?"slug":"[^"]+","name":"', prefix) and (
-                        '"shortName"' in prefix or '"modelCreatorName"' in prefix):
-                    raise SourceError('model_markup_drift', url, 'undecodable model object') from exc
-                continue
+                # Every slug-shaped object in the decoded flight stream must
+                # be valid JSON. We cannot prove a malformed one is unrelated
+                # to the model sweep, regardless of key order/field distance.
+                raise SourceError('model_markup_drift', url, 'undecodable slug object') from exc
             if isinstance(record, dict) and 'slug' in record:
                 found = True
                 yield record

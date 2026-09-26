@@ -7,6 +7,14 @@ from html.parser import HTMLParser
 from scripts.aa_public import SourceError
 
 URL = 'https://dev.meta.ai/docs/pricing-rate-limits'
+PLAN_TERMS = {
+    'Standard': ('Standard pricing; your prompts and completions are not used to train Meta models. '
+                 'These versions share the same standard pricing:'),
+    'Contributor': ('Heavily discounted token pricing in exchange for permission to use your prompts '
+                    'and completions to train future Meta models. It lowers the barrier to entry for '
+                    'prototyping, testing integrations, and scaling experiments where training on your '
+                    'data is acceptable.'),
+}
 
 
 class _Cells(HTMLParser):
@@ -57,12 +65,13 @@ def parse_meta_pricing(html: str) -> dict:
         if not model_line:
             raise SourceError('model_missing', URL, plan + ' active model list missing')
         available[plan] = re.findall(r'<code\b[^>]*>\s*([^<]+)\s*</code>', model_line[1], re.I)
+        paragraphs = re.findall(r'<p\b[^>]*>(.*?)</p>', before_table, re.S | re.I)
+        plan_texts = [' '.join(unescape(re.sub(r'<[^>]+>', ' ', p)).split()) for p in paragraphs]
+        if PLAN_TERMS[plan] not in plan_texts:
+            raise SourceError('training_terms_changed', URL, plan + ' active plan terms changed')
     if ('muse-spark-1.3-contributor' not in available['Contributor'] or
             'muse-spark-1.3' not in available['Standard']):
         raise SourceError('model_missing', URL, 'active model plan availability')
-    contributor_terms = unescape(re.sub(r'<[^>]+>', ' ', sections['Contributor'].split('<table', 1)[0]))
-    if 'permission to use your prompts and completions to train future Meta models' not in contributor_terms:
-        raise SourceError('training_terms_missing', URL, 'Contributor active training terms missing')
     rates = {}
     for plan, section in sections.items():
         rows = _table(section)
