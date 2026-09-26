@@ -1,6 +1,6 @@
 # 模型效率前線：Chat → GitHub CI 設計
 
-日期：2026-09-26。狀態：設計、私人遠端定位及修訂後計畫已獲使用者確認並指示繼續；實作中，尚未部署／完成 Chat 端驗收。
+日期：2026-09-26。狀態：設計及私人遠端已獲使用者批准；實作已發布至私人 `main`，Actions 重算、fresh、錯誤與 HTML artifact 遠端實測成功（證據見 `docs/superpowers/notes/2026-09-26-chat-ci-acceptance.md`）。ChatGPT Project 安裝及目標 Chat 端到端讀寫仍未驗收；不宣稱日常切換完成。
 
 ## 最新修訂：結報與 Notion 退役（2026-09-26 用戶確認）
 
