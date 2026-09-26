@@ -1,6 +1,6 @@
 # 模型效率前線：Chat → GitHub CI 設計
 
-日期：2026-09-26。狀態：口頭設計及私人遠端定位已获使用者同意；本書面規格待審閱，未實作／部署。
+日期：2026-09-26。狀態：設計、私人遠端定位及修訂後計畫已獲使用者確認並指示繼續；實作中，尚未部署／完成 Chat 端驗收。
 
 ## 最新修訂：結報與 Notion 退役（2026-09-26 用戶確認）
 
@@ -53,6 +53,8 @@ AA_API_KEY 由 Actions Secrets 注入；Chat instructions、請求、產物與�
 結果放獨立 `results` 分支，每次寫入 `results/<request_id>/<run_id>-<attempt>/`，含 result.json、report.md；fresh 另含候選、来源證據與 run notes。產品 main 不接受 CI 計算結果的自動寫入。發佈採序列化／衝突重試保存各次結果，不以 force push 覆蓋他人結果。
 
 result.json 必含 schema_version、operation、status、request_id、request_commit_sha、product_sha、run_id、run_attempt、source_snapshot、parameters、source_dates、benchmark/version/status、cost_basis、ladder、picks、candidate_statuses、caveats、errors。ladder 與 report 由同一次計算生成；candidate_statuses 覆蓋全候選，含 Grok、Contributor 與 cuts。失敗結果也有完整關聯及結構化 errors，不能包裝為成功。
+
+source_snapshot 區分兩種成功來源：recompute 為 `{commit,path}`，讀取已存在的固定 Git 快照；refresh 為 `{kind:"acquired",path:"snapshot/candidates.csv",sha256}`，hash 與本次新 CSV 位元組相符，不捏造新資料已存在於產品 commit。之後重算該 fresh 結果，請求使用已發布 results commit＋完整快照路徑，並核對相鄰成功 refresh envelope 與原始 hash。
 
 結果 commit 不放進其自身內容形成循環；Chat 解析 results 分支 commit，再以該固定 commit 讀取特定 request/run 的 result.json。run 與 metadata 必須和本次請求一致。成功產物通過驗證後才更新同一提交內的 latest-success.json 指標；重算情境不改 latest-refresh.json。並行完成時 freshness 以來源／請求時間排序，不以最後 push 時間讓較舊結果覆蓋較新指標。
 
