@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "operation": null,
+  "status": "failed",
+  "request_id": "af09db61-1e70-4b65-a28f-afc3427ce479",
+  "request_commit_sha": "11a37e75fd41069d4fe3da09077df263c651d3a0",
+  "product_sha": "16e9a2d8eae26d8bf191e8118f4841754f0c75ca",
+  "created_at": null,
+  "run_id": "36259725263",
+  "run_attempt": 1,
+  "run_url": "https://github.com/ga815647/model-efficiency-frontier/actions/runs/36259725263",
+  "source_snapshot": null,
+  "parameters": null,
+  "source_dates": [],
+  "errors": [
+    {
+      "code": "invalid_range",
+      "message": "invalid_range"
+    }
+  ]
+}
