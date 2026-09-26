@@ -1,0 +1,12 @@
+identity,model,effort,provider,pricing_plan,model_version,benchmark,benchmark_version,score,cost_per_task,cost_basis,privacy,is_free,evidence_url,checked_date,quota,notes
+Astra xhigh,Astra,xhigh,Provider X,Standard,2026-09-01,General,AA-2026-09,53,2.31,api,private-safe,false,https://example.com/x,2026-09-17,,
+Astra high,Astra,high,Provider X,Standard,2026-09-01,General,AA-2026-09,51,1.72,api,private-safe,false,https://example.com/x,2026-09-17,,
+Astra medium,Astra,medium,Provider X,Standard,2026-09-01,General,AA-2026-09,50,1.54,api,private-safe,false,https://example.com/x,2026-09-17,,gap 1pt noise-tier test
+Sol max,Sol,max,Provider Y,Standard,2026-09-01,General,AA-2026-09,47,1.99,api,private-safe,false,https://example.com/y,2026-09-17,,expect dominated
+Astra low,Astra,low,Provider X,Standard,2026-09-01,General,AA-2026-09,46,0.82,api,private-safe,false,https://example.com/x,2026-09-17,,
+Sol xhigh,Sol,xhigh,Provider Y,Standard,2026-09-01,General,AA-2026-09,44,1.18,api,private-safe,false,https://example.com/y,2026-09-17,,expect dominated
+Sol medium,Sol,medium,Provider Y,Standard,2026-09-01,General,AA-2026-09,39,0.50,api,private-safe,false,https://example.com/y,2026-09-17,,
+Luna max,Luna,max,Provider Z,Standard,2026-09-01,General,AA-2026-09,38,0.18,api,private-safe,false,https://example.com/z,2026-09-17,,gap 1pt vs Sol medium
+Luna xhigh,Luna,xhigh,Provider Z,Standard,2026-09-01,General,AA-2026-09,35,0.09,api,private-safe,false,https://example.com/z,2026-09-17,,
+CheapOther medium,CheapOther,medium,Provider W,Contributor,2026-09-01,General,AA-2026-09,40,0.40,api,other,false,https://example.com/w,2026-09-17,,separate bucket frontier
+FreeBot free,FreeBot,free,Provider Z,Free,2026-09-01,General,AA-2026-09,30,0,api,other,true,https://example.com/z,2026-09-17,50 req/day,sidecar only

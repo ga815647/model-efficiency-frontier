@@ -1,0 +1,6 @@
+identity,model,effort,provider,pricing_plan,model_version,benchmark,benchmark_version,score,cost_per_task,cost_basis,privacy,is_free,evidence_url,checked_date,quota,notes,ttft_s,time_per_task_s
+Model A xhigh,Model A,xhigh,Provider X,Standard,2026-09-01,General,AA-2026-09,53,2.31,api,private-safe,false,https://example.com/terms-x,2026-09-17,,GRADE-A score+cost AA article 2026-09-07; highest-capability start,,
+Model B high,Model B,high,Provider X,Standard,2026-09-01,General,AA-2026-09,51,1.72,api,private-safe,false,https://example.com/terms-x,2026-09-17,,,
+Model C low,Model C,low,Provider Y,Standard,2026-09-01,General,AA-2026-09,46,0.82,api,private-safe,false,https://example.com/terms-y,2026-09-17,,,
+Model D medium,Model D,medium,Provider X,Standard,2026-09-01,General,AA-2026-09,39,0.50,api,other,false,https://example.com/terms-x,2026-09-17,,GRADE-A other bucket example,,
+Model E free tier,Model E,free,Provider Z,Free,2026-09-01,General,AA-2026-09,30,0,api,other,true,https://example.com/terms-z,2026-09-17,100 req/day,goes to sidecar only,,
