@@ -262,7 +262,19 @@ def _pick(label, row):
     return f"- {label}：{_safe(row['identity'])}（S={row['_score']:g}, CP_adj={_cp_adj(row):.2f}）"
 
 
-def render(groups, rows, args):
+def select_picks(final: list[dict]) -> dict:
+    """Select the existing three non-Claude final rows, without changing tie breaks."""
+    pickable = [r for r in final if not _is_claude(r["identity"])]
+    by_score = sorted(pickable, key=lambda r: (-r["_score"], r["_cost"]))
+    return {
+        "strong": by_score[0] if by_score else None,
+        "middle": by_score[len(by_score) // 2] if by_score else None,
+        "cheap": min(pickable, key=lambda r: (-r["_cp"], -r["_score"], r["_cost"]))
+        if pickable else None,
+    }
+
+
+def render(groups, rows, args, title="# 番外篇 / 個人實測係數估算；Notion 主展示（非官方 AA 成本）"):
     """Render each benchmark/version/basis independently; final remains score-desc."""
     source_dates = sorted({(r.get("checked_date") or "").strip() for r in rows
                            if (r.get("checked_date") or "").strip()})
@@ -274,7 +286,7 @@ def render(groups, rows, args):
     reason = args.min_score_reason or (
         "同版本候選全量情境比較，floor=0；實際來源日期以快照欄位為準"
         if args.min_score == 0 else "使用者指定門檻；未另提供門檻理由")
-    out = ["# 番外篇 / 個人實測係數估算；Notion 主展示（非官方 AA 成本）",
+    out = [title,
            f"- 原因：ChatGPT 訂閱用好用滿，個人實測約 18.9 倍 API 用量；預設保守取整採 ×18（本次 ×{args.factor:g}），並非實測 18，也非 AA 實測。",
              f"- 細節：factor={args.factor:g}（GPT 預設 ×18；原始實測約 18.9），prefix={_safe(args.prefix)}；grok-factor={args.grok_factor:g}（Grok 預設 ×16：使用者指定情境，非實測、非 AA 實測）；GPT 訂閱 $20+$59 組合（預設合計 $79）；各家匹配行 cost_adj=cost_orig/該行係數、CP_adj=CP_orig×該行係數，其他及 Contributor ×1；N 用滿水位由使用者指定。",
             "- CP_orig、CP_adj 由原始未四捨五入的 Score 與 Cost_orig 計算，表中數字僅供顯示時取整。",
@@ -358,12 +370,8 @@ def render(groups, rows, args):
                      f" GPT ×{args.factor:g} / Grok ×{args.grok_factor:g} 調整另行標示，不冒充 AA 實測。",
                     f"- 此組 B 行：{', '.join(_safe(r['identity']) for r in b_rows)}", ""]
 
-        pickable = [r for r in final if not _is_claude(r["identity"])]
-         # Selection uses score-desc among non-Claude rows; displayed Claude rows are comparison only.
-        by_score = sorted(pickable, key=lambda r: (-r["_score"], r["_cost"]))
-        strong = by_score[0] if by_score else None
-        middle = by_score[len(by_score) // 2] if by_score else None
-        cheap = min(pickable, key=lambda r: (-r["_cp"], -r["_score"], r["_cost"])) if pickable else None
+        picks = select_picks(final)
+        strong, middle, cheap = (picks[name] for name in ("strong", "middle", "cheap"))
         out += ["## 檔位結論（僅非 Claude final）", _pick("攻堅", strong),
                 _pick("平衡", middle), _pick("省錢", cheap), "",
                 "## 外部 API 試算（僅情境；不影響階梯）",

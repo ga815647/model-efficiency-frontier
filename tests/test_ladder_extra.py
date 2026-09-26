@@ -16,6 +16,16 @@ import ladder
 
 
 class AdjustmentTests(unittest.TestCase):
+    def test_shared_picks_exclude_claude_and_preserve_tie_breaks(self):
+        rows = [dict(identity='Claude Opus', _score=100, _cost=1, _cp=100),
+                dict(identity='GPT Strong', _score=70, _cost=3, _cp=30),
+                dict(identity='Grok Middle', _score=60, _cost=2, _cp=40),
+                dict(identity='Other Cheap', _score=50, _cost=1, _cp=50)]
+        picks = extra.select_picks(rows)
+        self.assertEqual([picks[k]['identity'] for k in ('strong', 'middle', 'cheap')],
+                         ['GPT Strong', 'Grok Middle', 'Other Cheap'])
+        self.assertEqual(extra.select_picks(rows[:1]), dict.fromkeys(('strong', 'middle', 'cheap')))
+
     def test_adjustment_keeps_original_and_other_models(self):
         rows = [dict(identity="GPT-X", score="40", cost_per_task="2"),
                 dict(identity="Other", score="40", cost_per_task="2")]
