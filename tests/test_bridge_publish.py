@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from bridge.result import calculate_snapshot, make_envelope
 from bridge.publish import PublishError, choose_latest, publish_result
+from bridge.runner import _previous
 from test_bridge_request import request_data
 from test_bridge_result import SNAPSHOT, PARAMETERS, PROVENANCE
 
@@ -37,13 +38,16 @@ class PublishTests(unittest.TestCase):
             req['request_id'] = request
         calculation = dict(self.calculation)
         if operation == 'refresh':
-            csv = SNAPSHOT.read_bytes()
+            fresh, _ = self.valid_refresh_output()
+            csv = (fresh / 'snapshot/candidates.csv').read_bytes()
             calculation['source_snapshot'] = {'kind': 'acquired', 'path': 'snapshot/candidates.csv',
                                                'sha256': hashlib.sha256(csv).hexdigest()}
             (dest / 'snapshot/evidence').mkdir(parents=True)
             (dest / 'snapshot/candidates.csv').write_bytes(csv)
-            (dest / 'snapshot/evidence/source_map.json').write_text(json.dumps({'inventory': {'slugs': [], 'contributor_efforts': []}}))
-            (dest / 'snapshot/evidence/version.json').write_text(json.dumps({'benchmark_version': calculation['benchmark_version']}))
+            for name in ('source_map.json', 'version.json'):
+                (dest / 'snapshot/evidence' / name).write_bytes((fresh / 'snapshot/evidence' / name).read_bytes())
+            calculation, _ = calculate_snapshot(dest / 'snapshot/candidates.csv', PARAMETERS,
+                                                dict(PROVENANCE, source_locator=calculation['source_snapshot']))
         execution = {'request_commit_sha': 'b' * 40, 'run_id': run, 'run_attempt': attempt,
                      'run_url': 'https://github.com/example/actions/runs/' + run}
         if status == 'failed':
@@ -58,6 +62,76 @@ class PublishTests(unittest.TestCase):
 
     def pointer(self, name):
         return json.loads(git(self.remote, 'show', f'refs/heads/results:{name}'))
+
+    def valid_refresh_output(self):
+        # Runner's independently verified fixture has a complete, consistent
+        # candidate CSV/source-map/row inventory; don't mock the reconciliation.
+        from test_bridge_runner import RunnerTests
+        harness = RunnerTests()
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        harness.publish_refresh_fixture()
+        source = harness.repo / f'results/{request_data()["request_id"]}/777-1'
+        dest = self.base / f'valid-refresh-{len(list(self.base.glob("valid-refresh-*")))}'
+        (dest / 'snapshot/evidence').mkdir(parents=True)
+        for name in ('result.json', 'snapshot/candidates.csv',
+                     'snapshot/evidence/source_map.json', 'snapshot/evidence/version.json'):
+            path = dest / name
+            path.write_bytes((source / name).read_bytes())
+        (dest / 'report.md').write_text('# Report\n')
+        (dest / 'report.html').write_text('<!doctype html><title>Report</title>')
+        return dest, harness
+
+    def test_incomplete_refresh_inventory_rejected_before_any_pointer(self):
+        output, _ = self.output(operation='refresh')
+        source_map = output / 'snapshot/evidence/source_map.json'
+        inventory = json.loads(source_map.read_text())
+        inventory['inventory']['slugs'].pop()
+        source_map.write_text(json.dumps(inventory))
+        with self.assertRaises(PublishError):
+            publish_result(output, remote=str(self.remote))
+        self.assertNotEqual(subprocess.run(['git', '-C', str(self.remote), 'rev-parse',
+                                             '--verify', 'refs/heads/results'], capture_output=True).returncode, 0)
+
+    def test_valid_published_fresh_inventory_is_usable_by_runner(self):
+        output, harness = self.valid_refresh_output()
+        published = publish_result(output, remote=str(self.remote))
+        pointer = self.pointer('latest-refresh.json')
+        self.assertEqual(pointer['result_path'],
+                         f'results/{request_data()["request_id"]}/777-1/result.json')
+        git(harness.repo, 'checkout', '-q', '-B', 'main', harness.product)
+        git(harness.repo, 'branch', '-D', 'results')
+        git(harness.repo, 'fetch', '-q', str(self.remote), 'refs/heads/results:refs/heads/results')
+        self.assertEqual(git(harness.repo, 'rev-parse', 'results'), published)
+        inventory = _previous(harness.repo, harness.product)
+        self.assertTrue(inventory['inventory']['slugs'])
+        self.assertEqual(inventory['inventory']['contributor_efforts'], ['max', 'xhigh'])
+
+    def test_failure_without_request_uuid_uses_diagnostic_only_path(self):
+        output, _ = self.output(status='failed')
+        envelope = json.loads((output / 'result.json').read_text())
+        envelope['request_id'] = None
+        (output / 'result.json').write_text(json.dumps(envelope))
+        (output / 'snapshot/evidence').mkdir(parents=True)
+        (output / 'snapshot/evidence/missing_candidates.json').write_text('[]')
+        tip = publish_result(output, remote=str(self.remote))
+        path = f'results/invalid-{envelope["request_commit_sha"]}/{envelope["run_id"]}-{envelope["run_attempt"]}/result.json'
+        self.assertIsNone(json.loads(git(self.remote, 'show', f'{tip}:{path}'))['request_id'])
+        self.assertEqual(git(self.remote, 'show',
+                             f'{tip}:{path.removesuffix("result.json")}snapshot/evidence/missing_candidates.json'), '[]')
+        self.assertEqual(publish_result(output, remote=str(self.remote)), tip)
+        self.assertNotIn('latest-success.json', git(self.remote, 'ls-tree', '--name-only', tip))
+        self.assertNotIn('latest-refresh.json', git(self.remote, 'ls-tree', '--name-only', tip))
+
+    def test_http_remote_query_fragment_and_userinfo_rejected_before_git(self):
+        output, _ = self.output()
+        for remote in ('https://example.test/repo.git?access_token=secret',
+                       'https://example.test/repo.git#secret',
+                       'https://name:secret@example.test/repo.git'):
+            with self.subTest(remote=remote), patch('bridge.publish._git') as git_call:
+                with self.assertRaises(PublishError):
+                    publish_result(output, remote=remote)
+                git_call.assert_not_called()
 
     def test_preserves_attempts_and_idempotence(self):
         first, envelope = self.output()

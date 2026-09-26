@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 from urllib.parse import urlsplit
 
+from bridge.inventory import InventoryError, validate_fresh_inventory
 from bridge.result import validate_envelope
 
 
@@ -118,8 +119,9 @@ def _output_files(output):
         raise PublishError('missing_result')
     envelope = validate_envelope(_json(files['result.json']))
     request_id, run_id, attempt = (envelope[k] for k in ('request_id', 'run_id', 'run_attempt'))
-    if (type(request_id) is not str or not _UUID.fullmatch(request_id) or
-            type(run_id) is not str or not _RUN.fullmatch(run_id) or run_id in ('.', '..')):
+    if (type(run_id) is not str or not _RUN.fullmatch(run_id) or run_id in ('.', '..') or
+            request_id is not None and (type(request_id) is not str or not _UUID.fullmatch(request_id)) or
+            request_id is None and envelope['status'] != 'failed'):
         raise PublishError('invalid_result_path_identity')
     reports = {'report.md', 'report.html'}
     if envelope['status'] == 'success':
@@ -144,12 +146,18 @@ def _output_files(output):
             if (type(version) is not dict or version.get('benchmark_version') != envelope['benchmark_version']
                     or type(source_map) is not dict or type(source_map.get('inventory')) is not dict):
                 raise PublishError('invalid_refresh_evidence')
+            try:
+                validate_fresh_inventory(files['snapshot/candidates.csv'], source_map, envelope,
+                                         error_code='invalid_refresh_inventory')
+            except InventoryError as exc:
+                raise PublishError('invalid_refresh_inventory') from exc
         elif 'snapshot/candidates.csv' in files:
             # Recompute materializes a copy for diagnostics; the source remains pinned Git.
             pass
     elif reports & files.keys():
         raise PublishError('partial_failure_report')
-    return files, envelope, f'results/{request_id}/{run_id}-{attempt}'
+    directory = request_id if request_id is not None else 'invalid-' + envelope['request_commit_sha'].lower()
+    return files, envelope, f'results/{directory}/{run_id}-{attempt}'
 
 
 def _pointer(envelope, target):
@@ -217,7 +225,7 @@ def publish_result(output: Path, *, remote: str, branch: str = 'results') -> str
             branch.endswith(('/', '.')) or type(remote) is not str or not remote):
         raise PublishError('invalid_remote_or_branch')
     parts = urlsplit(remote)
-    if parts.scheme in ('http', 'https') and (parts.username or parts.password):
+    if parts.scheme in ('http', 'https') and (parts.username or parts.password or parts.query or parts.fragment):
         raise PublishError('credentials_in_remote_url')
     with tempfile.TemporaryDirectory(prefix='chat-publish-') as directory:
         env = dict(os.environ, GIT_TERMINAL_PROMPT='0')
