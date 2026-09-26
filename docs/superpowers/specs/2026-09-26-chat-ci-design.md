@@ -6,13 +6,13 @@
 
 本節覆蓋下方原「端到端完成後才停 Notion」的切換時點。用戶選擇 Chat 日常結報＋按需單檔 HTML，不部署網站；分享採截圖或傳 HTML。CI 結果同時支持機器可讀 JSON、內部 Markdown 和固定模板的自包含 HTML，數學僅算一次；HTML 內嵌樣式，不依賴 CDN，不每次由模型重寫。Chat 是否能直接提供附件尚未驗證，可由 CI 可下載產物交付，不宣稱 Chat 內建預覽已可用。
 
-用戶另明確要求立即將 Notion 原頁移入「垃圾桶」，日後自行手刪。已 fetch 核對原標題、move、fetch 父頁確認 child listing；原頁 `3e539f3f-a67c-810a-9eca-f2de2c0fe1a5`，父頁 `3e639f3f-a67c-8111-a4f9-d682d34f06b7`。這是搬到用戶垃圾桶頁，不是永久刪除或 Notion 原生 in_trash；內容保留。Notion 即日起停止同步，不等待新 CI 驗收。CI／HTML 未實作，既有本地結果仍可使用。
+用戶另明確要求立即將 Notion 原頁移入「垃圾桶」，日後自行手刪。已 fetch 核對原標題、move、fetch 父頁確認 child listing；原頁 `3e539f3f-a67c-810a-9eca-f2de2c0fe1a5`，父頁 `3e639f3f-a67c-8111-a4f9-d682d34f06b7`。這是搬到用戶垃圾桶頁，不是永久刪除或 Notion 原生 in_trash；內容保留。Notion 已停止日常展示與同步，不等待新 CI 驗收。CI／HTML 已部署並由 OpenCode 在遠端驗證；ChatGPT Project settings 安裝及目標 Chat 端到端讀寫仍待驗收，既有本地結果仍可使用。
 
 ## 1. 目的與成功條件
 
 ChatGPT Project 是日常操作、模型比較與結果呈現入口；GitHub Actions 執行取數、計算、驗證；Git 保存可追溯資料與結果。使用者說「更新一次，GPT ×18、Grok ×16」即可提交請求，無須日常手動操作 Actions。查詢已有結果不啟動 CI。Chat 不自行推算 picks。
 
-遠端定位：`ga815647/model-efficiency-frontier`，私人庫；預設產品分支 main。既有本地快照及 frozen 數學完整保留。端到端驗收後 Notion 退出日常同步，舊頁保留。
+遠端定位：`ga815647/model-efficiency-frontier`，私人庫；預設產品分支 main。既有本地快照及 frozen 數學完整保留。Notion 已退出日常展示與同步，舊頁保留於用戶「垃圾桶」父頁；Chat 端到端驗收是日常 Chat 入口切換的門檻，而非 Notion 退役的門檻。
 
 ## 2. 已有能力與選擇
 
@@ -74,7 +74,7 @@ source_snapshot 區分兩種成功來源：recompute 為 `{commit,path}`，讀�
 
 先在本專案遠端驗證 CI 的 recompute 與 refresh 成功／失敗路徑，接著由目標 Chat 建分支提交請求、查該 run、以結果 commit 完整讀回；區分 OpenCode 實測與使用者提供的 Chat 端證據。實際驗收包括一個可與既有快照比對的 recompute，以及一個有新來源證據的 refresh。
 
-只有 Chat 整條鏈成功、bootstrap 安裝獲確認後才更新 README/AGENTS 最新入口並停止 Notion 日常同步。既有 Notion 與所有歷史快照保留。
+只有 Chat 整條鏈成功、bootstrap 安裝獲確認後才將 README/AGENTS 的日常入口切換為 Chat＋CI；部署狀態可依已取得的證據先更新。Notion 已停止日常展示與同步，原頁保留於用戶「垃圾桶」父頁；所有歷史快照保留。
 
 ## 8. 可重用 skill 與專案契約界線
 
