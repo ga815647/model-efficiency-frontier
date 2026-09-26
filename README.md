@@ -2,7 +2,9 @@
 
 AA Intelligence Index 的付費模型成本／能力快照與個人使用情境階梯。階梯以同一 benchmark 版本、API cost basis 的候選重算；`Cost_orig` 是 AA 每任務原價，`CP_adj` 是情境效率，**不是實際 API 折扣或 AA 實測成本**。政策及流程見 [AGENTS.md](AGENTS.md)。
 
-最新展示：[2026-09-26 GPT ×18／Grok ×16 番外篇](runs/2026-09-26-general-grok16/ladder-extra.md)（16 階；155 個付費候選；4 個零成本報值另見 [sidecar](runs/2026-09-26-general-grok16/free-sidecar.md)）。[run notes](runs/2026-09-26-general-grok16/run-notes.md) 說明版本推定、GRADE-B 公式、資料來源與重現方式。唯一展示的 [Notion 頁](https://app.notion.com/p/3e539f3fa67c810a9ecaf2de2c0fe1a5?pvs=204) 同步番外篇；舊 run 原樣封存。
+最新結果：[2026-09-26 GPT ×18／Grok ×16 番外篇](runs/2026-09-26-general-grok16/ladder-extra.md)（16 階；155 個付費候選；4 個零成本報值另見 [sidecar](runs/2026-09-26-general-grok16/free-sidecar.md)）。[run notes](runs/2026-09-26-general-grok16/run-notes.md) 說明版本推定、GRADE-B 公式、資料來源與重現方式。舊 run 原樣封存。
+
+結報方向已確認為 **Chat 對談＋按需單檔 HTML**，CI／HTML 尚待實作，不部署網站。Notion 已停止展示與同步，原頁已移到用戶的「垃圾桶」父頁，待用戶日後手动刪除。詳見 [Chat／CI 設計](docs/superpowers/specs/2026-09-26-chat-ci-design.md)。
 
 在 repo 根目錄重新產出**同一快照**（不會抓資料）：
 

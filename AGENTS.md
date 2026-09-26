@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-09-26 最新展示決策（覆蓋下方 Notion 展示／同步政策）**：用戶採 Chat 結報＋按需單檔 HTML；CI／HTML 尚待實作，不部署網站。Notion 已立即退出日常展示與同步：原頁 `3e539f3f-a67c-810a-9eca-f2de2c0fe1a5` 已搬入用戶「垃圾桶」父頁 `3e639f3f-a67c-8111-a4f9-d682d34f06b7` 並回讀確認，保留內容等用戶手動刪除；不再自動更新／恢復該頁。既有本地 run 快照仍為 SSOT。新結報設計見 `docs/superpowers/specs/2026-09-26-chat-ci-design.md` 最新修訂。
+
 > 最新展示 SSOT：`runs/2026-09-26-general-grok16/ladder-extra.md`（2026-09-26 公開頁 **推定 v4.3.2**，GPT ×18／Grok ×16；資料與版本限制見同目錄 `run-notes.md`；唯一 Notion 頁 `3e539f3f-a67c-810a-9eca-f2de2c0fe1a5` 標題更新為「模型效率前線｜番外篇 GPT×18／Grok×16（2026-09-26 快照）」）。原有 v5 ladder／番外篇快照封存不可改；認證 API v4.3 另外留存，不能混入本次公開 v4.3.2 情境。頂層 `README.md` 為入口。
 
 > 定位：這裡存的是**狀態**（每次研究的日期、價格快照、證據、frontier 結果）。
