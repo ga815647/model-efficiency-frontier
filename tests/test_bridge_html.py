@@ -1,5 +1,7 @@
 import html
+import re
 import unittest
+from html.parser import HTMLParser
 
 from bridge.html_report import render_html
 from test_bridge_result import SNAPSHOT, PARAMETERS, PROVENANCE
@@ -43,6 +45,55 @@ class HTMLTests(unittest.TestCase):
         page = render_html(payload)
         self.assertNotIn(evil, page)
         self.assertIn(html.escape(evil), page)
+
+    def test_cards_table_and_states_match_payload_with_override_factors(self):
+        class Sections(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.sections = {'card': [], 'tr': [], 'li': []}
+                self.stack = []
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == 'article' and attrs.get('class') == 'card':
+                    self.stack.append(('card', ''))
+                elif tag == 'tr' and 'data-rank' in attrs:
+                    self.stack.append(('tr', ''))
+                elif tag == 'li' and self.stack == []:
+                    self.stack.append(('li', ''))
+            def handle_data(self, data):
+                if self.stack:
+                    kind, text = self.stack[-1]
+                    self.stack[-1] = (kind, text + data)
+            def handle_endtag(self, tag):
+                if self.stack and ((tag == 'article' and self.stack[-1][0] == 'card') or
+                                   (tag == 'tr' and self.stack[-1][0] == 'tr') or
+                                   (tag == 'li' and self.stack[-1][0] == 'li')):
+                    kind, text = self.stack.pop()
+                    self.sections[kind].append(text)
+        params = dict(PARAMETERS, gpt_factor=3, grok_factor=4)
+        payload, _ = calculate_snapshot(SNAPSHOT, params, PROVENANCE)
+        page = render_html(payload)
+        parser = Sections()
+        parser.feed(page)
+        for card, name in zip(parser.sections['card'], ('strong', 'middle', 'cheap')):
+            self.assertIn(payload['picks'][name]['identity'], card)
+        self.assertEqual(len(parser.sections['tr']), len(payload['ladder']))
+        for line, row in zip(parser.sections['tr'], payload['ladder']):
+            self.assertIn(row['identity'], line)
+            self.assertIn('×' + str(row['factor']), line)
+        self.assertIn('GPT ×3', page)
+        self.assertIn('Grok ×4', page)
+        self.assertNotIn('GPT ×18 為個人情境', page)
+        self.assertNotIn('Grok ×16 非實測', page)
+        self.assertEqual(sum(r['is_grok'] for r in payload['candidate_statuses']), 9)
+        self.assertEqual(sum(r['is_contributor'] for r in payload['candidate_statuses']), 2)
+        for family, flag in (('grok', 'is_grok'), ('contributor', 'is_contributor')):
+            section = page.split(f'data-family="{family}"', 1)[1].split('</section>', 1)[0]
+            identities = [html.unescape(s) for s in re.findall(r'<li><strong>(.*?)</strong>', section)]
+            expected = [r['identity'] for r in payload['candidate_statuses'] if r[flag]]
+            self.assertEqual(identities, expected)
+            for row in (r for r in payload['candidate_statuses'] if r[flag]):
+                self.assertIn('>' + row['status'] + '</span>', section)
 
 
 if __name__ == '__main__':

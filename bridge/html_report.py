@@ -35,7 +35,7 @@ def render_html(calculation: dict) -> str:
         else:
             body = '<strong>從缺</strong><span>無非 Claude 階梯候選</span>'
         cards.append(f'<article class="card"><div class="eyebrow">{title} · {subtitle}</div>{body}</article>')
-    def states(name, predicate):
+    def states(name, family, predicate):
         selected = [r for r in statuses if predicate(r)]
         items = ''.join(
             f'<li><strong>{_text(r["identity"])}</strong> <span class="badge">{_text(r["status"])}</span>'
@@ -43,12 +43,16 @@ def render_html(calculation: dict) -> str:
             f' · ×{_text(r["factor"])} · CP_adj {_num(r["cp_adj"])} · GRADE {_text(r["grade"])}</div>'
             f'<p>{_text(r["reason"])}{(" → " + _text(r["winner"])) if r["winner"] else ""}</p>'
             f'<small>來源：{_text(r["source_url"])} · {_text(r["source_date"])}<br>{_text(r["notes"])}</small></li>' for r in selected)
-        return f'<section class="panel"><h2>{name} 狀態 <span class="count">{len(selected)}</span></h2><ul class="states">{items}</ul></section>'
+        return f'<section class="panel" data-family="{family}"><h2>{name} 狀態 <span class="count">{len(selected)}</span></h2><ul class="states">{items}</ul></section>'
     meta = (f'{_text(calculation["benchmark"])} · {_text(calculation["benchmark_version"])}'
             f' ({_text(calculation["version_status"])}) · {_text(calculation["cost_basis"])}')
     source = calculation['source_snapshot']
     caveats = ''.join(f'<li>{_text(c)}</li>' for c in calculation['caveats'])
     dates = ', '.join(str(d) for d in calculation['source_dates'])
+    source_ref = (source['commit'] if 'commit' in source else
+                  'SHA-256 ' + source['sha256'])
+    gpt_factor = _text(calculation['parameters']['gpt_factor'])
+    grok_factor = _text(calculation['parameters']['grok_factor'])
     return f'''<!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>模型效率前線｜情境結報</title>
@@ -67,7 +71,7 @@ main {{ max-width:1120px; margin:auto; padding:clamp(16px,4vw,48px); }} h1 {{ fo
 <header><div class="eyebrow">MODEL EFFICIENCY FRONTIER · PERSONAL SCENARIO</div><h1>模型效率前線</h1><p class="intro">Score 降序 · 原價與情境係數分列 · Claude 僅比較，不列推薦</p><p class="intro">{meta}</p></header>
 <section class="cards" aria-label="三檔推薦">{''.join(cards)}</section>
 <section class="panel"><h2>效率階梯 <span class="count">{len(ladder)}</span></h2><div class="table-wrap"><table><thead><tr><th>#</th><th>模型身份</th><th>Score</th><th>Cost_orig</th><th>係數</th><th>CP_adj</th></tr></thead><tbody>{''.join(_row(row, i) for i,row in enumerate(ladder,1))}</tbody></table></div></section>
-{states('Grok', lambda r: r['model'].lower().startswith('grok') or r['identity'].lower().startswith(('grok ', 'grok-')))}
-{states('Contributor', lambda r: 'contributor' in r['identity'].lower() or 'contributor' in r['notes'].lower() and r['grade'] == 'B')}
-<section class="panel source"><h2>來源與限制</h2><p>來源日期：{_text(dates)} · 快照：{_text(source['path'])} @ {_text(source['commit'])}</p><p>cost_adj = Cost_orig ÷ 係數；CP_adj = Score ÷ cost_adj。GPT ×18 為個人情境；Grok ×16 非實測。Contributor ×1。價格為原始來源價，非折扣後實測價。</p><ul>{caveats}</ul></section>
+{states('Grok', 'grok', lambda r: r['is_grok'])}
+{states('Contributor', 'contributor', lambda r: r['is_contributor'])}
+<section class="panel source"><h2>來源與限制</h2><p>來源日期：{_text(dates)} · 快照：{_text(source['path'])} @ {_text(source_ref)}</p><p>cost_adj = Cost_orig ÷ 係數；CP_adj = Score ÷ cost_adj。GPT ×{gpt_factor} 為個人情境；Grok ×{grok_factor} 非實測。Contributor ×1。價格為原始來源價，非折扣後實測價。</p><ul>{caveats}</ul></section>
 </main></body></html>'''

@@ -1,4 +1,6 @@
 import csv
+from copy import deepcopy
+import hashlib
 import json
 import sys
 import tempfile
@@ -60,6 +62,10 @@ class ResultTests(unittest.TestCase):
                 if subset:
                     payload, _ = calculate_snapshot(file, PARAMETERS, PROVENANCE)
                     self.assertEqual(payload['picks'], {'strong': None, 'middle': None, 'cheap': None})
+                    env = make_envelope(request_data(), dict(request_commit_sha='b'*40,
+                        run_id='123', run_attempt=1, run_url='https://github.com/example/actions/runs/123'),
+                        calculation=payload, errors=[])
+                    self.assertEqual(env['status'], 'success')
                 else:
                     with self.assertRaisesRegex(ValueError, 'empty_paid'):
                         calculate_snapshot(file, PARAMETERS, PROVENANCE)
@@ -99,6 +105,81 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(validate_envelope(failed), failed)
         with self.assertRaises(ValueError):
             validate_envelope(dict(failed, picks=calc['picks']))
+
+    def test_envelope_rejects_hollow_success_and_inconsistent_rows(self):
+        calc, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
+        base = make_envelope(request_data(), dict(request_commit_sha='b' * 40, run_id='9753',
+                             run_attempt=2, run_url='https://github.com/example/actions/runs/9753'),
+                             calculation=calc, errors=[])
+        mutations = (
+            lambda e: e.update(request_id=''),
+            lambda e: e.update(ladder=[], candidate_statuses=[], picks=dict.fromkeys(('strong','middle','cheap'))),
+            lambda e: e['ladder'].reverse(),
+            lambda e: e['candidate_statuses'].pop(),
+            lambda e: e['picks'].update(strong=None),
+            lambda e: e['picks'].update(cheap=e['candidate_statuses'][-1]),
+            lambda e: e['candidate_statuses'][0].update(status='surprise'),
+            lambda e: e.update(errors=[{'code': 'x', 'message': 'y'}]),
+            lambda e: e.update(source_dates=['yesterday']),
+            lambda e: e['ladder'][0].update(score=float('nan')),
+            lambda e: e.update(candidate_count=True),
+            lambda e: e.update(run_attempt=True),
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                damaged = deepcopy(base)
+                mutation(damaged)
+                with self.assertRaises(ValueError):
+                    validate_envelope(damaged)
+
+    def test_failure_accepts_unvalidated_params_but_requires_safe_errors(self):
+        r = request_data()
+        r['parameters'] = {'unparsed': True}
+        execution = dict(request_commit_sha='b' * 40, run_id='123', run_attempt=1,
+                         run_url='https://github.com/example/actions/runs/123')
+        failed = make_envelope(r, execution, calculation=None,
+                               errors=[{'code': 'invalid_request', 'message': 'Bad parameters'}])
+        self.assertEqual(failed['parameters'], {'unparsed': True})
+        for errors in ([], [{'code': '', 'message': 'bad'}], [{'code': 'bad'}], ['bad']):
+            with self.subTest(errors=errors), self.assertRaises(ValueError):
+                validate_envelope(dict(failed, errors=errors))
+
+    def test_acquired_locator_checks_hash_and_provenance_semantics(self):
+        acquired = deepcopy(PROVENANCE)
+        acquired['source_locator'] = {'kind': 'acquired', 'path': 'snapshot/candidates.csv',
+                                      'sha256': hashlib.sha256(SNAPSHOT.read_bytes()).hexdigest()}
+        payload, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, acquired)
+        self.assertEqual(payload['source_snapshot'], acquired['source_locator'])
+        for bad in ({'commit': 'oops', 'path': PROVENANCE['source_locator']['path']},
+                    {'commit': 'a' * 40, 'path': '../secret.csv'},
+                    {'commit': 'a' * 40, 'path': 'results/not-a-uuid/123-1/snapshot/candidates.csv'},
+                    {'kind': 'acquired', 'path': 'snapshot/candidates.csv', 'sha256': '0' * 64}):
+            with self.subTest(locator=bad), self.assertRaises(ValueError):
+                calculate_snapshot(SNAPSHOT, PARAMETERS, dict(PROVENANCE, source_locator=bad))
+        for updates in ({'version_status': 'unknown'}, {'source_dates': ['2026-15-50']},
+                        {'caveats': []}):
+            with self.subTest(updates=updates), self.assertRaises(ValueError):
+                calculate_snapshot(SNAPSHOT, PARAMETERS, dict(PROVENANCE, **updates))
+        with self.assertRaisesRegex(ValueError, 'missing_grade_b_caveat'):
+            calculate_snapshot(SNAPSHOT, PARAMETERS, dict(PROVENANCE, version_status='explicit', caveats=[]))
+        pinned = dict(PROVENANCE, source_locator={
+            'commit': 'a' * 40,
+            'path': 'results/c49aef65-50dd-4fc2-b2f2-8ecccf4ff24d/123-1/snapshot/candidates.csv'})
+        self.assertEqual(calculate_snapshot(SNAPSHOT, PARAMETERS, pinned)[0]['source_snapshot'], pinned['source_locator'])
+
+    def test_all_filtered_is_valid_success_and_flags_follow_math_predicates(self):
+        params = dict(PARAMETERS, min_score=999)
+        payload, _ = calculate_snapshot(SNAPSHOT, params, PROVENANCE)
+        self.assertEqual(payload['ladder'], [])
+        self.assertEqual(set(r['status'] for r in payload['candidate_statuses']), {'excluded'})
+        self.assertEqual(payload['picks'], dict.fromkeys(('strong', 'middle', 'cheap')))
+        self.assertEqual(sum(r['is_grok'] for r in payload['candidate_statuses']), 9)
+        self.assertEqual(sum(r['is_contributor'] for r in payload['candidate_statuses']), 2)
+        env = make_envelope(dict(request_data(), parameters=params),
+                            dict(request_commit_sha='b'*40, run_id='123', run_attempt=1,
+                                 run_url='https://github.com/example/actions/runs/123'),
+                            calculation=payload, errors=[])
+        self.assertEqual(env['status'], 'success')
 
 
 if __name__ == '__main__':
