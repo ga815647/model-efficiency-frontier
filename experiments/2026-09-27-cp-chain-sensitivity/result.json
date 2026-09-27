@@ -1,0 +1,708 @@
+{
+  "source_sha256": "e3916f8405904154f0e1dc648588bb08ce92f483cd616ba9be0ff2e5c726ed22",
+  "candidate_count": 154,
+  "chain": [
+    {
+      "identity": "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price",
+      "score": 57.6223698102963,
+      "cost_adj": 5.982012019521066,
+      "cp_adj": 9.632606825639526
+    },
+    {
+      "identity": "Claude Opus 5.5 Adaptive Reasoning, Xhigh Effort, Default Fallback AA-public published-price",
+      "score": 55.9873505840139,
+      "cost_adj": 3.459110175822289,
+      "cp_adj": 16.185477691731737
+    },
+    {
+      "identity": "Claude Opus 5.5 Adaptive Reasoning, High Effort, Default Fallback AA-public published-price",
+      "score": 53.5831959822067,
+      "cost_adj": 1.822504718771704,
+      "cp_adj": 29.400854456124346
+    },
+    {
+      "identity": "GPT-6 Astra max AA-public published-price",
+      "score": 52.673669395513,
+      "cost_adj": 0.18097223963796757,
+      "cp_adj": 291.05938845032773
+    },
+    {
+      "identity": "GPT-6 Astra xhigh AA-public published-price",
+      "score": 52.3863277108782,
+      "cost_adj": 0.12826643957050424,
+      "cp_adj": 408.41803893748056
+    },
+    {
+      "identity": "GPT-6 Astra high AA-public published-price",
+      "score": 50.9191471636152,
+      "cost_adj": 0.09584739367249143,
+      "cp_adj": 531.2522877523919
+    },
+    {
+      "identity": "GPT-6 Astra medium AA-public published-price",
+      "score": 49.5704363034369,
+      "cost_adj": 0.08559162900011759,
+      "cp_adj": 579.1505183686689
+    },
+    {
+      "identity": "GPT-6 Sol max AA-public published-price",
+      "score": 47.5276426437724,
+      "cost_adj": 0.05869022718931327,
+      "cp_adj": 809.8050547745463
+    },
+    {
+      "identity": "GPT-6 Astra low AA-public published-price",
+      "score": 45.7819243120341,
+      "cost_adj": 0.04541744047586698,
+      "cp_adj": 1008.0251954392012
+    },
+    {
+      "identity": "GPT-6 Sol xhigh AA-public published-price",
+      "score": 44.1009705516407,
+      "cost_adj": 0.029549792735500797,
+      "cp_adj": 1492.4290991272596
+    },
+    {
+      "identity": "GPT-6 Sol high AA-public published-price",
+      "score": 42.8215513642985,
+      "cost_adj": 0.020812927261934462,
+      "cp_adj": 2057.4497198487034
+    },
+    {
+      "identity": "GPT-6 Sol medium AA-public published-price",
+      "score": 39.7820971749522,
+      "cost_adj": 0.013789005321479982,
+      "cp_adj": 2885.0592372301994
+    },
+    {
+      "identity": "GPT-5.6 Luna max AA-public published-price",
+      "score": 37.3244239690841,
+      "cost_adj": 0.009905403417938385,
+      "cp_adj": 3768.087214044276
+    },
+    {
+      "identity": "GPT-6 Luna max AA-public published-price",
+      "score": 37.2559686869738,
+      "cost_adj": 0.00378305479372281,
+      "cp_adj": 9848.117650527374
+    },
+    {
+      "identity": "GPT-6 Luna xhigh AA-public published-price",
+      "score": 33.8845820217785,
+      "cost_adj": 0.002317153977469531,
+      "cp_adj": 14623.362258723293
+    },
+    {
+      "identity": "GPT-6 Luna high AA-public published-price",
+      "score": 32.1482304150837,
+      "cost_adj": 0.0015899804871865805,
+      "cp_adj": 20219.2609746859
+    },
+    {
+      "identity": "GPT-6 Luna medium AA-public published-price",
+      "score": 29.4619523515762,
+      "cost_adj": 0.000958533010792549,
+      "cp_adj": 30736.502572004294
+    },
+    {
+      "identity": "GPT-5.6 Luna low AA-public published-price",
+      "score": 21.0124783424265,
+      "cost_adj": 0.0005459583197031109,
+      "cp_adj": 38487.330596689084
+    },
+    {
+      "identity": "GPT-6 Luna low AA-public published-price",
+      "score": 20.9225480080866,
+      "cost_adj": 0.00024910051441883406,
+      "cp_adj": 83992.39181380303
+    }
+  ],
+  "baseline": [
+    "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price",
+    "GPT-6 Astra xhigh AA-public published-price",
+    "GPT-6 Astra medium AA-public published-price",
+    "GPT-6 Sol max AA-public published-price",
+    "GPT-6 Sol high AA-public published-price",
+    "GPT-6 Sol medium AA-public published-price",
+    "GPT-6 Luna max AA-public published-price",
+    "GPT-6 Luna high AA-public published-price",
+    "GPT-6 Luna medium AA-public published-price",
+    "GPT-6 Luna low AA-public published-price"
+  ],
+  "trace": [
+    {
+      "winner": "GPT-6 Luna max AA-public published-price",
+      "strength": 4.784827910304184,
+      "removed": [
+        "GPT-5.6 Luna max AA-public published-price"
+      ]
+    },
+    {
+      "winner": "GPT-6 Astra xhigh AA-public published-price",
+      "strength": 1.8837814552422576,
+      "removed": [
+        "Claude Opus 5.5 Adaptive Reasoning, High Effort, Default Fallback AA-public published-price",
+        "GPT-6 Astra max AA-public published-price",
+        "GPT-6 Astra high AA-public published-price"
+      ]
+    },
+    {
+      "winner": "GPT-6 Sol high AA-public published-price",
+      "strength": 0.8136291967416701,
+      "removed": [
+        "GPT-6 Sol xhigh AA-public published-price"
+      ]
+    },
+    {
+      "winner": "GPT-6 Sol max AA-public published-price",
+      "strength": 0.26880230749514866,
+      "removed": [
+        "GPT-6 Astra low AA-public published-price"
+      ]
+    },
+    {
+      "winner": "GPT-6 Luna high AA-public published-price",
+      "strength": 0.17973109710728752,
+      "removed": [
+        "GPT-6 Luna xhigh AA-public published-price"
+      ]
+    },
+    {
+      "winner": "GPT-6 Luna low AA-public published-price",
+      "strength": 0.0,
+      "removed": [
+        "GPT-5.6 Luna low AA-public published-price"
+      ]
+    },
+    {
+      "winner": "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price",
+      "strength": 0.0,
+      "removed": [
+        "Claude Opus 5.5 Adaptive Reasoning, Xhigh Effort, Default Fallback AA-public published-price"
+      ]
+    }
+  ],
+  "thresholds": [
+    {
+      "distance": 1.5,
+      "count": 13,
+      "added": [
+        "Claude Opus 5.5 Adaptive Reasoning, Xhigh Effort, Default Fallback AA-public published-price",
+        "GPT-6 Astra low AA-public published-price",
+        "GPT-6 Luna xhigh AA-public published-price"
+      ],
+      "removed": []
+    },
+    {
+      "distance": 1.75,
+      "count": 10,
+      "added": [],
+      "removed": []
+    },
+    {
+      "distance": 1.9,
+      "count": 10,
+      "added": [],
+      "removed": []
+    },
+    {
+      "distance": 2.0,
+      "count": 10,
+      "added": [],
+      "removed": []
+    },
+    {
+      "distance": 2.1,
+      "count": 9,
+      "added": [],
+      "removed": [
+        "GPT-6 Astra medium AA-public published-price"
+      ]
+    },
+    {
+      "distance": 2.25,
+      "count": 9,
+      "added": [],
+      "removed": [
+        "GPT-6 Astra medium AA-public published-price"
+      ]
+    },
+    {
+      "distance": 2.5,
+      "count": 9,
+      "added": [],
+      "removed": [
+        "GPT-6 Astra medium AA-public published-price"
+      ]
+    }
+  ],
+  "endpoint_sensitivity": [
+    {
+      "endpoint": -1.0,
+      "added": [],
+      "removed": []
+    },
+    {
+      "endpoint": 0.0,
+      "added": [],
+      "removed": []
+    },
+    {
+      "endpoint": 1.0,
+      "added": [],
+      "removed": []
+    }
+  ],
+  "static_priority": {
+    "added": [
+      "Claude Opus 5.5 Adaptive Reasoning, Xhigh Effort, Default Fallback AA-public published-price"
+    ],
+    "removed": [
+      "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price"
+    ],
+    "trace": [
+      {
+        "winner": "GPT-6 Luna max AA-public published-price",
+        "strength": 4.784827910304184,
+        "removed": [
+          "GPT-5.6 Luna max AA-public published-price"
+        ]
+      },
+      {
+        "winner": "GPT-6 Astra xhigh AA-public published-price",
+        "strength": 1.8837814552422576,
+        "removed": [
+          "Claude Opus 5.5 Adaptive Reasoning, High Effort, Default Fallback AA-public published-price",
+          "GPT-6 Astra max AA-public published-price",
+          "GPT-6 Astra high AA-public published-price"
+        ]
+      },
+      {
+        "winner": "GPT-6 Sol high AA-public published-price",
+        "strength": 0.8136291967416701,
+        "removed": [
+          "GPT-6 Sol xhigh AA-public published-price"
+        ]
+      },
+      {
+        "winner": "GPT-6 Sol max AA-public published-price",
+        "strength": 0.26880230749514866,
+        "removed": [
+          "GPT-6 Astra low AA-public published-price"
+        ]
+      },
+      {
+        "winner": "Claude Opus 5.5 Adaptive Reasoning, Xhigh Effort, Default Fallback AA-public published-price",
+        "strength": 0.24560632512830463,
+        "removed": [
+          "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price"
+        ]
+      },
+      {
+        "winner": "GPT-6 Luna high AA-public published-price",
+        "strength": 0.17973109710728752,
+        "removed": [
+          "GPT-6 Luna xhigh AA-public published-price"
+        ]
+      },
+      {
+        "winner": "GPT-6 Luna low AA-public published-price",
+        "strength": 0.0,
+        "removed": [
+          "GPT-5.6 Luna low AA-public published-price"
+        ]
+      }
+    ]
+  },
+  "input_order_checks": 20,
+  "synthetic_endpoint_example": {
+    "purpose": "Prove neutral endpoints do not pin the highest score; not model evidence",
+    "input": [
+      {
+        "identity": "top",
+        "_score": 10.0,
+        "_cp": 1.0,
+        "_cost": 10.0
+      },
+      {
+        "identity": "middle",
+        "_score": 9.0,
+        "_cp": 3.0,
+        "_cost": 3.0
+      },
+      {
+        "identity": "tail",
+        "_score": 6.0,
+        "_cp": 4.0,
+        "_cost": 1.5
+      }
+    ],
+    "kept": [
+      "middle",
+      "tail"
+    ],
+    "trace": [
+      {
+        "winner": "middle",
+        "strength": 2.4385594399920474,
+        "removed": [
+          "top"
+        ]
+      }
+    ]
+  },
+  "perturbations": [
+    {
+      "scope": "stage2_only",
+      "field": "score",
+      "amount": 0.1,
+      "total": 38,
+      "skipped": 4,
+      "changed": 2,
+      "retention_counts": {
+        "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price": 34,
+        "GPT-6 Astra medium AA-public published-price": 32,
+        "GPT-6 Astra xhigh AA-public published-price": 34,
+        "GPT-6 Luna high AA-public published-price": 34,
+        "GPT-6 Luna low AA-public published-price": 34,
+        "GPT-6 Luna max AA-public published-price": 34,
+        "GPT-6 Luna medium AA-public published-price": 34,
+        "GPT-6 Sol high AA-public published-price": 34,
+        "GPT-6 Sol max AA-public published-price": 34,
+        "GPT-6 Sol medium AA-public published-price": 34
+      },
+      "cases": [
+        {
+          "changed_identity": "GPT-6 Astra medium AA-public published-price",
+          "sign": -1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Sol max AA-public published-price",
+          "sign": 1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-5.6 Luna max AA-public published-price",
+          "sign": -1,
+          "skipped": "chain ordering/CP monotonicity changed"
+        },
+        {
+          "changed_identity": "GPT-6 Luna max AA-public published-price",
+          "sign": 1,
+          "skipped": "chain ordering/CP monotonicity changed"
+        },
+        {
+          "changed_identity": "GPT-5.6 Luna low AA-public published-price",
+          "sign": -1,
+          "skipped": "chain ordering/CP monotonicity changed"
+        },
+        {
+          "changed_identity": "GPT-6 Luna low AA-public published-price",
+          "sign": 1,
+          "skipped": "chain ordering/CP monotonicity changed"
+        }
+      ]
+    },
+    {
+      "scope": "stage2_only",
+      "field": "score",
+      "amount": 0.25,
+      "total": 38,
+      "skipped": 4,
+      "changed": 4,
+      "retention_counts": {
+        "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price": 34,
+        "GPT-6 Astra medium AA-public published-price": 31,
+        "GPT-6 Astra xhigh AA-public published-price": 32,
+        "GPT-6 Luna high AA-public published-price": 34,
+        "GPT-6 Luna low AA-public published-price": 34,
+        "GPT-6 Luna max AA-public published-price": 34,
+        "GPT-6 Luna medium AA-public published-price": 34,
+        "GPT-6 Sol high AA-public published-price": 34,
+        "GPT-6 Sol max AA-public published-price": 34,
+        "GPT-6 Sol medium AA-public published-price": 34
+      },
+      "cases": [
+        {
+          "changed_identity": "GPT-6 Astra max AA-public published-price",
+          "sign": 1,
+          "added": [
+            "GPT-6 Astra high AA-public published-price",
+            "GPT-6 Astra max AA-public published-price"
+          ],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price",
+            "GPT-6 Astra xhigh AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Astra xhigh AA-public published-price",
+          "sign": -1,
+          "added": [
+            "GPT-6 Astra max AA-public published-price"
+          ],
+          "removed": [
+            "GPT-6 Astra xhigh AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Astra medium AA-public published-price",
+          "sign": -1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Sol max AA-public published-price",
+          "sign": 1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-5.6 Luna max AA-public published-price",
+          "sign": -1,
+          "skipped": "chain ordering/CP monotonicity changed"
+        },
+        {
+          "changed_identity": "GPT-6 Luna max AA-public published-price",
+          "sign": 1,
+          "skipped": "chain ordering/CP monotonicity changed"
+        },
+        {
+          "changed_identity": "GPT-5.6 Luna low AA-public published-price",
+          "sign": -1,
+          "skipped": "chain ordering/CP monotonicity changed"
+        },
+        {
+          "changed_identity": "GPT-6 Luna low AA-public published-price",
+          "sign": 1,
+          "skipped": "chain ordering/CP monotonicity changed"
+        }
+      ]
+    },
+    {
+      "scope": "stage2_only",
+      "field": "cost",
+      "amount": 0.01,
+      "total": 38,
+      "skipped": 0,
+      "changed": 0,
+      "retention_counts": {
+        "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price": 38,
+        "GPT-6 Astra medium AA-public published-price": 38,
+        "GPT-6 Astra xhigh AA-public published-price": 38,
+        "GPT-6 Luna high AA-public published-price": 38,
+        "GPT-6 Luna low AA-public published-price": 38,
+        "GPT-6 Luna max AA-public published-price": 38,
+        "GPT-6 Luna medium AA-public published-price": 38,
+        "GPT-6 Sol high AA-public published-price": 38,
+        "GPT-6 Sol max AA-public published-price": 38,
+        "GPT-6 Sol medium AA-public published-price": 38
+      },
+      "cases": []
+    },
+    {
+      "scope": "stage2_only",
+      "field": "cost",
+      "amount": 0.05,
+      "total": 38,
+      "skipped": 0,
+      "changed": 1,
+      "retention_counts": {
+        "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price": 37,
+        "GPT-6 Astra medium AA-public published-price": 37,
+        "GPT-6 Astra xhigh AA-public published-price": 37,
+        "GPT-6 Luna high AA-public published-price": 38,
+        "GPT-6 Luna low AA-public published-price": 38,
+        "GPT-6 Luna max AA-public published-price": 38,
+        "GPT-6 Luna medium AA-public published-price": 38,
+        "GPT-6 Sol high AA-public published-price": 38,
+        "GPT-6 Sol max AA-public published-price": 38,
+        "GPT-6 Sol medium AA-public published-price": 38
+      },
+      "cases": [
+        {
+          "changed_identity": "GPT-6 Astra high AA-public published-price",
+          "sign": -1,
+          "added": [
+            "Claude Opus 5.5 Adaptive Reasoning, High Effort, Default Fallback AA-public published-price",
+            "Claude Opus 5.5 Adaptive Reasoning, Xhigh Effort, Default Fallback AA-public published-price",
+            "GPT-6 Astra high AA-public published-price"
+          ],
+          "removed": [
+            "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price",
+            "GPT-6 Astra medium AA-public published-price",
+            "GPT-6 Astra xhigh AA-public published-price"
+          ]
+        }
+      ]
+    },
+    {
+      "scope": "full_pipeline",
+      "field": "score",
+      "amount": 0.1,
+      "total": 308,
+      "skipped": 0,
+      "changed": 2,
+      "retention_counts": {
+        "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price": 308,
+        "GPT-6 Astra medium AA-public published-price": 306,
+        "GPT-6 Astra xhigh AA-public published-price": 308,
+        "GPT-6 Luna high AA-public published-price": 308,
+        "GPT-6 Luna low AA-public published-price": 308,
+        "GPT-6 Luna max AA-public published-price": 308,
+        "GPT-6 Luna medium AA-public published-price": 308,
+        "GPT-6 Sol high AA-public published-price": 308,
+        "GPT-6 Sol max AA-public published-price": 308,
+        "GPT-6 Sol medium AA-public published-price": 308
+      },
+      "cases": [
+        {
+          "changed_identity": "GPT-6 Astra medium AA-public published-price",
+          "sign": -1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Sol max AA-public published-price",
+          "sign": 1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        }
+      ]
+    },
+    {
+      "scope": "full_pipeline",
+      "field": "score",
+      "amount": 0.25,
+      "total": 308,
+      "skipped": 0,
+      "changed": 4,
+      "retention_counts": {
+        "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price": 308,
+        "GPT-6 Astra medium AA-public published-price": 305,
+        "GPT-6 Astra xhigh AA-public published-price": 306,
+        "GPT-6 Luna high AA-public published-price": 308,
+        "GPT-6 Luna low AA-public published-price": 308,
+        "GPT-6 Luna max AA-public published-price": 308,
+        "GPT-6 Luna medium AA-public published-price": 308,
+        "GPT-6 Sol high AA-public published-price": 308,
+        "GPT-6 Sol max AA-public published-price": 308,
+        "GPT-6 Sol medium AA-public published-price": 308
+      },
+      "cases": [
+        {
+          "changed_identity": "GPT-6 Astra max AA-public published-price",
+          "sign": 1,
+          "added": [
+            "GPT-6 Astra high AA-public published-price",
+            "GPT-6 Astra max AA-public published-price"
+          ],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price",
+            "GPT-6 Astra xhigh AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Astra medium AA-public published-price",
+          "sign": -1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Astra xhigh AA-public published-price",
+          "sign": -1,
+          "added": [
+            "GPT-6 Astra max AA-public published-price"
+          ],
+          "removed": [
+            "GPT-6 Astra xhigh AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Sol max AA-public published-price",
+          "sign": 1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        }
+      ]
+    },
+    {
+      "scope": "full_pipeline",
+      "field": "cost",
+      "amount": 0.01,
+      "total": 308,
+      "skipped": 0,
+      "changed": 0,
+      "retention_counts": {
+        "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price": 308,
+        "GPT-6 Astra medium AA-public published-price": 308,
+        "GPT-6 Astra xhigh AA-public published-price": 308,
+        "GPT-6 Luna high AA-public published-price": 308,
+        "GPT-6 Luna low AA-public published-price": 308,
+        "GPT-6 Luna max AA-public published-price": 308,
+        "GPT-6 Luna medium AA-public published-price": 308,
+        "GPT-6 Sol high AA-public published-price": 308,
+        "GPT-6 Sol max AA-public published-price": 308,
+        "GPT-6 Sol medium AA-public published-price": 308
+      },
+      "cases": []
+    },
+    {
+      "scope": "full_pipeline",
+      "field": "cost",
+      "amount": 0.05,
+      "total": 308,
+      "skipped": 0,
+      "changed": 2,
+      "retention_counts": {
+        "Claude Opus 5.5 Adaptive Reasoning, Max Effort, Default Fallback AA-public published-price": 308,
+        "GPT-6 Astra medium AA-public published-price": 306,
+        "GPT-6 Astra xhigh AA-public published-price": 308,
+        "GPT-6 Luna high AA-public published-price": 308,
+        "GPT-6 Luna low AA-public published-price": 308,
+        "GPT-6 Luna max AA-public published-price": 308,
+        "GPT-6 Luna medium AA-public published-price": 308,
+        "GPT-6 Sol high AA-public published-price": 308,
+        "GPT-6 Sol max AA-public published-price": 308,
+        "GPT-6 Sol medium AA-public published-price": 308
+      },
+      "cases": [
+        {
+          "changed_identity": "GPT-6 Astra high AA-public published-price",
+          "sign": -1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        },
+        {
+          "changed_identity": "GPT-6 Astra medium AA-public published-price",
+          "sign": 1,
+          "added": [],
+          "removed": [
+            "GPT-6 Astra medium AA-public published-price"
+          ]
+        }
+      ]
+    }
+  ]
+}
