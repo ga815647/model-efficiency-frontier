@@ -2,6 +2,8 @@
 
 > **9/27 身份更正：**歷史155行快照及先前試版含不可用的 **Muse Spark 1.3 Contributor max**；官方max僅限Standard。引用舊輸出須附 [更正說明](docs/superpowers/notes/2026-09-27-contributor-effort-correction.md)，選型須排除該行後重算整條鏈。
 
+身份修復已發布並通過 [雲端重算驗收](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36294948064)（16階；HTML可由該run下載）。[固定更正報表](https://github.com/ga815647/model-efficiency-frontier/blob/bbb5fadaf04633aae0e6849f9fbb74924a5040ad/results/95a3ddbc-5d8d-4985-9c6d-1a73c251e0f4/36294948064-1/report.md)是9/26歷史輸入的修正重算；即時fresh仍受兩個task-cost缺值阻擋。
+
 AA Intelligence Index 的付費模型成本／能力快照與個人使用情境階梯。階梯以同一 benchmark 版本、API cost basis 的候選重算；`Cost_orig` 是 AA 每任務原價，`CP_adj` 是情境效率，**不是實際 API 折扣或 AA 實測成本**。政策及流程見 [AGENTS.md](AGENTS.md)。
 
 最新結果：[2026-09-26 GPT ×18／Grok ×16 番外篇](runs/2026-09-26-general-grok16/ladder-extra.md)（16 階；155 個付費候選；4 個零成本報值另見 [sidecar](runs/2026-09-26-general-grok16/free-sidecar.md)）。[run notes](runs/2026-09-26-general-grok16/run-notes.md) 說明版本推定、GRADE-B 公式、資料來源與重現方式。舊 run 原樣封存。

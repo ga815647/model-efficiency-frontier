@@ -31,4 +31,24 @@
 
 補強提交 `d62cfd8` 封住後期失敗刪光能力證據仍可發布的漏洞：`missing_candidate`須保有完整證據，真正早期抓取／解析失敗仍可發布診斷。原覆核者最終spec／quality gate通過；控制端重跑全套 **169 tests，28.127秒，全部通過**。
 
-雲端部署／重算驗收待追加；目前仍不能宣稱當前fresh成功。
+## 雲端發布及驗收（已完成）
+
+產品 `076c7ca`（含三個修復commit）已發布私人main。以下由OpenCode提交及讀回，不冒充新一輪Chat端實測；既有Chat能力證據沿用。
+
+| 項目 | 固定證據 |
+|---|---|
+| 重算request | `95a3ddbc-5d8d-4985-9c6d-1a73c251e0f4`；commit `bf0f44fc11bcc7c8d4a884ee102f7392cfb5e1b8` |
+| 重算run | [36294948064](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36294948064)，success |
+| refresh request | `796291ad-49ed-4af1-8290-b6c6f59845dd`；commit `dd71ee07d3a449ba7baa572c7f6fa40683374f39` |
+| refresh run | [36294949623](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36294949623)，failed，`missing_candidate: inkling,minimax-m2-7` |
+| 固定結果commit | `bbb5fadaf04633aae0e6849f9fbb74924a5040ad`，包含上述兩次結果 |
+| 重算結果目錄 | `results/95a3ddbc-5d8d-4985-9c6d-1a73c251e0f4/36294948064-1/` |
+| refresh診斷目錄 | `results/796291ad-49ed-4af1-8290-b6c6f59845dd/36294949623-1/` |
+
+已按request／product／run／parameters及source locator核對envelope，再以固定commit讀回。重算保留155行status（154行可用身份）、16階；非法Contributor max是`excluded`，原因明載Standard-only、官方URL及核對日期，未參與CP更新／去重／picks。舊正式三picks名稱仍為Astra max／Sol high／Luna low；這是原正式演算法的修復重算，不是待議的10點精簡試算。
+
+HTML artifact下載後與固定Git `report.html`逐位元組相同，SHA-256 `737bf83f1dc7b067cc4c1b2ef118f77deb601fdfa8b6bd9cb899b3ec29423eb5`。原CSV SHA-256仍是 `e3916f8405904154f0e1dc648588bb08ce92f483cd616ba9be0ff2e5c726ed22`，原run檔未改。
+
+fresh失敗結果已成功發布13份evidence檔，包括當次 `models.html`、`meta_models.json`、`availability.json`；解析結果為Contributor max不可用，退出稽核精確記錄舊1.3 max身份。失敗源仍是兩個先前付費候選當前成本缺值，不沿用舊價、不悄悄丟候選；當前fresh成功未達成。更早三遍來源核對見 `2026-09-27-chat-readback-and-source-gap.md`。
+
+Git內Chat指示已更新身份更正與重算規則；bootstrap定位不變，Project不用因這次更新重貼。Settings安裝狀態仍不由Git發布推定。
