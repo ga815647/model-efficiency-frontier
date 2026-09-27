@@ -1,4 +1,4 @@
-# Chat → CI 契約（schema v1；2026-09-26）
+# Chat → CI 契約（request v1／result v2＋歷史v1；2026-09-27）
 
 此文件描述**本地實作**，不是遠端／Chat Project 已安裝證明。私人目標 `ga815647/model-efficiency-frontier`；產品 `main`，發佈 `results`；不得同步或恢復已移往用戶垃圾桶父頁的 Notion 頁，不部署網站。`bridge/request.py`、`bridge/result.py`、`bridge/runner.py`、`bridge/publish.py` 和 `.github/workflows/chat-execution.yml` 是精確欄位與驗證的實作來源。
 
@@ -41,6 +41,8 @@
 
 ## 查 run、固定發佈與讀回
 
+**版本範圍：**下方原有「成功 envelope」欄位清單中的 `picks` 及原row欄位描述是**歷史v1**；v2的完整差異與成功／失敗契約見下一節。當前 `eb3ecf1` 是已覆核本地v2實作，遠端發布／關聯讀回仍待完成，見 [驗收草稿](../superpowers/notes/2026-09-27-window-knee-acceptance.md)。依固定結果的 `schema_version` 判讀，不依pointer名称猜版本。
+
 Contributor 身份修復新增取得證據：`snapshot/evidence/models.html`、`meta_models.json`、`availability.json`，並在 `sources.json` 記官方models來源雜湊。新refresh先驗effort可用性，再換價；已取得的能力證據在成功及失敗發布均驗證。早於修復的成功快照仍可讀取／重算，原CSV保留；修正後計算把其中不可用的Muse Spark1.3 Contributor max明確列為excluded。詳見 `docs/superpowers/notes/2026-09-27-contributor-effort-correction.md` 的發布及驗收狀態。
 
 查 `/actions/runs?event=push&head_sha=<request_commit_sha>`（依 GitHub API 實際支援的篩選，否則分頁列表逐筆篩）並查 `/actions/runs/{run_id}`；要求 `event=push`、`head_sha=request_commit_sha`、`head_branch=efficiency-run/<request_id>`，核對 `run_id` 和 `run_attempt`。不要使用 PR-only helper、單看「最新」run、或以 request ID 字串搜尋冒充關聯。未完成則在可用工具預算內有限次查詢，不能承諾背景通知；保留 ID／run URL 供下次續查。
@@ -52,3 +54,34 @@ Contributor 身份修復新增取得證據：`snapshot/evidence/models.html`、`
 `status="failed"` 有 `errors: [{code,message},...]`，無 ladder/picks/benchmark 等成功欄位；允許 `request_id=null`（無效 transport 診斷）、`operation/created_at/parameters/source_snapshot` 不完整。先保留 `request_commit_sha`、run URL、錯誤碼與具體缺口，不對無效診斷身分套成功關聯規則，也絕不使用舊 picks。Actions 成功 + envelope 不完整／身份錯誤亦**不可交付**；Actions 失敗時即使有 envelope 只報失敗。
 
 成功同一次計算輸出 `report.md`、`report.html`（自包含單檔）與 JSON。HTML 在該 run 的 Actions artifact `report-<request_id>-<run_id>-<attempt>` 可下載，且 Git `results/<request_id>/<run_id>-<attempt>/report.html` 為耐久路徑；它不是公開 Pages 或網站。Chat 附件能力未驗證，不承諾直接在對話附檔；若無法直接附加，提供對應 Actions run/artifact 下載入口或固定 Git 檔定位，私人庫需授權登入。不要在 Notion 同步。
+
+## result v2 精確欄位與遷移
+
+`bridge/result.py` 新計算／envelope預設v2，`validate_envelope` 分派合法v1/v2，未知版本與混合欄位拒絕。request仍v1，五個parameters、唯一push分支與三個固定commit不變。新bootstrap可發布排隊中舊product生成的v1；runner、publisher、inventory、固定成功refresh來源及 `assert-success` 皆接受合法v1/v2。`latest-success`／`latest-refresh` 延續append-only與原排序規則；讀到v1不自動觸發重算、不把三picks或表格手推為v2。原Project bootstrap定位不變，無需因本次改制重貼；Git指示發布不證明settings安裝。
+
+v2根欄位（成功與失敗共有）精確為：`schema_version`（2）、`operation`、`status`、`request_id`、`request_commit_sha`、`product_sha`、`created_at`、`run_id`、`run_attempt`、`run_url`、`source_snapshot`、`parameters`、`source_dates`、`errors`。成功為 `status="success"`、`errors=[]`，另有下列欄位，**沒有 `picks`**：
+
+| 欄位 | 語義 |
+| --- | --- |
+| `benchmark`, `benchmark_version`, `version_status`, `cost_basis`, `caveats`, `candidate_count` | 單一General同版本同basis；原始paid稽核數含不可用身份 |
+| `selection_policy` | `cp-new-high-window-v1` |
+| `eps` | `{"score":2.0,"cp":0.05}`，frozen第一階段参数 |
+| `selection_parameters` | `{"window_score":2.0,"replacement_score":2.0}`，固定產品政策，不是request欄位 |
+| `ladder` | 全部final行，Score降序，含Claude僅比較 |
+| `anchors` | 恰好 `highest_retained_score`（最強保留檔）、`lowest_retained_cost`（最低情境成本保留檔）；完整row或null |
+| `candidate_statuses` | 全部原始paid行，原輸入順序 |
+| `chain_identities` | 第一階段CP鏈，原順序，等於final與cut的集合 |
+| `selection_trace` | 每步恰好 `step`, `winner`, `strength`, `support`, `removed` |
+| `grade_b_effects` | 每項恰好 `identity`, `with_b_retained`, `without_b_retained`；依identity排序的A行保留差異 |
+
+v2 row精確欄位：`identity`, `model`, `effort`, `score`, `cost_orig`, `cost_adj`, `cp_orig`, `cp_adj`, `factor`, `grade`, `status`, `reason`, `winner`, `source_url`, `source_date`, `notes`, `is_grok`, `is_contributor`, `comparison_only`, `upgrade`。同一identity在ladder／anchors／statuses內容一致：
+
+- `final`：reason/winner皆null；`cut`：reason=`within_replacement_radius`，winner指向final且分差嚴格小於2；`excluded`：第一階段未入鏈，保留排除理由、winner=null。不可用Muse Spark1.3 Contributor max必為excluded；不得轉用max分數到xhigh，歷史CSV原樣保存。
+- Claude-family `comparison_only=true`，數學照常參戰但不進anchors或升級路線。兩入口只來自final非Claude，可相同；無非Claude時皆null，不從cut／excluded補位，也不反向保送全候選最高分。
+- `upgrade` 為null或恰好 `cheaper_identity`, `delta_score`, `cost_multiple`, `delta_cost_adj`；比較下一個較低分非Claude保留行。最低非Claude行、Claude及非final行皆null。
+- trace的step從1起；removed按當時Score降序，每個cut只移除一次。support僅 `full_window`／`neutral_missing_window`，後者strength=0，不外插；完整視窗strength可負。剩餘鏈左右各2分log-CP插值後逐次重算，以strength、CP、Score降序及identity字典序選代表；剛好2分不替代，不按相鄰距離串群。最終相鄰分差至少2分。
+- B行照常參戰且標GRADE／推導假設；去除全部可用B後以相同兩階段診斷A行是否仍保留，`grade_b_effects`只記狀態改變者，無可用B則空陣列。winner為A仍可能受B插值或第一階段間接影響，不能解釋成單一B唯一因果。硬邊界與逐次選擇仍敏感，非完全穩健保證。
+
+v2失敗 `status="failed"`、`errors=[{"code":...,"message":...},...]`，僅共有根欄位，無ladder／anchors／candidate_statuses／selection_trace等成功衍生欄位；無效transport可有null身份及不完整請求資訊。保留原關聯驗證及失敗處理，不以舊成功補位。當前真實fresh最後已驗證因Inkling／MiniMax-M2.7 task cost缺值而失敗；修算法不授權略過候選或沿用舊價。失敗診斷證據仍需發布且不推進成功pointer；新的真實fresh結果需遠端驗收後更新狀態。
+
+JSON、Markdown與HTML消費同一主結果，完整呈現Grok／Contributor狀態、cut/excluded理由及B影響；renderer不重新選檔或抓來源。歷史輸出不回寫，新結果固定於新的request/run路徑。v2成功refresh可作後續固定重算來源，v1成功refresh仍可讀／重算，所有來源hash、版本、inventory及能力證據檢查延續。
