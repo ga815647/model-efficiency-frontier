@@ -17,6 +17,17 @@ class SourceError(ValueError):
         super().__init__(f'{code}: {url}: {detail}')
 
 
+def _scalar(value, url, slug, field, *, undefined_is_missing=False):
+    """Decode an AA Flight measurement without coercing strings to numbers."""
+    if value is None or (undefined_is_missing and value == '$undefined'):
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, Decimal)) or not Decimal(value).is_finite():
+        raise SourceError('invalid_measurement', url, f'{slug}: {field}')
+    if 'CostPerTask' in field and value < 0:
+        raise SourceError('invalid_measurement', url, f'{slug}: {field}')
+    return value
+
+
 def _objects(html, url):
     decoder = json.JSONDecoder(parse_float=Decimal)
     found = False
@@ -100,10 +111,15 @@ def parse_leaderboard(html: str) -> list[dict]:
             raise SourceError('model_shape_drift', LEADERBOARD, str(obj.get('slug')))
         if not isinstance(obj['name'], str) or not isinstance(obj.get('intelligenceIndexIsEstimated'), bool):
             raise SourceError('invalid_measurement', LEADERBOARD, str(obj.get('slug')))
+        slug = obj['slug']
+        score = _scalar(obj['intelligenceIndex'], LEADERBOARD, slug, 'intelligenceIndex',
+                        undefined_is_missing=True)
+        cost = _scalar(obj.get('intelligenceIndexCostPerTask'), LEADERBOARD, slug,
+                       'intelligenceIndexCostPerTask', undefined_is_missing=True)
         records.append({'slug': obj['slug'], 'name': obj['name'],
                         'creator': obj.get('modelCreatorName'),
-                        'score': obj.get('intelligenceIndex'),
-                        'cost_per_task': obj.get('intelligenceIndexCostPerTask'),
+                        'score': score,
+                        'cost_per_task': cost,
                         'is_estimated': obj.get('intelligenceIndexIsEstimated'),
                         'deprecated': obj.get('deprecated'),
                         'price1m_input': obj.get('price1mInputTokens'),
@@ -127,12 +143,13 @@ def parse_release(html: str, url: str) -> dict:
         if not isinstance(structure, dict) or not isinstance(structure.get('cost'), dict):
             raise SourceError('release_shape_drift', url, obj['slug'])
         cost = structure['cost']
-        if not isinstance(obj.get('intelligenceIndex'), (int, Decimal)) or any(
-                not isinstance(cost.get(field), (int, Decimal)) for field in
-                ('total', 'nonCacheInput', 'cacheRead', 'cacheWrite', 'output')):
+        score = _scalar(obj.get('intelligenceIndex'), url, obj['slug'], 'intelligenceIndex')
+        components = {field: _scalar(cost.get(field), url, obj['slug'], f'intelligenceIndexCostPerTask.cost.{field}')
+                      for field in ('total', 'nonCacheInput', 'cacheRead', 'cacheWrite', 'output')}
+        if score is None or any(value is None for value in components.values()):
             raise SourceError('release_shape_drift', url, obj['slug'])
-        records.append({'slug': obj['slug'], 'score': obj.get('intelligenceIndex'),
-                        'cost_per_task': cost.get('total'), 'components': cost})
+        records.append({'slug': obj['slug'], 'score': score,
+                         'cost_per_task': cost.get('total'), 'components': cost})
     return {'url': url, 'declared_version': versions.pop(), 'records': _unique(records, url)}
 
 
@@ -147,11 +164,13 @@ def corroborate_version(records: list[dict], releases: list[dict]) -> dict:
     for release in releases:
         for slug in RELEASE_SLUGS[release['url']]:
             row = release['records'].get(slug)
-            if not row or slug not in public or any(
-                    row.get(k) is None or public[slug].get(k) is None or
-                    Decimal(str(row[k])) != Decimal(str(public[slug][k]))
-                    for k in ('score', 'cost_per_task')):
+            if not row or slug not in public:
                 raise SourceError('crosscheck_mismatch', release['url'], slug)
+            for key, field in (('score', 'intelligenceIndex'), ('cost_per_task', 'intelligenceIndexCostPerTask')):
+                left = _scalar(row.get(key), release['url'], slug, field)
+                right = _scalar(public[slug].get(key), LEADERBOARD, slug, field)
+                if left is None or right is None or left != right:
+                    raise SourceError('crosscheck_mismatch', release['url'], slug)
             crosschecks.append({'slug': slug, 'url': release['url'],
                                 'score': public[slug]['score'], 'cost_per_task': public[slug]['cost_per_task']})
     return {'benchmark_version': 'AA-Intelligence-Index-v' + versions.pop(),

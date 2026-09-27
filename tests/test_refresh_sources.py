@@ -17,9 +17,145 @@ URLS = {'leader': 'https://artificialanalysis.ai/leaderboards/models',
         'grok': 'https://artificialanalysis.ai/models/releases/grok-4-7',
         'muse': 'https://artificialanalysis.ai/models/releases/muse-spark-1-3',
         'meta': 'https://dev.meta.ai/docs/pricing-rate-limits'}
+SAVED = Path('/tmp/opencode/2026-09-27-refresh-debug')
+
+
+def flight_record(raw):
+    """Wrap a small first-party model JSON object in its escaped Flight transport."""
+    return '<script>self.__next_f.push([1,' + json.dumps(raw) + '])</script>'
 
 
 class RefreshSourcesTest(unittest.TestCase):
+    def test_saved_flight_undefined_is_missing_not_free_or_numeric(self):
+        # Minimal real failed-page model: its score is numeric, but the cost
+        # arrived as the literal string "$undefined" inside the Flight JSON.
+        raw = ('{"slug":"mistral-medium-3-1","name":"Mistral Medium 3.1",'
+               '"modelCreatorName":"Mistral","shortName":"Mistral Medium 3.1",'
+               '"intelligenceIndex":9.18437902519296,"intelligenceIndexIsEstimated":false,'
+               '"intelligenceIndexCostPerTask":"$undefined"}')
+        html = flight_record(raw)
+        self.assertIn(r'\"intelligenceIndexCostPerTask\":\"$undefined\"', html)
+        row = parse_leaderboard(html)[0]
+        self.assertEqual(row['score'], Decimal('9.18437902519296'))
+        self.assertIsNone(row['cost_per_task'])
+        missing_score = parse_leaderboard(flight_record(raw.replace('9.18437902519296', '"$undefined"')))[0]
+        self.assertIsNone(missing_score['score'])
+        self.assertIsNone(missing_score['cost_per_task'])
+
+        # A never-paid model is sidecar material; a prior paid model instead
+        # must trip the missing-candidate guard (covered below).
+        base = (FIX / 'leader.html').read_bytes()
+        altered = base.replace(b'intelligenceIndexCostPerTask\\":0.4637245706928438',
+                               b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
+        self.assertNotEqual(base, altered)
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        data[URLS['leader']] = altered
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            refresh_snapshot(dest, previous=None, fetch=data.__getitem__)
+            excluded = json.loads((dest / 'free-sidecar.json').read_text())['excluded_non_paid_or_unusable']
+            self.assertTrue(any(r['reason'] == 'missing_score_or_cost' for r in excluded))
+            self.assertIn({'slug': 'apodex-1-1', 'name': 'Apodex 1.1', 'reason': 'missing_score_or_cost'}, excluded)
+            self.assertFalse(any(r['reason'] == 'zero_cost' and r['slug'] == 'apodex-1-1' for r in excluded))
+
+    def test_bad_scalar_fields_fail_with_slug_and_field(self):
+        base = {'slug': 'inkling', 'name': 'Inkling (xhigh)', 'shortName': 'Inkling',
+                'modelCreatorName': 'Thinking Machines', 'intelligenceIndex': 24.9847810999384,
+                'intelligenceIndexIsEstimated': False, 'intelligenceIndexCostPerTask': 0.6070445010820831}
+        for field in ('intelligenceIndex', 'intelligenceIndexCostPerTask'):
+            for bad in ('garbage', '$undefined', '$Undefined', '0.6070445010820831',
+                        True, False, {}, [], float('nan'), float('inf')):
+                if bad == '$undefined':
+                    continue
+                with self.subTest(field=field, bad=bad):
+                    with self.assertRaises(SourceError) as caught:
+                        parse_leaderboard(flight_record(json.dumps({**base, field: bad})))
+                    self.assertEqual(caught.exception.code, 'invalid_measurement')
+                    self.assertIn('inkling', str(caught.exception))
+                    self.assertIn(field, str(caught.exception))
+        with self.assertRaises(SourceError) as caught:
+            parse_leaderboard(flight_record(json.dumps({**base, 'intelligenceIndexCostPerTask': -1})))
+        self.assertEqual(caught.exception.code, 'invalid_measurement')
+
+    def test_null_absent_zero_and_precision_stay_distinct(self):
+        base = ('{"slug":"inkling","name":"Inkling (xhigh)","shortName":"Inkling",'
+                '"modelCreatorName":"Thinking Machines","intelligenceIndex":24.9847810999384,'
+                '"intelligenceIndexIsEstimated":false')
+        for suffix, expected in (('', None), (',"intelligenceIndexCostPerTask":null', None),
+                                 (',"intelligenceIndexCostPerTask":0', 0),
+                                 (',"intelligenceIndexCostPerTask":0.6070445010820831',
+                                  Decimal('0.6070445010820831'))):
+            with self.subTest(suffix=suffix):
+                row = parse_leaderboard(flight_record(base + suffix + '}'))[0]
+                self.assertEqual(row['score'], Decimal('24.9847810999384'))
+                self.assertEqual(row['cost_per_task'], expected)
+                if expected is None:
+                    self.assertIsNone(row['cost_per_task'])
+
+    def test_release_and_crosscheck_reject_invalid_scalars(self):
+        release_html = (FIX / 'grok.html').read_text()
+        marker = 'intelligenceIndexCostPerTask\\":{\\"cost\\":{\\"total\\":3.738325952106939'
+        self.assertIn(marker, release_html)
+        for value in ('true', 'NaN', '\\"not-a-number\\"', '-1'):
+            with self.subTest(value=value):
+                with self.assertRaises(SourceError) as caught:
+                    parse_release(release_html.replace(marker, marker.replace('3.738325952106939', value), 1),
+                                  URLS['grok'])
+                self.assertEqual(caught.exception.code, 'invalid_measurement')
+                self.assertIn('intelligenceIndexCostPerTask.cost.total', str(caught.exception))
+        with self.assertRaises(SourceError) as caught:
+            parse_release(release_html.replace(marker, marker.replace('3.738325952106939', 'null'), 1),
+                          URLS['grok'])
+        self.assertEqual(caught.exception.code, 'release_shape_drift')
+        rows = parse_leaderboard((FIX / 'leader.html').read_text())
+        releases = [parse_release((FIX / k).with_suffix('.html').read_text(), URLS[k]) for k in ('grok', 'muse')]
+        target = next(r for r in rows if r['slug'] == 'grok-4-7-high')
+        for value in (True, 'garbage', float('nan')):
+            with self.subTest(crosscheck=value):
+                target['score'] = value
+                with self.assertRaises(SourceError) as caught:
+                    corroborate_version(rows, releases)
+                self.assertEqual(caught.exception.code, 'invalid_measurement')
+                self.assertIn('grok-4-7-high: intelligenceIndex', str(caught.exception))
+        target['score'] = Decimal('46.3321770885625')
+        target['cost_per_task'] = '$undefined'
+        with self.assertRaises(SourceError) as caught:
+            corroborate_version(rows, releases)
+        self.assertEqual(caught.exception.code, 'invalid_measurement')
+        self.assertIn('grok-4-7-high: intelligenceIndexCostPerTask', str(caught.exception))
+
+    def test_undefined_prior_paid_cost_blocks_and_keeps_diagnostic(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        before = data[URLS['leader']]
+        data[URLS['leader']] = before.replace(b'intelligenceIndexCostPerTask\\":0.4637245706928438',
+                                              b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
+        self.assertNotEqual(before, data[URLS['leader']])
+        archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            with self.assertRaises(SourceError) as caught:
+                refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
+            self.assertEqual(caught.exception.code, 'missing_candidate')
+            missing = json.loads((dest / 'evidence/missing_candidates.json').read_text())
+            self.assertTrue(any(r['leaderboard_source_check']['cost_per_task'] is None for r in missing))
+            self.assertFalse((dest / 'candidates.csv').exists())
+
+    @unittest.skipUnless((SAVED / 'failed/leaderboard.html').exists(), 'saved failed response not in this checkout')
+    def test_saved_failed_refresh_all_four_bytes_reaches_missing_candidate(self):
+        data = {URLS[k]: (SAVED / 'failed' / (label + '.html')).read_bytes()
+                for k, label in [('leader', 'leaderboard'), ('grok', 'grok_release'),
+                                 ('muse', 'muse_release'), ('meta', 'meta_pricing')]}
+        previous = json.loads((SAVED / 'previous/source_map.json').read_text())
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            with self.assertRaises(SourceError) as caught:
+                refresh_snapshot(dest, previous=previous, fetch=data.__getitem__)
+            self.assertEqual(caught.exception.code, 'missing_candidate')
+            missing = json.loads((dest / 'evidence/missing_candidates.json').read_text())
+            self.assertEqual({r['slug'] for r in missing}, {'inkling', 'minimax-m2-7'})
+            self.assertTrue(all(r['leaderboard_source_check']['cost_per_task'] is None for r in missing))
+            self.assertFalse((dest / 'candidates.csv').exists())
+
     def test_real_flight_and_version(self):
         rows = parse_leaderboard((FIX / 'leader.html').read_text())
         releases = [parse_release((FIX / k).with_suffix('.html').read_text(), URLS[k]) for k in ('grok', 'muse')]
