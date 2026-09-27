@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-09-27 正式改制方向已確認、尚待書面規格審閱／實作**：使用者已選「正式採用」試版的雙軸支配＋升級代價，並選非 Claude「最高分／最低情境成本」兩個客觀入口，取消原三 picks 的平衡中段與最高 CP 省錢語義。設計見 `docs/superpowers/specs/2026-09-27-tradeoff-production-design.md`；目前部署仍是 v1 舊制，勿把方向批准當作已切換。規格確認後寫計畫，沿用 Subagent-driven。
+
 > **2026-09-27 最新增量（覆蓋下方 Chat 尚未讀寫的狀態）**：使用者帶回目標 Chat 實測，recompute `36282186076` 成功、refresh `36282226673` 失敗；OpenCode 另核對固定結果。Chat 對本私人庫的提交／查 run／成功及失敗讀回已通過，不重做能力問卷。fresh 的 Flight `$undefined` parser 錯誤已修正、覆核並發布於 `0174e98`，本地重播仍受 Inkling xhigh／MiniMax-M2.7 當前 task cost 缺值阻擋；已三遍核對，不靜默移除或沿用舊價。settings 安裝確認與當前 fresh 成功仍不推定。證據見 `docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md`。
 
 > **2026-09-27 試版授權**：用戶「試試看」批准以 9/26 固定快照另做升級取捨展示：僅按 Score／Cost_adj 的嚴格支配排除，逐相鄰檔列 ΔScore、成本倍率、ΔCost_adj；2 分只作差異註記／折疊，不作同能力宣稱，不套 5% 購買價值門檻。此為 `experiments/` 診斷試版，不取代正式 ladder／三 picks／frozen 數學，須看過結果再定正式政策。
