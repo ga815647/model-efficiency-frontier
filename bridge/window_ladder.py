@@ -8,6 +8,7 @@ _SCRIPTS = str(Path(__file__).resolve().parents[1] / 'scripts')
 if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 import compute_frontier as cf
+import ladder_extra as extra
 from scripts.meta_availability import unavailable_reason
 
 
@@ -87,3 +88,77 @@ def select_chain(rows: list[dict], *, min_score: float, max_cost: float | None) 
     cuts = {identity: step['winner'] for step in trace for identity in step['removed']}
     return dict(chain=chain, final=final, excluded=excluded + frozen_excluded,
                 cuts=cuts, trace=trace)
+
+
+def _project(row, status, reason=None, winner=None):
+    """Project one adjusted candidate, preserving source evidence and original prices."""
+    return {
+        'identity': row['identity'], 'model': row.get('model') or '',
+        'effort': row.get('effort') or '', 'score': row['_score'],
+        'cost_orig': row['_cost_orig'], 'cost_adj': row['_cost'],
+        'cp_orig': row['_cp_orig'], 'cp_adj': extra._cp_adj(row),
+        'factor': row['_factor'], 'grade': extra.grade_of(row),
+        'status': status, 'reason': extra._reason(reason) if reason else None,
+        'winner': winner, 'source_url': row.get('evidence_url') or '',
+        'source_date': row.get('checked_date') or '', 'notes': row.get('notes') or '',
+        'is_grok': extra._grok(row), 'is_contributor': extra._contributor(row),
+        'comparison_only': extra._is_claude(row['identity']), 'upgrade': None,
+    }
+
+
+def select_anchors(ladder: list[dict]) -> dict:
+    """Choose two objective entry points from projected final non-Claude rows."""
+    eligible = [r for r in ladder if not r['comparison_only']]
+    return {
+        'highest_retained_score': min(eligible, key=lambda r: (
+            -r['score'], r['cost_adj'], r['identity'])) if eligible else None,
+        'lowest_retained_cost': min(eligible, key=lambda r: (
+            r['cost_adj'], -r['score'], r['identity'])) if eligible else None,
+    }
+
+
+def calculate_ladder(rows: list[dict], *, min_score: float, max_cost: float | None) -> dict:
+    """Compose one main selection and an independent all-B-removed membership audit."""
+    selection = select_chain(rows, min_score=min_score, max_cost=max_cost)
+    final_ids = {r['identity'] for r in selection['final']}
+    excluded = {r['identity']: (r, reason) for r, reason in selection['excluded']}
+    chain = {r['identity']: r for r in selection['chain']}
+    statuses = []
+    for source in rows:
+        identity = source['identity']
+        if identity in final_ids:
+            projected = _project(chain[identity], 'final')
+        elif identity in selection['cuts']:
+            projected = _project(chain[identity], 'cut', 'within_replacement_radius',
+                                 selection['cuts'][identity])
+        else:
+            row, reason = excluded[identity]
+            projected = _project(row, 'excluded', reason)
+        statuses.append(projected)
+    by_identity = {r['identity']: r for r in statuses}
+    ladder = [by_identity[r['identity']] for r in selection['final']]
+    eligible = [r for r in ladder if not r['comparison_only']]
+    for upper, lower in zip(eligible, eligible[1:]):
+        upper['upgrade'] = {
+            'cheaper_identity': lower['identity'],
+            'delta_score': upper['score'] - lower['score'],
+            'cost_multiple': upper['cost_adj'] / lower['cost_adj'],
+            'delta_cost_adj': upper['cost_adj'] - lower['cost_adj'],
+        }
+
+    grade_b_effects = []
+    usable_b = any(extra.grade_of(r) == 'B' and not unavailable_reason(r)
+                   and r['_score'] >= min_score
+                   and (max_cost is None or r['_cost'] <= max_cost) for r in rows)
+    if usable_b:
+        without_b = select_chain(deepcopy([r for r in rows if extra.grade_of(r) != 'B']),
+                                 min_score=min_score, max_cost=max_cost)
+        without_b_ids = {r['identity'] for r in without_b['final']}
+        for identity in sorted(r['identity'] for r in rows if extra.grade_of(r) == 'A'):
+            with_retained, without_retained = identity in final_ids, identity in without_b_ids
+            if with_retained != without_retained:
+                grade_b_effects.append(dict(identity=identity, with_b_retained=with_retained,
+                                            without_b_retained=without_retained))
+    return dict(ladder=ladder, anchors=select_anchors(ladder), candidate_statuses=statuses,
+                candidate_count=len(rows), chain_identities=[r['identity'] for r in selection['chain']],
+                selection_trace=selection['trace'], grade_b_effects=grade_b_effects)
