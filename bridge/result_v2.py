@@ -9,6 +9,8 @@ import json
 import math
 from pathlib import Path
 
+from scripts.meta_availability import unavailable_reason
+
 from . import result_v1 as v1
 from .window_ladder import calculate_ladder, select_anchors
 
@@ -107,6 +109,8 @@ def _rows(envelope):
     params = envelope['parameters']
     for row in statuses:
         _row_shape(row)
+        if unavailable_reason(row) and row['status'] != 'excluded':
+            raise ResultError('unavailable_identity_not_excluded')
         if row['source_date'] not in envelope['source_dates']:
             raise ResultError('source_date_mismatch')
         if (row['is_grok'] != extra._grok(row) or row['is_contributor'] != extra._contributor(row)

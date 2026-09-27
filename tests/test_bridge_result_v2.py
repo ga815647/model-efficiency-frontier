@@ -9,6 +9,7 @@ from pathlib import Path
 from test_bridge_result import SNAPSHOT, PARAMETERS, PROVENANCE, recompute_data
 from bridge.result_v1 import calculate_snapshot, make_envelope
 from bridge.result import validate_envelope
+from bridge.result import make_envelope as make_current_envelope
 from bridge.result_v2 import calculate_v2, make_v2_envelope
 
 EXECUTION = dict(request_commit_sha='b'*40, run_id='9753', run_attempt=1,
@@ -50,6 +51,44 @@ class V2ResultTests(unittest.TestCase):
             r for r in env['candidate_statuses'] if r['status'] == 'cut')
         with self.assertRaises(ValueError):
             validate_envelope(env)
+
+    def test_v2_unavailable_contributor_max_excluded_audit_is_valid(self):
+        with SNAPSHOT.open(newline='', encoding='utf-8') as f:
+            row = next(r for r in csv.DictReader(f)
+                       if r['identity'] == 'Muse Spark 1.3 max Meta Contributor')
+        env = self.source_envelope([row])
+        audit = env['candidate_statuses'][0]
+        self.assertEqual(audit['status'], 'excluded')
+        self.assertIn('max Standard tier only', audit['reason'])
+        self.assertIsNone(audit['winner'])
+        self.assertIsNone(audit['upgrade'])
+        self.assertEqual(env['ladder'], [])
+        self.assertEqual(env['chain_identities'], [])
+        self.assertEqual(env['anchors'], dict(highest_retained_score=None, lowest_retained_cost=None))
+        self.assertEqual(validate_envelope(env), env)
+
+    def test_v2_rejects_unavailable_contributor_max_as_self_consistent_singleton(self):
+        calc = calculate_v2(SNAPSHOT, PARAMETERS, PROVENANCE)
+        row = next(r for r in calc['candidate_statuses']
+                   if r['identity'] == 'Muse Spark 1.3 max Meta Contributor')
+        self.assertEqual(row['status'], 'excluded')
+        # Isolate the historical row without changing its source numbers or identity.
+        calc.update(candidate_statuses=[row], candidate_count=1, ladder=[],
+                    chain_identities=[], selection_trace=[], grade_b_effects=[],
+                    anchors=dict(highest_retained_score=None, lowest_retained_cost=None))
+        env = make_current_envelope(recompute_data(), EXECUTION, calculation=calc, errors=[])
+        row.update(status='final', reason=None, winner=None)
+        for payload in (calc, env):
+            payload.update(ladder=[row], chain_identities=[row['identity']],
+                           anchors=dict(highest_retained_score=row, lowest_retained_cost=row))
+        # Both the readback validator and publication envelope factory must reject
+        # an otherwise consistent graph, not just dangling or mismatched anchors.
+        with self.subTest(boundary='validator'), self.assertRaisesRegex(
+                ValueError, 'unavailable_identity_not_excluded'):
+            validate_envelope(env)
+        with self.subTest(boundary='factory'), self.assertRaisesRegex(
+                ValueError, 'unavailable_identity_not_excluded'):
+            make_current_envelope(recompute_data(), EXECUTION, calculation=calc, errors=[])
 
     def test_relation_and_numeric_tampering_rejected(self):
         base = self.envelope()
