@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "request_id": "bf70e74b-bd05-424c-9afd-5b8258bdffb9",
+  "created_at": "2026-09-27T18:34:15.434770+00:00",
+  "product_sha": "575f78fbdb8acc0c2ec5c2490cd08a503f8aace2",
+  "operation": "refresh",
+  "parameters": {
+    "gpt_factor": 18,
+    "grok_factor": 16,
+    "min_score": 0,
+    "min_score_reason": "用戶確認：同版本全候選情境比較；固定視窗正式改制驗收",
+    "max_cost": null
+  }
+}
