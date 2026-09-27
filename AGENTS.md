@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-09-27 書面規格已確認、實作計畫待審（最新）**：使用者對固定視窗正式規格審閱請求回覆「好」，`docs/superpowers/specs/2026-09-27-window-knee-production-design.md` 已確認。六任務實作計畫位於 `docs/superpowers/plans/2026-09-27-window-knee-production.md`，待使用者審閱後沿用Subagent-driven。計畫涵蓋選擇核心、final-only兩入口／B診斷、v1/v2相容、報表、整合及雲端驗收；尚未改產品程式或切換正式16階。下方「規格待審」為較早狀態。
+
 > **2026-09-27 固定視窗正式規格待審**：使用者對固定視窗改善結果回覆「好」，已整理 `docs/superpowers/specs/2026-09-27-window-knee-production-design.md` 供書面審閱。保留CP-new-high→跨family固定2分視窗精簡；摘要提案只從final非Claude行取最強／最低情境成本，沒有保送原最高分或淘汰行補位。新result v2／request v1、升級比較、B影響診斷及舊結果相容均為本稿待確認內容。尚未批准書面規格／實作計畫，不把方向確認當作已部署；原Pareto草案继续撤回。
 
 > **2026-09-27 轉折公式改善試算（最新，未切正式）**：使用者要求改善極小分差敏感度並複驗。分母floor／smooth及局部chord均未改善整體；較好的候選為剩餘混合CP鏈上左右各2分的log-CP插值增益比，缺完整雙側視窗給中性0、不外插。原Astra max+0.25／xhigh−0.25反例消失，但新增high+0.25會由xhigh＋medium改high。相同全154逐行擾動中，非Claude名單改變數（每組308）由原2／4／0／2變2／3／0／2（Score±.1／±.25、Cost±1%／±5%），只屬有限改善。基準仍9個非Claude原名單，Claude比較行由max改xhigh。證據、未採候選及剩餘敏感性見 `experiments/2026-09-27-cp-chain-regularized/`。尚未批准正式公式、spec或部署；維持CP-new-high第一階段與正式16階。
