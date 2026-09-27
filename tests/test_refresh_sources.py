@@ -17,7 +17,6 @@ URLS = {'leader': 'https://artificialanalysis.ai/leaderboards/models',
         'grok': 'https://artificialanalysis.ai/models/releases/grok-4-7',
         'muse': 'https://artificialanalysis.ai/models/releases/muse-spark-1-3',
         'meta': 'https://dev.meta.ai/docs/pricing-rate-limits'}
-SAVED = Path('/tmp/opencode/2026-09-27-refresh-debug')
 
 
 def flight_record(raw):
@@ -26,6 +25,31 @@ def flight_record(raw):
 
 
 class RefreshSourcesTest(unittest.TestCase):
+    def test_optional_price_scalars_use_strict_numeric_decimals_or_missing(self):
+        base = {'slug': 'inkling', 'name': 'Inkling (xhigh)', 'shortName': 'Inkling',
+                'modelCreatorName': 'Thinking Machines', 'intelligenceIndex': 24.9847810999384,
+                'intelligenceIndexIsEstimated': False, 'intelligenceIndexCostPerTask': 0.6070445010820831}
+        fields = {'price1mInputTokens': 'price1m_input', 'price1mOutputTokens': 'price1m_output',
+                  'cacheHitPrice': 'cache_hit_price'}
+        for source, parsed in fields.items():
+            for raw, expected in (('0.0000123456789012345', Decimal('0.0000123456789012345')),
+                                  ('1.25e-6', Decimal('1.25e-6')),
+                                  (0.15, Decimal('0.15')), (0, 0), ('$undefined', None), (None, None)):
+                with self.subTest(source=source, raw=raw):
+                    row = parse_leaderboard(flight_record(json.dumps({**base, source: raw})))[0]
+                    self.assertEqual(row[parsed], expected)
+                    if expected is None:
+                        self.assertIsNone(row[parsed])
+            row = parse_leaderboard(flight_record(json.dumps(base)))[0]
+            self.assertIsNone(row[parsed])
+            for bad in ('garbage', '$Undefined', 'NaN', 'Infinity', ' 0.25 ',
+                        True, False, {}, [], float('nan'), float('inf'), '-0.1', -1):
+                with self.subTest(source=source, bad=bad):
+                    with self.assertRaises(SourceError) as caught:
+                        parse_leaderboard(flight_record(json.dumps({**base, source: bad})))
+                    self.assertEqual(caught.exception.code, 'invalid_measurement')
+                    self.assertIn('inkling: ' + source, str(caught.exception))
+
     def test_saved_flight_undefined_is_missing_not_free_or_numeric(self):
         # Minimal real failed-page model: its score is numeric, but the cost
         # arrived as the literal string "$undefined" inside the Flight JSON.
@@ -140,17 +164,16 @@ class RefreshSourcesTest(unittest.TestCase):
             self.assertTrue(any(r['leaderboard_source_check']['cost_per_task'] is None for r in missing))
             self.assertFalse((dest / 'candidates.csv').exists())
 
-    @unittest.skipUnless((SAVED / 'failed/leaderboard.html').exists(), 'saved failed response not in this checkout')
-    def test_saved_failed_refresh_all_four_bytes_reaches_missing_candidate(self):
-        data = {URLS[k]: (SAVED / 'failed' / (label + '.html')).read_bytes()
-                for k, label in [('leader', 'leaderboard'), ('grok', 'grok_release'),
-                                 ('muse', 'muse_release'), ('meta', 'meta_pricing')]}
-        previous = json.loads((SAVED / 'previous/source_map.json').read_text())
+    def test_saved_two_paid_missing_costs_block_without_host_fixture(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in ('grok', 'muse', 'meta')}
+        data[URLS['leader']] = (FIX / 'failed-two-costs-flight.html').read_bytes()
+        previous = {'slugs': ['inkling', 'minimax-m2-7']}
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / 'snapshot'
             with self.assertRaises(SourceError) as caught:
                 refresh_snapshot(dest, previous=previous, fetch=data.__getitem__)
             self.assertEqual(caught.exception.code, 'missing_candidate')
+            self.assertIn('inkling,minimax-m2-7', str(caught.exception))
             missing = json.loads((dest / 'evidence/missing_candidates.json').read_text())
             self.assertEqual({r['slug'] for r in missing}, {'inkling', 'minimax-m2-7'})
             self.assertTrue(all(r['leaderboard_source_check']['cost_per_task'] is None for r in missing))

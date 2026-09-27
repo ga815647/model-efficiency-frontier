@@ -1,7 +1,7 @@
 """Strict, precision-preserving adapters for the approved AA public pages."""
 import json
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 LEADERBOARD = 'https://artificialanalysis.ai/leaderboards/models'
 GROK = 'https://artificialanalysis.ai/models/releases/grok-4-7'
@@ -9,6 +9,7 @@ MUSE = 'https://artificialanalysis.ai/models/releases/muse-spark-1-3'
 RELEASE_SLUGS = {GROK: ('grok-4-7-high', 'grok-4-7'),
                  MUSE: ('muse-spark-1-3-xhigh', 'muse-spark-1-3')}
 FLIGHT = re.compile(r'self\.__next_f\.push\(\[\d+,\s*("(?:\\.|[^"\\])*")\]\)')
+PRICE_DECIMAL = re.compile(r'(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\Z')
 
 
 class SourceError(ValueError):
@@ -25,6 +26,21 @@ def _scalar(value, url, slug, field, *, undefined_is_missing=False):
         raise SourceError('invalid_measurement', url, f'{slug}: {field}')
     if 'CostPerTask' in field and value < 0:
         raise SourceError('invalid_measurement', url, f'{slug}: {field}')
+    return value
+
+
+def _optional_price(value, slug, field):
+    """AA prices can be JSON numbers or decimal strings, unlike task cost/score."""
+    if isinstance(value, str) and value != '$undefined':
+        if not PRICE_DECIMAL.fullmatch(value):
+            raise SourceError('invalid_measurement', LEADERBOARD, f'{slug}: {field}')
+        try:
+            value = Decimal(value)
+        except InvalidOperation as exc:
+            raise SourceError('invalid_measurement', LEADERBOARD, f'{slug}: {field}') from exc
+    value = _scalar(value, LEADERBOARD, slug, field, undefined_is_missing=True)
+    if value is not None and value < 0:
+        raise SourceError('invalid_measurement', LEADERBOARD, f'{slug}: {field}')
     return value
 
 
@@ -122,9 +138,9 @@ def parse_leaderboard(html: str) -> list[dict]:
                         'cost_per_task': cost,
                         'is_estimated': obj.get('intelligenceIndexIsEstimated'),
                         'deprecated': obj.get('deprecated'),
-                        'price1m_input': obj.get('price1mInputTokens'),
-                        'price1m_output': obj.get('price1mOutputTokens'),
-                        'cache_hit_price': obj.get('cacheHitPrice')})
+                        'price1m_input': _optional_price(obj.get('price1mInputTokens'), slug, 'price1mInputTokens'),
+                        'price1m_output': _optional_price(obj.get('price1mOutputTokens'), slug, 'price1mOutputTokens'),
+                        'cache_hit_price': _optional_price(obj.get('cacheHitPrice'), slug, 'cacheHitPrice')})
     return list(_unique(records, LEADERBOARD).values())
 
 
