@@ -1,5 +1,6 @@
 # Local SDD records and generated Python artifacts
 .superpowers/
+.worktrees/
 .codegraph
 __pycache__/
 *.py[cod]
