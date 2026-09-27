@@ -1,7 +1,7 @@
 # 固定視窗 v2 發布與雲端驗收帳
 
 日期：2026-09-27。**v2已發布；真實recompute成功，真實refresh按既有來源成本缺口失敗並完成診斷發布驗收。** 不是live fresh成功，也不是產品回歸。
-產品／phase A文件 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已由控制端非force推送main並以GitHub API讀回相同SHA；發布前確認main為祖先。產品基準 `eb3ecf1` 的覆核及phase A文件獨立覆核均已通過。此次是OpenCode控制端雲端驗收，不新增目標Chat端實測或Project settings安裝證明。本份phase B驗收文件仍待控制端獨立覆核及推送，不冒稱已發布本文件。規格：[固定視窗設計](../specs/2026-09-27-window-knee-production-design.md)；契約：[request v1／result v2](../../contracts/chat-ci.md)。
+產品／phase A文件 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已由控制端非force推送main並以GitHub API讀回相同SHA；發布前確認main為祖先。產品基準 `eb3ecf1` 的覆核及phase A文件獨立覆核均已通過。此次是OpenCode控制端雲端驗收，不新增目標Chat端實測或Project settings安裝證明。規格：[固定視窗設計](../specs/2026-09-27-window-knee-production-design.md)；契約：[request v1／result v2](../../contracts/chat-ci.md)。
 
 ## 本地實作與覆核
 
