@@ -43,10 +43,28 @@ class RefreshSourcesTest(unittest.TestCase):
         bad = dict(model='Muse Spark 1.3', effort='max', pricing_plan='Contributor',
                    identity='Muse Spark 1.3 max Meta Contributor')
         self.assertIn(MODELS_URL, unavailable_reason(bad))
-        for update in (dict(effort='xhigh'), dict(pricing_plan='published-price'),
-                       dict(pricing_plan='Standard'), dict(model='Muse Spark 1.2'),
-                       dict(model='Muse Spark 1.30'), dict(model='Grok 4.7')):
+        for update in (dict(effort='xhigh', identity='Muse Spark 1.3 xhigh Meta Contributor'),
+                       dict(pricing_plan='published-price', identity='Muse Spark 1.3 max AA-public published-price'),
+                       dict(pricing_plan='Standard', identity='Muse Spark 1.3 max Meta Standard'),
+                       dict(model='Muse Spark 1.2', identity='Muse Spark 1.2 max Meta Contributor'),
+                       dict(model='Muse Spark 1.30', identity='Muse Spark 1.30 max Meta Contributor'),
+                       dict(model='Grok 4.7', identity='Grok 4.7 max Meta Contributor')):
             self.assertIsNone(unavailable_reason(dict(bad, **update)))
+
+    def test_structured_and_identity_aliases_must_agree_on_disproven_identity(self):
+        canonical = dict(model='Muse Spark 1.3', effort='max', pricing_plan='Contributor',
+                         identity='Muse Spark 1.3 max Meta Contributor')
+        self.assertIn(MODELS_URL, unavailable_reason(dict(canonical, model='Muse Spark 1.3 (max)')))
+        self.assertIn(MODELS_URL, unavailable_reason(dict(canonical, model='muse-spark-1.3')))
+        self.assertIn(MODELS_URL, unavailable_reason(dict(canonical, model='Muse Spark1.3')))
+        self.assertIn(MODELS_URL, unavailable_reason(dict(canonical, model='muse-spark-1-3')))
+        for update in (dict(model='Grok 4.7'),
+                       dict(identity='Grok 4.7 max Meta Contributor'),
+                       dict(effort='xhigh'),
+                       dict(pricing_plan='Standard'),
+                       dict(model='Muse Spark 1.3 (xhigh)')):
+            with self.subTest(update=update), self.assertRaisesRegex(ValueError, 'identity_mismatch'):
+                unavailable_reason(dict(canonical, **update))
 
     def test_previous_max_retires_only_with_models_proof_and_saves_audit(self):
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
@@ -82,6 +100,58 @@ class RefreshSourcesTest(unittest.TestCase):
             self.assertEqual(json.loads((dest / 'evidence/availability.json').read_text())['retired_previous_efforts'][0]['effort'], 'max')
             self.assertTrue((dest / 'evidence/missing_candidates.json').exists())
             self.assertFalse((dest / 'candidates.csv').exists())
+
+    def test_prior_other_model_or_ambiguous_max_does_not_retire_muse_13(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        for previous, effort in (({'source_by_slug': {}, 'contributor': [{'model': 'Muse Spark 1.2 (max)'}]}, 'max'),
+                                 ({'source_by_slug': {}, 'contributor': [{'model': 'Muse Spark 1.2 (xhigh)'}]}, 'xhigh'),
+                                 ({'slugs': [], 'contributor_efforts': ['max']}, 'max'),
+                                 ({'inventory': {'slugs': [], 'contributor_efforts': ['max']}}, 'max')):
+            with self.subTest(previous=previous), tempfile.TemporaryDirectory() as temp:
+                dest = Path(temp) / 'snapshot'
+                with self.assertRaises(SourceError) as caught:
+                    refresh_snapshot(dest, previous=previous, fetch=data.__getitem__)
+                self.assertEqual(caught.exception.code, 'missing_candidate')
+                audit = json.loads((dest / 'evidence/availability.json').read_text())
+                self.assertEqual(audit['retired_previous_efforts'], [])
+                missing = json.loads((dest / 'evidence/missing_candidates.json').read_text())
+                self.assertEqual(missing[0]['effort'], effort)
+                self.assertNotEqual(missing[0]['identity'], 'Muse Spark 1.3 max Meta Contributor')
+                self.assertFalse((dest / 'candidates.csv').exists())
+
+    def test_prior_slug_or_model_conflict_fails_closed_before_retirement(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        for contributor in ({'slug': 'muse-spark-1-3-xhigh', 'effort': 'max'},
+                            {'slug': 'muse-spark-1-3', 'model': 'Muse Spark 1.2 (max)'},
+                            {'model': 'Muse Spark 1.3 (max)', 'identity': 'Grok 4.7 max Meta Contributor'}):
+            with self.subTest(contributor=contributor), tempfile.TemporaryDirectory() as temp:
+                dest = Path(temp) / 'snapshot'
+                with self.assertRaises(SourceError) as caught:
+                    refresh_snapshot(dest, previous={'source_by_slug': {},
+                        'contributor': [contributor]}, fetch=data.__getitem__)
+                self.assertEqual(caught.exception.code, 'previous_inventory_missing')
+                self.assertFalse((dest / 'candidates.csv').exists())
+
+    def test_prior_new_source_map_preserves_muse_identity_through_inventory(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        with tempfile.TemporaryDirectory() as temp:
+            first = Path(temp) / 'first'
+            refresh_snapshot(first, previous=None, fetch=data.__getitem__)
+            previous = json.loads((first / 'evidence/source_map.json').read_text())
+            self.assertEqual(previous['inventory']['contributor_efforts'], ['xhigh'])
+            second = Path(temp) / 'second'
+            refresh_snapshot(second, previous=previous, fetch=data.__getitem__)
+            self.assertEqual(json.loads((second / 'evidence/availability.json').read_text())['retired_previous_efforts'], [])
+
+    def test_prior_supported_model_alias_max_is_retired_not_misclassified_missing(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            refresh_snapshot(dest, previous={'source_by_slug': {},
+                                              'contributor': [{'model': 'Muse Spark1.3 (max)'}]},
+                             fetch=data.__getitem__)
+            audit = json.loads((dest / 'evidence/availability.json').read_text())
+            self.assertEqual(audit['retired_previous_efforts'][0]['identity'], 'Muse Spark 1.3 max Meta Contributor')
 
     def test_optional_price_scalars_use_strict_numeric_decimals_or_missing(self):
         base = {'slug': 'inkling', 'name': 'Inkling (xhigh)', 'shortName': 'Inkling',

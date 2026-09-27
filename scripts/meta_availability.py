@@ -72,17 +72,35 @@ def parse_meta_models(html: str) -> dict:
 
 def unavailable_reason(row: dict) -> str | None:
     """Match only the disproven identity, not other families/plans/efforts."""
-    model = row.get('model') or ''
-    identity = row.get('identity') or ''
-    if not model:
-        model = re.sub(r'\s+(?:max|xhigh|high|medium|low)\s+Meta Contributor$', '', identity, flags=re.I)
-    model_key = re.sub(r'[\s_-]+', '-', model.strip().lower())
+    def model_parts(value):
+        name = (value or '').strip()
+        suffix = re.fullmatch(r'(.*?)\s*\((max|xhigh|high|medium|low)\)', name, re.I)
+        if suffix:
+            name = suffix[1]
+        if re.fullmatch(r'muse[-_ ]?spark[-_ ]?1[.-]3', name, re.I):
+            return 'muse-spark-1.3', suffix[2].lower() if suffix else None
+        return re.sub(r'[\s_-]+', '-', name.lower()), suffix[2].lower() if suffix else None
+
+    model, embedded_effort = model_parts(row.get('model'))
+    identity = (row.get('identity') or '').strip()
+    match = re.fullmatch(r'(.+?)\s+(?:\((max|xhigh|high|medium|low)\)|(max|xhigh|high|medium|low))\s+Meta Contributor', identity, re.I)
+    identity_model = model_parts(match[1])[0] if match else ''
+    identity_effort = (match[2] or match[3]).lower() if match else ''
     plan = (row.get('pricing_plan') or '').strip().lower()
     effort = (row.get('effort') or '').strip().lower()
-    if not plan and identity.lower().endswith(' meta contributor'):
-        plan = 'contributor'
-    if not effort and re.search(r'\smax\s+Meta Contributor$', identity, re.I):
-        effort = 'max'
-    if model_key == 'muse-spark-1.3' and plan == 'contributor' and effort == 'max':
+    target = 'muse-spark-1.3'
+    if (model == target or identity_model == target) and (plan == 'contributor' or
+                                                         identity.lower().endswith(' meta contributor')):
+        if (model and identity and (not match or model != identity_model)
+                or model == target and identity and plan and plan != 'contributor' and match
+                or identity_model == target and plan and plan != 'contributor'
+                or effort and identity_effort and effort != identity_effort
+                or embedded_effort and effort and embedded_effort != effort
+                or embedded_effort and identity_effort and embedded_effort != identity_effort):
+            raise ValueError('identity_mismatch: Muse Spark 1.3 model/effort/plan disagrees with identity')
+    model = model or identity_model
+    effort = effort or embedded_effort or identity_effort
+    plan = plan or ('contributor' if match else '')
+    if model == target and plan == 'contributor' and effort == 'max':
         return f'Muse Spark 1.3 max unavailable on Contributor; max Standard tier only ({MODELS_URL}; checked {PROOF_DATE})'
     return None

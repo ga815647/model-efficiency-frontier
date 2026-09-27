@@ -109,6 +109,59 @@ def _order(pointer):
     return (latest, timestamp.astimezone(timezone.utc), commit.lower())
 
 
+def _capability_evidence(files, envelope, source_map=None):
+    """Validate a completed proof stage even when a later refresh step failed."""
+    base = 'snapshot/evidence/'
+    needed = {base + name for name in ('models.html', 'meta_models.json', 'sources.json')}
+    present = needed & files.keys()
+    audit_path = base + 'availability.json'
+    if present == {base + 'models.html'} and audit_path not in files and source_map is None:
+        return  # Fetch completed but semantic parsing may have failed before proof.
+    if not present and audit_path not in files:
+        if source_map is not None:
+            raise PublishError('missing_capability_evidence')
+        return
+    if (needed - files.keys() or
+            audit_path not in files and (source_map is not None or any(
+                base + name in files for name in ('leaderboard_records.json', 'missing_candidates.json', 'source_map.json')))):
+        raise PublishError('missing_capability_evidence')
+    try:
+        raw = files[base + 'models.html']
+        sources = _json(files[base + 'sources.json'])
+        fact = parse_meta_models(raw.decode('utf-8'))
+        parsed = _json(files[base + 'meta_models.json'])
+        day = parsed['checked_date']
+        if (sources['sha256_by_url'][MODELS_URL] != hashlib.sha256(raw).hexdigest()
+                or sources['checked_date'] != day or parsed != dict(fact, checked_date=day)
+                or envelope['status'] == 'success' and day not in envelope['source_dates']):
+            raise ValueError('inconsistent models proof')
+        if audit_path not in files:
+            return  # Previous-inventory parsing failed after the models proof completed.
+        audit = _json(files[audit_path])
+        retired = audit['retired_previous_efforts']
+        excluded = audit['excluded_current_identities']
+        identity = 'Muse Spark 1.3 max Meta Contributor'
+        reason = unavailable_reason({'identity': identity})
+        retirement = {'identity': identity, 'effort': 'max', 'source_url': MODELS_URL,
+                      'checked_date': day, 'reason': reason}
+        current_exclusion = {'slug': 'muse-spark-1-3', 'identity': identity,
+                             'reason': reason, 'source_url': MODELS_URL, 'checked_date': day}
+        if (audit['source_url'] != MODELS_URL or audit['checked_date'] != day
+                or retired not in ([], [retirement])
+                or excluded not in ([], [current_exclusion])
+                or source_map is not None and source_map.get('availability') != audit):
+            raise ValueError('invalid capability audit')
+        if source_map is not None:
+            rows = list(csv.DictReader(io.StringIO(files['snapshot/candidates.csv'].decode())))
+            if any(unavailable_reason(row) for row in rows):
+                raise ValueError('unavailable candidate in fresh CSV')
+            expected = [current_exclusion] if 'muse-spark-1-3' in source_map['source_by_slug'] else []
+            if excluded != expected:
+                raise ValueError('missing or invented effort exclusion audit')
+    except (SourceError, KeyError, ValueError, TypeError, UnicodeError) as exc:
+        raise PublishError('invalid_capability_evidence') from exc
+
+
 def choose_latest(existing: dict | None, incoming: dict, *, refresh_only: bool) -> dict | None:
     """Select a successful result by source date, request time, then commit ID."""
     if incoming['status'] != 'success' or refresh_only and incoming['operation'] != 'refresh':
@@ -152,6 +205,8 @@ def _output_files(output):
     if 'result.json' not in files:
         raise PublishError('missing_result')
     envelope = validate_envelope(_json(files['result.json']))
+    if envelope['status'] == 'failed':
+        _capability_evidence(files, envelope)
     if 'snapshot/evidence/api_envelopes.json' in files:
         pages = _api_response_bodies(files['snapshot/evidence/api_envelopes.json'])
         if envelope['status'] == 'success':
@@ -193,43 +248,9 @@ def _output_files(output):
                     or type(source_map) is not dict or type(source_map.get('inventory')) is not dict):
                 raise PublishError('invalid_refresh_evidence')
             if max(envelope['source_dates']) >= '2026-09-27':
-                base = 'snapshot/evidence/'
-                needed = {base + name for name in ('models.html', 'meta_models.json',
-                                                  'availability.json', 'sources.json')}
-                if not needed <= files.keys():
-                    raise PublishError('missing_capability_evidence')
-                try:
-                    raw = files[base + 'models.html']
-                    sources = _json(files[base + 'sources.json'])
-                    fact = parse_meta_models(raw.decode('utf-8'))
-                    parsed = _json(files[base + 'meta_models.json'])
-                    audit = _json(files[base + 'availability.json'])
-                    day = parsed['checked_date']
-                    if (sources['sha256_by_url'][MODELS_URL] != hashlib.sha256(raw).hexdigest()
-                            or sources['checked_date'] != day or day not in envelope['source_dates']
-                            or parsed != dict(fact, checked_date=day)
-                            or source_map.get('availability') != audit
-                            or audit['source_url'] != MODELS_URL or audit['checked_date'] != day
-                            or type(audit['retired_previous_efforts']) is not list
-                            or type(audit['excluded_current_identities']) is not list):
-                        raise ValueError('inconsistent models proof')
-                    rows = list(csv.DictReader(io.StringIO(files['snapshot/candidates.csv'].decode())))
-                    if any(unavailable_reason(row) for row in rows):
-                        raise ValueError('unavailable candidate in fresh CSV')
-                    expected_excluded = []
-                    if 'muse-spark-1-3' in source_map['source_by_slug']:
-                        identity = 'Muse Spark 1.3 max Meta Contributor'
-                        expected_excluded.append({'slug': 'muse-spark-1-3', 'identity': identity,
-                            'reason': unavailable_reason({'identity': identity}),
-                            'source_url': MODELS_URL, 'checked_date': day})
-                    if audit['excluded_current_identities'] != expected_excluded:
-                        raise ValueError('missing or invented effort exclusion audit')
-                    for entry in audit['retired_previous_efforts'] + audit['excluded_current_identities']:
-                        if (entry['source_url'] != MODELS_URL or entry['checked_date'] != day
-                                or not unavailable_reason(entry)):
-                            raise ValueError('unjustified retirement')
-                except (SourceError, KeyError, ValueError, TypeError, UnicodeError) as exc:
-                    raise PublishError('invalid_capability_evidence') from exc
+                _capability_evidence(files, envelope, source_map)
+            elif 'snapshot/evidence/meta_models.json' in files:
+                _capability_evidence(files, envelope, source_map)
             try:
                 validate_fresh_inventory(files['snapshot/candidates.csv'], source_map, envelope,
                                          error_code='invalid_refresh_inventory')

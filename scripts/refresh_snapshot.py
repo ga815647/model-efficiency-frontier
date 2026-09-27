@@ -79,28 +79,63 @@ def _previous_slugs(previous):
     A candidate entry must have a slug or a CSV identity + pricing_plan;
     absence of inventory is valid only for the initial refresh.
     """
+    def contributor(row):
+        effort = row.get('effort')
+        name = row.get('model') or ''
+        if name:
+            parsed, embedded, _ = _model_effort(name, 'previous-contributor')
+            if embedded != 'unspecified':
+                if effort and effort != embedded:
+                    raise SourceError('previous_inventory_missing', MUSE, 'Contributor model/effort conflict')
+                effort = embedded
+            name = parsed
+        elif row.get('slug'):
+            slug = row['slug']
+            if slug in ('muse-spark-1-3', 'muse-spark-1-3-xhigh') and effort and effort != (
+                    'max' if slug == 'muse-spark-1-3' else 'xhigh'):
+                raise SourceError('previous_inventory_missing', MUSE, 'Contributor slug/effort conflict')
+            name = 'Muse Spark 1.3' if slug in ('muse-spark-1-3', 'muse-spark-1-3-xhigh') else slug
+        elif row.get('identity'):
+            match = re.fullmatch(r'(.+?)\s+(max|xhigh|high|medium|low)\s+Meta Contributor', row['identity'], re.I)
+            if match:
+                name, inferred = match.groups()
+                if effort and effort != inferred:
+                    raise SourceError('previous_inventory_missing', MUSE, 'Contributor identity/effort conflict')
+                effort = inferred
+        if not effort:
+            raise SourceError('previous_inventory_missing', MUSE, 'Contributor effort missing')
+        if effort == 'max' and unavailable_reason({'model': name, 'effort': effort,
+                                                   'pricing_plan': 'Contributor'}):
+            name = 'Muse Spark 1.3'
+        slug = row.get('slug')
+        if slug in ('muse-spark-1-3', 'muse-spark-1-3-xhigh') and (
+                name != 'Muse Spark 1.3' or effort != ('max' if slug == 'muse-spark-1-3' else 'xhigh')):
+            raise SourceError('previous_inventory_missing', MUSE, 'Contributor slug/model/effort conflict')
+        if row.get('identity'):
+            try:
+                unavailable_reason({'model': name, 'effort': effort, 'pricing_plan': 'Contributor',
+                                    'identity': row['identity']})
+            except ValueError as exc:
+                raise SourceError('previous_inventory_missing', MUSE, 'Contributor identity conflict') from exc
+        return (name or None, effort)
+
     if previous is None:
         return set(), set()
     if 'inventory' in previous:
-        return _previous_slugs(previous['inventory'])
+        slugs, inventory_efforts = _previous_slugs(previous['inventory'])
+        if 'contributor' in previous:
+            identified = {contributor(row) for row in previous['contributor']}
+            if {effort for _, effort in identified} != {effort for _, effort in inventory_efforts}:
+                raise SourceError('previous_inventory_missing', MUSE, 'Contributor inventory/source disagreement')
+            return slugs, identified
+        return slugs, inventory_efforts
     if 'source_by_slug' in previous:
-        efforts = set()
-        for row in previous.get('contributor', []):
-            if 'effort' in row:
-                efforts.add(row['effort'])
-            elif 'model' in row:
-                _, effort, _ = _model_effort(row['model'], 'previous-contributor')
-                if effort == 'unspecified':
-                    raise SourceError('previous_inventory_missing', MUSE, 'Contributor effort unspecified')
-                efforts.add(effort)
-            else:
-                raise SourceError('previous_inventory_missing', MUSE, 'Contributor identity missing')
-        return set(previous['source_by_slug']), efforts
+        return set(previous['source_by_slug']), {contributor(row) for row in previous.get('contributor', [])}
     if 'slugs' in previous:
-        return set(previous['slugs']), set(previous.get('contributor_efforts', []))
+        return set(previous['slugs']), {(None, effort) for effort in previous.get('contributor_efforts', [])}
     if 'candidates' in previous:
         return ({r['slug'] for r in previous['candidates'] if r.get('pricing_plan') != 'Contributor'},
-                {r['effort'] for r in previous['candidates'] if r.get('pricing_plan') == 'Contributor'})
+                {contributor(r) for r in previous['candidates'] if r.get('pricing_plan') == 'Contributor'})
     raise SourceError('previous_inventory_missing', LEADERBOARD)
 
 
@@ -169,7 +204,7 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
     retirement = [{'identity': 'Muse Spark 1.3 max Meta Contributor', 'effort': 'max',
                    'source_url': MODELS_URL, 'checked_date': today,
                    'reason': unavailable_reason({'model': 'Muse Spark 1.3', 'effort': 'max',
-                                                 'pricing_plan': 'Contributor'})}] if 'max' in prev_efforts else []
+                                                 'pricing_plan': 'Contributor'})}] if ('Muse Spark 1.3', 'max') in prev_efforts else []
     availability = {'source_url': MODELS_URL, 'checked_date': today,
                     'retired_previous_efforts': retirement, 'excluded_current_identities': []}
     _json(evidence / 'availability.json', availability)
@@ -254,13 +289,15 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
                      'notes': notes, 'ttft_s': '', 'time_per_task_s': ''})
         contributors.append({'slug': slug, 'effort': effort, 'standard_components': parts,
                              'derived_cost': str(derived), 'formula': notes})
-    lost_efforts = sorted(prev_efforts - {r['effort'] for r in contributors} - {'max'})
+    current_identities = {('Muse Spark 1.3', r['effort']) for r in contributors}
+    lost_efforts = sorted(prev_efforts - current_identities - {('Muse Spark 1.3', 'max')},
+                          key=lambda item: (item[0] or '', item[1]))
     if lost_efforts:
         # An effort is a previous plan identity, not proof that its exact slug
         # disappeared. Save what the acquired pages actually show and leave
         # source-page/ID disambiguation explicitly pending human review.
         _json(evidence / 'missing_candidates.json', [
-            {'identity': f'Muse Spark 1.3 {effort} Meta Contributor',
+            {'identity': f'{model or "unknown-model"} {effort} Meta Contributor',
              'pricing_plan': 'Contributor', 'effort': effort,
              'local_snapshot_search': 'present in approved previous Contributor effort inventory',
              'leaderboard_source_check': {
@@ -273,8 +310,9 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
                  'status': 'pending_manual_review_do_not_substitute',
                  'release_page_slugs': sorted(muse),
                  'current_contributor_efforts': sorted(r['effort'] for r in contributors)}}
-            for effort in lost_efforts])
-        raise SourceError('missing_candidate', MUSE, 'previous Contributor efforts lost: ' + ','.join(lost_efforts))
+            for model, effort in lost_efforts])
+        raise SourceError('missing_candidate', MUSE, 'previous Contributor identities lost: ' +
+                          ','.join(f'{model or "unknown-model"}/{effort}' for model, effort in lost_efforts))
     _json(evidence / 'source_map.json', {'source_by_slug': included, 'excluded': excluded,
                                           'availability': availability,
                                           'contributor': contributors, 'inventory': {'slugs': sorted(included),

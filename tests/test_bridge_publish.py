@@ -19,6 +19,104 @@ def git(repo, *args):
 
 
 class PublishTests(unittest.TestCase):
+    def test_preproof_models_fetch_failure_remains_publishable_as_failure(self):
+        from test_refresh_sources import FIX, URLS
+        from scripts.refresh_snapshot import refresh_snapshot
+        from scripts.aa_public import SourceError
+        pages = {URLS[name]: (FIX / name).with_suffix('.html').read_bytes() for name in URLS}
+        output = self.base / 'preproof-fetch-failure'
+        output.mkdir()
+
+        def fetch(url):
+            if url == URLS['models']:
+                raise SourceError('fetch_failed', url)
+            return pages[url]
+
+        with self.assertRaises(SourceError) as caught:
+            refresh_snapshot(output / 'snapshot', previous=None, fetch=fetch)
+        self.assertEqual(caught.exception.code, 'fetch_failed')
+        req = dict(request_data(), operation='refresh')
+        execution = {'request_commit_sha': 'b' * 40, 'run_id': '803', 'run_attempt': 1,
+                     'run_url': 'https://github.com/example/actions/runs/803'}
+        (output / 'result.json').write_text(json.dumps(make_envelope(req, execution, calculation=None,
+            errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])))
+        self.assertFalse((output / 'snapshot/evidence/models.html').exists())
+        tip = publish_result(output, remote=str(self.remote))
+        self.assertEqual(json.loads(git(self.remote, 'show',
+            f'{tip}:results/{req["request_id"]}/803-1/result.json'))['status'], 'failed')
+
+    def test_failed_refresh_capability_evidence_cannot_be_forged_or_partial(self):
+        from test_refresh_sources import FIX, URLS
+        from scripts.refresh_snapshot import refresh_snapshot
+        from scripts.aa_public import SourceError
+        pages = {URLS[name]: (FIX / name).with_suffix('.html').read_bytes() for name in URLS}
+        before = pages[URLS['leader']]
+        pages[URLS['leader']] = before.replace(b'intelligenceIndexCostPerTask\\":0.4637245706928438',
+                                               b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
+        self.assertNotEqual(before, pages[URLS['leader']])
+        previous = json.loads((Path(__file__).resolve().parents[1] /
+                              'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        for tamper in ('models', 'hash', 'audit_identity', 'partial', 'missing_audit'):
+            with self.subTest(tamper=tamper):
+                output = self.base / ('failed-proof-' + tamper)
+                output.mkdir()
+                with self.assertRaises(SourceError) as caught:
+                    refresh_snapshot(output / 'snapshot', previous=previous, fetch=pages.__getitem__)
+                self.assertEqual(caught.exception.code, 'missing_candidate')
+                req = dict(request_data(), operation='refresh')
+                execution = {'request_commit_sha': 'b' * 40, 'run_id': '801', 'run_attempt': 1,
+                             'run_url': 'https://github.com/example/actions/runs/801'}
+                (output / 'result.json').write_text(json.dumps(make_envelope(
+                    req, execution, calculation=None,
+                    errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])))
+                evidence = output / 'snapshot/evidence'
+                if tamper == 'models':
+                    (evidence / 'models.html').write_text('<li>fabricated</li>')
+                elif tamper == 'hash':
+                    sources = json.loads((evidence / 'sources.json').read_text())
+                    sources['sha256_by_url'][URLS['models']] = '0' * 64
+                    (evidence / 'sources.json').write_text(json.dumps(sources))
+                elif tamper == 'partial':
+                    (evidence / 'meta_models.json').unlink()
+                elif tamper == 'missing_audit':
+                    (evidence / 'availability.json').unlink()
+                else:
+                    audit = json.loads((evidence / 'availability.json').read_text())
+                    audit['retired_previous_efforts'][0].update(identity='Grok 4.7 max Meta Contributor',
+                                                                  model='Muse Spark 1.3')
+                    (evidence / 'availability.json').write_text(json.dumps(audit))
+                with self.assertRaises(PublishError):
+                    publish_result(output, remote=str(self.remote))
+        self.assertNotEqual(subprocess.run(['git', '-C', str(self.remote), 'rev-parse', '--verify',
+                                            'refs/heads/results'], capture_output=True).returncode, 0)
+
+    def test_success_retirement_audit_rejects_conflicting_identity_even_if_map_matches(self):
+        from test_refresh_sources import FIX, URLS
+        from scripts.refresh_snapshot import refresh_snapshot
+        pages = {URLS[name]: (FIX / name).with_suffix('.html').read_bytes() for name in URLS}
+        previous = json.loads((Path(__file__).resolve().parents[1] /
+                              'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        output = self.base / 'forged-success-retirement'
+        output.mkdir()
+        provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=pages.__getitem__)
+        calculation, _ = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
+        req = dict(request_data(), operation='refresh')
+        execution = {'request_commit_sha': 'b' * 40, 'run_id': '802', 'run_attempt': 1,
+                     'run_url': 'https://github.com/example/actions/runs/802'}
+        (output / 'result.json').write_text(json.dumps(make_envelope(req, execution, calculation=calculation, errors=[])))
+        (output / 'report.md').write_text('# Report')
+        (output / 'report.html').write_text('<!doctype html><title>Report</title>')
+        evidence = output / 'snapshot/evidence'
+        audit = json.loads((evidence / 'availability.json').read_text())
+        audit['retired_previous_efforts'][0].update(identity='Grok 4.7 max Meta Contributor',
+                                                      model='Muse Spark 1.3')
+        (evidence / 'availability.json').write_text(json.dumps(audit))
+        mapping = json.loads((evidence / 'source_map.json').read_text())
+        mapping['availability'] = audit
+        (evidence / 'source_map.json').write_text(json.dumps(mapping))
+        with self.assertRaises(PublishError):
+            publish_result(output, remote=str(self.remote))
+
     def test_actual_five_source_refresh_and_failed_missing_cost_are_publishable(self):
         from test_refresh_sources import FIX, URLS
         from scripts.refresh_snapshot import refresh_snapshot
