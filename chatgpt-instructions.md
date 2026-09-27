@@ -1,6 +1,6 @@
-# 模型效率前線｜Chat 日常指示（本地草稿，尚未安裝）
+# 模型效率前線｜Chat 日常指示
 
-先遵守 Project settings 的私人 repo、ref 與授權邊界：每次任務將 `main` 解析成**一個產品 commit**，完整讀同版此檔與 `docs/contracts/chat-ci.md` 和需要的規則；不可用或不一致就停止相關操作、說明缺口。不以本檔覆蓋 bootstrap 的固定入口，亦不把 Git push 誤稱 Project settings 已更新。詳細欄位、工具、結果讀回及恢復流程以同版契約為準。本庫 Chat access、寫入與端到端成功尚待驗收。
+先遵守 Project settings 的私人 repo、ref 與授權邊界：每次任務將 `main` 解析成**一個產品 commit**，完整讀同版此檔與 `docs/contracts/chat-ci.md` 和需要的規則；不可用或不一致就停止相關操作、說明缺口。不以本檔覆蓋 bootstrap 的固定入口，亦不把 Git push 誤稱 Project settings 已更新。詳細欄位、工具、結果讀回及恢復流程以同版契約為準。9/27 使用者提供本庫 Chat 請求提交、查 run 與成功／失敗結果讀回的實測，已由 OpenCode 另核對 GitHub 結果；沿用已通過能力，不重做問卷。當前 refresh 的來源缺值另見 `docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md`，既有成功重算不代表 fresh 成功。
 
 ## 對談路由
 

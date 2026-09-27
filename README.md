@@ -4,7 +4,9 @@ AA Intelligence Index 的付費模型成本／能力快照與個人使用情境�
 
 最新結果：[2026-09-26 GPT ×18／Grok ×16 番外篇](runs/2026-09-26-general-grok16/ladder-extra.md)（16 階；155 個付費候選；4 個零成本報值另見 [sidecar](runs/2026-09-26-general-grok16/free-sidecar.md)）。[run notes](runs/2026-09-26-general-grok16/run-notes.md) 說明版本推定、GRADE-B 公式、資料來源與重現方式。舊 run 原樣封存。
 
-結報方向已確認為 **Chat 對談＋按需單檔 HTML**，不部署網站。私人 [GitHub repo](https://github.com/ga815647/model-efficiency-frontier) 的 `main` 已有 Chat → CI 實作，遠端 Actions 已驗證歷史重算、fresh 公開取數、失敗路徑與 HTML artifact；**ChatGPT Project 設定安裝及目標 Chat 端到端讀寫尚未驗收，日常入口尚未切換**。操作契約見 [Chat／CI 契約](docs/contracts/chat-ci.md)，分項證據見 [驗收帳](docs/superpowers/notes/2026-09-26-chat-ci-acceptance.md)。Notion 已停止展示與同步，原頁已移到用戶的「垃圾桶」父頁，待用戶日後手動刪除；既有本地快照仍可用。
+9/27 另做 [升級代價試版](experiments/2026-09-27-tradeoffs/README.md)（[單檔 HTML](experiments/2026-09-27-tradeoffs/report.html)）：同一 9/26 快照的 155 候選留下 21 個 Score／Cost_adj 取捨點，逐階列分數增加、成本倍率與差額；2 分只作註記／折疊。此為試看用比較，不取代上方正式階梯。
+
+結報方向已確認為 **Chat 對談＋按需單檔 HTML**，不部署網站。私人 [GitHub repo](https://github.com/ga815647/model-efficiency-frontier) 的 `main` 已有 Chat → CI 實作，遠端 Actions 已驗證歷史重算、fresh 公開取數、失敗路徑與 HTML artifact。**9/27 目標 Chat 的請求提交、run 查詢及成功／失敗讀回也已通過；當前 fresh 仍有來源成本缺值，不能宣稱更新成功**。Project settings 安裝未另獲明確確認。操作契約見 [Chat／CI 契約](docs/contracts/chat-ci.md)，分項證據見 [驗收帳](docs/superpowers/notes/2026-09-26-chat-ci-acceptance.md) 與 [9/27 來源缺口](docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md)。Notion 已停止展示與同步，原頁已移到用戶的「垃圾桶」父頁，待用戶日後手動刪除；既有本地快照仍可用。
 
 在 repo 根目錄重新產出**同一快照**（不會抓資料）：
 

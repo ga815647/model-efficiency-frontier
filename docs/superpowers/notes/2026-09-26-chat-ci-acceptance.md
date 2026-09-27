@@ -1,5 +1,7 @@
 # Chat → CI 驗收帳（2026-09-26）
 
+> **2026-09-27 增量覆蓋本表的「目標 Chat 尚待驗收」項：**使用者帶回目標 Chat 實際提交／查詢／讀回，OpenCode 另核對 recompute `36282186076` 成功與 refresh `36282226673` 失敗的固定 Git 結果。Chat 傳輸與結果讀回已通過；當前 fresh 卡在來源缺值。詳細證據及三遍核對見 [9/27 記錄](2026-09-27-chat-readback-and-source-gap.md)。Project settings 安裝未另獲明確確認；下方保留 9/26 當時狀態。
+
 | 能力 | 現有證據／狀態 | 待 Task 8 證據 |
 | --- | --- | --- |
 | 契約／完整指示／薄型 bootstrap | 已發佈至私人 `main` `16e9a2d8eae26d8bf191e8118f4841754f0c75ca`；OpenCode 已從本地審核內容及遠端 commit 身分核對，非目標 Chat 讀回 | Chat 在同一固定 product commit 完整讀回 |
