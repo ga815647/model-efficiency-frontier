@@ -19,6 +19,91 @@ def git(repo, *args):
 
 
 class PublishTests(unittest.TestCase):
+    def test_actual_five_source_refresh_and_failed_missing_cost_are_publishable(self):
+        from test_refresh_sources import FIX, URLS
+        from scripts.refresh_snapshot import refresh_snapshot
+        from scripts.aa_public import SourceError
+        pages = {URLS[name]: (FIX / name).with_suffix('.html').read_bytes() for name in URLS}
+        previous = json.loads((Path(__file__).resolve().parents[1] /
+                              'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        for run, missing in (('601', False), ('602', True)):
+            with self.subTest(run=run):
+                output = self.base / ('actual-' + run)
+                output.mkdir()
+                source = dict(pages)
+                if missing:
+                    before = source[URLS['leader']]
+                    source[URLS['leader']] = before.replace(b'intelligenceIndexCostPerTask\\":0.4637245706928438',
+                                                          b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
+                    self.assertNotEqual(source[URLS['leader']], before)
+                req = dict(request_data(), operation='refresh')
+                execution = {'request_commit_sha': 'b' * 40, 'run_id': run, 'run_attempt': 1,
+                             'run_url': 'https://github.com/example/actions/runs/' + run}
+                if missing:
+                    with self.assertRaises(SourceError) as caught:
+                        refresh_snapshot(output / 'snapshot', previous=previous, fetch=source.__getitem__)
+                    self.assertEqual(caught.exception.code, 'missing_candidate')
+                    result = make_envelope(req, execution, calculation=None,
+                                           errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])
+                else:
+                    provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=source.__getitem__)
+                    calculation, report = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
+                    self.assertEqual(calculation['candidate_count'], 154)
+                    self.assertEqual(len(calculation['candidate_statuses']), 154)
+                    result = make_envelope(req, execution, calculation=calculation, errors=[])
+                    (output / 'report.md').write_text(report)
+                    (output / 'report.html').write_text('<!doctype html><title>Report</title>')
+                (output / 'result.json').write_text(json.dumps(result))
+                tip = publish_result(output, remote=str(self.remote))
+                target = f'results/{req["request_id"]}/{run}-1'
+                self.assertEqual(json.loads(git(self.remote, 'show', f'{tip}:{target}/result.json'))['status'],
+                                 'failed' if missing else 'success')
+                audit = json.loads(git(self.remote, 'show', f'{tip}:{target}/snapshot/evidence/availability.json'))
+                self.assertEqual(audit['retired_previous_efforts'][0]['effort'], 'max')
+                self.assertIn('snapshot/evidence/models.html', git(self.remote, 'ls-tree', '-r', '--name-only', tip))
+                if missing:
+                    self.assertIn('missing_candidates.json', git(self.remote, 'ls-tree', '-r', '--name-only', tip))
+                    self.assertFalse((output / 'snapshot/candidates.csv').exists())
+                else:
+                    self.assertEqual(self.pointer('latest-refresh.json')['run_id'], '601')
+
+    def test_new_refresh_rejects_tampered_capability_proof_before_git_write(self):
+        from test_refresh_sources import FIX, URLS
+        from scripts.refresh_snapshot import refresh_snapshot
+        pages = {URLS[name]: (FIX / name).with_suffix('.html').read_bytes() for name in URLS}
+        for tamper in ('models', 'audit', 'hash', 'both'):
+            with self.subTest(tamper=tamper):
+                output = self.base / ('tampered-' + tamper)
+                output.mkdir()
+                provenance = refresh_snapshot(output / 'snapshot', previous=None, fetch=pages.__getitem__)
+                calculation, _ = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
+                req = dict(request_data(), operation='refresh')
+                execution = {'request_commit_sha': 'b' * 40, 'run_id': '701', 'run_attempt': 1,
+                             'run_url': 'https://github.com/example/actions/runs/701'}
+                (output / 'result.json').write_text(json.dumps(make_envelope(
+                    req, execution, calculation=calculation, errors=[])))
+                (output / 'report.md').write_text('# Report')
+                (output / 'report.html').write_text('<!doctype html><title>Report</title>')
+                evidence = output / 'snapshot/evidence'
+                if tamper == 'models':
+                    (evidence / 'models.html').write_text('<li>wrong</li>')
+                elif tamper == 'audit':
+                    (evidence / 'availability.json').write_text('{}')
+                else:
+                    if tamper == 'hash':
+                        sources = json.loads((evidence / 'sources.json').read_text())
+                        sources['sha256_by_url'][URLS['models']] = '0' * 64
+                        (evidence / 'sources.json').write_text(json.dumps(sources))
+                    else:
+                        audit = json.loads((evidence / 'availability.json').read_text())
+                        audit['excluded_current_identities'] = []
+                        (evidence / 'availability.json').write_text(json.dumps(audit))
+                        source_map = json.loads((evidence / 'source_map.json').read_text())
+                        source_map['availability'] = audit
+                        (evidence / 'source_map.json').write_text(json.dumps(source_map))
+                with self.assertRaises(PublishError):
+                    publish_result(output, remote=str(self.remote))
+
     @classmethod
     def setUpClass(cls):
         cls.calculation, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)

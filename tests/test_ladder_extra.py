@@ -144,6 +144,33 @@ def run_cli(*args):
 
 
 class InputAndComputationTests(unittest.TestCase):
+    def test_historical_invalid_contributor_max_never_reaches_frozen_math(self):
+        from bridge.result import calculate_snapshot
+        from test_bridge_result import PARAMETERS, PROVENANCE
+        source = Path(__file__).resolve().parents[1] / 'runs/2026-09-26-general-grok16/candidates.csv'
+        payload, report = calculate_snapshot(source, PARAMETERS, PROVENANCE)
+        self.assertEqual(payload['candidate_count'], 155)
+        bad = next(r for r in payload['candidate_statuses'] if r['identity'] == 'Muse Spark 1.3 max Meta Contributor')
+        self.assertEqual(bad['status'], 'excluded')
+        self.assertIn('https://dev.meta.ai/docs/models', bad['reason'])
+        self.assertNotIn(bad['identity'], [r['identity'] for r in payload['ladder']])
+        self.assertNotIn(bad['identity'], [r['identity'] for r in payload['picks'].values() if r])
+        self.assertIn('Muse Spark 1.3 max Meta Contributor', report)
+        self.assertIn('excluded：', report.split('Muse Spark 1.3 max Meta Contributor（S=', 1)[1])
+        self.assertTrue(any(r['identity'] == 'Muse Spark 1.3 max AA-public published-price'
+                            for r in payload['candidate_statuses']))
+        xhigh = next(r for r in payload['candidate_statuses'] if r['identity'] == 'Muse Spark 1.3 xhigh Meta Contributor')
+        self.assertEqual(xhigh['score'], 45.0732966922226)
+        self.assertNotEqual(xhigh['score'], bad['score'])
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / 'scenario.md'
+            cli = run_cli('--input', source, '--output', output, '--min-score', '0')
+            self.assertEqual(cli.returncode, 0, cli.stderr)
+            text = output.read_text()
+            self.assertNotIn('| Muse Spark 1.3 max Meta Contributor |', text)
+            self.assertIn('Muse Spark 1.3 max Meta Contributor（S=', text)
+            self.assertIn('max Standard tier only (https://dev.meta.ai/docs/models;', text)
+
     def test_csv_requires_expected_columns_even_when_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "input.csv"

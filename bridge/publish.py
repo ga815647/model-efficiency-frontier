@@ -14,6 +14,10 @@ from urllib.parse import urlsplit
 
 from bridge.inventory import InventoryError, validate_fresh_inventory
 from bridge.result import validate_envelope
+from scripts.meta_availability import MODELS_URL, parse_meta_models, unavailable_reason
+from scripts.aa_public import SourceError
+import csv
+import io
 
 
 class PublishError(ValueError):
@@ -24,7 +28,8 @@ _UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 _RUN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*\Z')
 _BRANCH = re.compile(r'[A-Za-z0-9][A-Za-z0-9._/-]*\Z')
 _EVIDENCE = {'leaderboard.html', 'grok_release.html', 'muse_release.html',
-              'meta_pricing.html', 'sources.json', 'leaderboard_records.json',
+               'meta_pricing.html', 'models.html', 'sources.json', 'meta_models.json',
+               'availability.json', 'leaderboard_records.json',
               'releases.json', 'version.json', 'meta_pricing.json',
               'missing_candidates.json', 'source_map.json', 'api_diagnostic.json',
               'api_envelopes.json'}
@@ -187,6 +192,44 @@ def _output_files(output):
             if (type(version) is not dict or version.get('benchmark_version') != envelope['benchmark_version']
                     or type(source_map) is not dict or type(source_map.get('inventory')) is not dict):
                 raise PublishError('invalid_refresh_evidence')
+            if max(envelope['source_dates']) >= '2026-09-27':
+                base = 'snapshot/evidence/'
+                needed = {base + name for name in ('models.html', 'meta_models.json',
+                                                  'availability.json', 'sources.json')}
+                if not needed <= files.keys():
+                    raise PublishError('missing_capability_evidence')
+                try:
+                    raw = files[base + 'models.html']
+                    sources = _json(files[base + 'sources.json'])
+                    fact = parse_meta_models(raw.decode('utf-8'))
+                    parsed = _json(files[base + 'meta_models.json'])
+                    audit = _json(files[base + 'availability.json'])
+                    day = parsed['checked_date']
+                    if (sources['sha256_by_url'][MODELS_URL] != hashlib.sha256(raw).hexdigest()
+                            or sources['checked_date'] != day or day not in envelope['source_dates']
+                            or parsed != dict(fact, checked_date=day)
+                            or source_map.get('availability') != audit
+                            or audit['source_url'] != MODELS_URL or audit['checked_date'] != day
+                            or type(audit['retired_previous_efforts']) is not list
+                            or type(audit['excluded_current_identities']) is not list):
+                        raise ValueError('inconsistent models proof')
+                    rows = list(csv.DictReader(io.StringIO(files['snapshot/candidates.csv'].decode())))
+                    if any(unavailable_reason(row) for row in rows):
+                        raise ValueError('unavailable candidate in fresh CSV')
+                    expected_excluded = []
+                    if 'muse-spark-1-3' in source_map['source_by_slug']:
+                        identity = 'Muse Spark 1.3 max Meta Contributor'
+                        expected_excluded.append({'slug': 'muse-spark-1-3', 'identity': identity,
+                            'reason': unavailable_reason({'identity': identity}),
+                            'source_url': MODELS_URL, 'checked_date': day})
+                    if audit['excluded_current_identities'] != expected_excluded:
+                        raise ValueError('missing or invented effort exclusion audit')
+                    for entry in audit['retired_previous_efforts'] + audit['excluded_current_identities']:
+                        if (entry['source_url'] != MODELS_URL or entry['checked_date'] != day
+                                or not unavailable_reason(entry)):
+                            raise ValueError('unjustified retirement')
+                except (SourceError, KeyError, ValueError, TypeError, UnicodeError) as exc:
+                    raise PublishError('invalid_capability_evidence') from exc
             try:
                 validate_fresh_inventory(files['snapshot/candidates.csv'], source_map, envelope,
                                          error_code='invalid_refresh_inventory')

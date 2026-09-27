@@ -24,6 +24,9 @@ from collections import defaultdict
 from pathlib import Path
 
 import compute_frontier as cf
+if str(Path(__file__).resolve().parents[1]) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.meta_availability import unavailable_reason
 
 
 def parse_args(argv=None):
@@ -206,8 +209,16 @@ def compute_groups(rows, args):
     """Compute each paid scenario group with frozen math, then band-dedup."""
     results = {}
     for key, members in group_rows(rows).items():
-        kept, excluded = cf.compute_one_group(members, args.min_score,
+        available, unavailable = [], []
+        for row in members:
+            reason = unavailable_reason(row)
+            if reason:
+                unavailable.append((row, reason))
+            else:
+                available.append(row)
+        kept, excluded = cf.compute_one_group(available, args.min_score,
                                                args.max_cost, args.eps_score, args.eps_cp)
+        excluded.extend(unavailable)
         final, cuts = dedup_bands([r for r, _ in kept], args.eps_score)
         results[key] = dict(kept=kept, final=final, cuts=cuts, excluded=excluded)
     return results

@@ -16,8 +16,9 @@ from scripts.aa_public import (GROK, LEADERBOARD, MUSE, SourceError,
                                corroborate_version, parse_leaderboard, parse_release)
 from scripts.fetch_aa import COLUMNS
 from scripts.meta_pricing import URL as META, parse_meta_pricing, rescale_contributor
+from scripts.meta_availability import MODELS_URL, parse_meta_models, unavailable_reason
 
-SOURCES = (LEADERBOARD, GROK, MUSE, META)
+SOURCES = (LEADERBOARD, GROK, MUSE, META, MODELS_URL)
 
 
 def fetch_public(url: str) -> bytes:
@@ -151,7 +152,7 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
     today = dt.date.today().isoformat()
     raw = {}
     hashes = {}
-    for label, url in zip(('leaderboard', 'grok_release', 'muse_release', 'meta_pricing'), SOURCES):
+    for label, url in zip(('leaderboard', 'grok_release', 'muse_release', 'meta_pricing', 'models'), SOURCES):
         payload = fetch(url)
         if not isinstance(payload, bytes):
             raise SourceError('fetch_invalid', url, 'expected bytes')
@@ -161,11 +162,21 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
             raw[url] = payload.decode('utf-8')
         except UnicodeDecodeError as exc:
             raise SourceError('encoding_invalid', url) from exc
+    capability = parse_meta_models(raw[MODELS_URL])
+    _json(evidence / 'sources.json', {'checked_date': today, 'sha256_by_url': hashes})
+    _json(evidence / 'meta_models.json', dict(capability, checked_date=today))
+    prev_slugs, prev_efforts = _previous_slugs(previous)
+    retirement = [{'identity': 'Muse Spark 1.3 max Meta Contributor', 'effort': 'max',
+                   'source_url': MODELS_URL, 'checked_date': today,
+                   'reason': unavailable_reason({'model': 'Muse Spark 1.3', 'effort': 'max',
+                                                 'pricing_plan': 'Contributor'})}] if 'max' in prev_efforts else []
+    availability = {'source_url': MODELS_URL, 'checked_date': today,
+                    'retired_previous_efforts': retirement, 'excluded_current_identities': []}
+    _json(evidence / 'availability.json', availability)
     records = parse_leaderboard(raw[LEADERBOARD])
     releases = [parse_release(raw[url], url) for url in (GROK, MUSE)]
     version = corroborate_version(records, releases)
     meta = parse_meta_pricing(raw[META])
-    _json(evidence / 'sources.json', {'checked_date': today, 'sha256_by_url': hashes})
     _json(evidence / 'leaderboard_records.json', records)
     _json(evidence / 'releases.json', releases)
     _json(evidence / 'version.json', version)
@@ -194,7 +205,6 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
                                f'source_date={today}; version inferred from both release pages and four exact pairs; '
                                'public first-party/provider median, not provider-specific; full-precision flight JSON'),
                      'ttft_s': '', 'time_per_task_s': ''})
-    prev_slugs, prev_efforts = _previous_slugs(previous)
     lost = sorted(prev_slugs - included.keys())
     if lost:
         current = {r['slug']: r for r in records}
@@ -214,6 +224,13 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
     for item in candidates:
         slug = item['slug']
         model, effort, checkpoint = _model_effort(item['name'], slug)
+        reason = unavailable_reason({'model': model, 'effort': effort, 'pricing_plan': 'Contributor'})
+        if reason:
+            availability['excluded_current_identities'].append({'slug': slug,
+                'identity': f'{model} {effort} Meta Contributor', 'reason': reason,
+                'source_url': MODELS_URL, 'checked_date': today})
+            _json(evidence / 'availability.json', availability)
+            continue
         if slug not in muse:
             raise SourceError('components_missing', MUSE, slug)
         parts = muse[slug]['components']
@@ -237,7 +254,7 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
                      'notes': notes, 'ttft_s': '', 'time_per_task_s': ''})
         contributors.append({'slug': slug, 'effort': effort, 'standard_components': parts,
                              'derived_cost': str(derived), 'formula': notes})
-    lost_efforts = sorted(prev_efforts - {r['effort'] for r in contributors})
+    lost_efforts = sorted(prev_efforts - {r['effort'] for r in contributors} - {'max'})
     if lost_efforts:
         # An effort is a previous plan identity, not proof that its exact slug
         # disappeared. Save what the acquired pages actually show and leave
@@ -259,7 +276,8 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
             for effort in lost_efforts])
         raise SourceError('missing_candidate', MUSE, 'previous Contributor efforts lost: ' + ','.join(lost_efforts))
     _json(evidence / 'source_map.json', {'source_by_slug': included, 'excluded': excluded,
-                                         'contributor': contributors, 'inventory': {'slugs': sorted(included),
+                                          'availability': availability,
+                                          'contributor': contributors, 'inventory': {'slugs': sorted(included),
                                                                                   'contributor_efforts': sorted(r['effort'] for r in contributors)}})
     diagnostic = _diagnostic(evidence, version['benchmark_version'])
     _json(evidence / 'api_diagnostic.json', diagnostic)

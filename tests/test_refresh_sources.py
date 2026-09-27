@@ -8,6 +8,7 @@ from pathlib import Path
 
 from scripts.aa_public import SourceError, parse_leaderboard, parse_release, corroborate_version
 from scripts.meta_pricing import parse_meta_pricing, rescale_contributor
+from scripts.meta_availability import parse_meta_models, unavailable_reason, MODELS_URL
 from scripts.refresh_snapshot import refresh_snapshot, _diagnostic
 from scripts.refresh_snapshot import _model_effort
 
@@ -16,7 +17,7 @@ FIX = ROOT / 'tests/fixtures/refresh'
 URLS = {'leader': 'https://artificialanalysis.ai/leaderboards/models',
         'grok': 'https://artificialanalysis.ai/models/releases/grok-4-7',
         'muse': 'https://artificialanalysis.ai/models/releases/muse-spark-1-3',
-        'meta': 'https://dev.meta.ai/docs/pricing-rate-limits'}
+         'meta': 'https://dev.meta.ai/docs/pricing-rate-limits', 'models': MODELS_URL}
 
 
 def flight_record(raw):
@@ -25,6 +26,63 @@ def flight_record(raw):
 
 
 class RefreshSourcesTest(unittest.TestCase):
+    def test_models_page_proves_exact_muse_version_and_max_plan_restriction(self):
+        html = (FIX / 'models.html').read_text()
+        fact = parse_meta_models(html)
+        self.assertEqual(fact['model_id'], 'muse-spark-1.3')
+        self.assertEqual(fact['max_plan'], 'Standard')
+        for change in (html.replace('available on Standard tier only', 'available on both tiers'),
+                       html.replace('muse-spark-1.3</code>', 'muse-spark-1.2</code>'),
+                       html.replace('Supports all', 'Does not support all'),
+                       html.replace('Recommended for new work.', 'Contributor now supports max. Recommended for new work.')):
+            self.assertNotEqual(change, html)
+            with self.subTest(change=change), self.assertRaises(SourceError):
+                parse_meta_models(change + '<footer>Muse Spark 1.3 muse-spark-1.3 max available on Standard tier only</footer>')
+
+    def test_eligibility_is_exact_identity_not_family_or_rate_inference(self):
+        bad = dict(model='Muse Spark 1.3', effort='max', pricing_plan='Contributor',
+                   identity='Muse Spark 1.3 max Meta Contributor')
+        self.assertIn(MODELS_URL, unavailable_reason(bad))
+        for update in (dict(effort='xhigh'), dict(pricing_plan='published-price'),
+                       dict(pricing_plan='Standard'), dict(model='Muse Spark 1.2'),
+                       dict(model='Muse Spark 1.30'), dict(model='Grok 4.7')):
+            self.assertIsNone(unavailable_reason(dict(bad, **update)))
+
+    def test_previous_max_retires_only_with_models_proof_and_saves_audit(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
+            with (dest / 'candidates.csv').open() as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(len(rows), 154)
+            self.assertEqual([r['effort'] for r in rows if r['pricing_plan'] == 'Contributor'], ['xhigh'])
+            self.assertTrue(any(r['effort'] == 'max' and r['pricing_plan'] == 'published-price' for r in rows))
+            audit = json.loads((dest / 'evidence/availability.json').read_text())
+            self.assertEqual(audit['retired_previous_efforts'][0]['effort'], 'max')
+            self.assertEqual(audit['retired_previous_efforts'][0]['source_url'], MODELS_URL)
+            self.assertEqual(json.loads((dest / 'evidence/source_map.json').read_text())['inventory']['contributor_efforts'], ['xhigh'])
+            self.assertEqual(json.loads((dest / 'evidence/meta_models.json').read_text())['max_plan'], 'Standard')
+            self.assertEqual((dest / 'evidence/models.html').read_bytes(), data[MODELS_URL])
+            self.assertEqual(len(json.loads((dest / 'evidence/sources.json').read_text())['sha256_by_url']), 5)
+
+    def test_previous_max_retirement_audit_survives_unrelated_paid_cost_loss(self):
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
+        before = data[URLS['leader']]
+        data[URLS['leader']] = before.replace(b'intelligenceIndexCostPerTask\\":0.4637245706928438',
+                                               b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
+        self.assertNotEqual(before, data[URLS['leader']])
+        archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            with self.assertRaises(SourceError) as caught:
+                refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
+            self.assertEqual(caught.exception.code, 'missing_candidate')
+            self.assertEqual(json.loads((dest / 'evidence/availability.json').read_text())['retired_previous_efforts'][0]['effort'], 'max')
+            self.assertTrue((dest / 'evidence/missing_candidates.json').exists())
+            self.assertFalse((dest / 'candidates.csv').exists())
+
     def test_optional_price_scalars_use_strict_numeric_decimals_or_missing(self):
         base = {'slug': 'inkling', 'name': 'Inkling (xhigh)', 'shortName': 'Inkling',
                 'modelCreatorName': 'Thinking Machines', 'intelligenceIndex': 24.9847810999384,
@@ -165,7 +223,7 @@ class RefreshSourcesTest(unittest.TestCase):
             self.assertFalse((dest / 'candidates.csv').exists())
 
     def test_saved_two_paid_missing_costs_block_without_host_fixture(self):
-        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in ('grok', 'muse', 'meta')}
+        data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in ('grok', 'muse', 'meta', 'models')}
         data[URLS['leader']] = (FIX / 'failed-two-costs-flight.html').read_bytes()
         previous = {'slugs': ['inkling', 'minimax-m2-7']}
         with tempfile.TemporaryDirectory() as temp:
@@ -392,7 +450,7 @@ class RefreshSourcesTest(unittest.TestCase):
             refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
             with (dest / 'candidates.csv').open() as stream:
                 rows = list(csv.DictReader(stream))
-            self.assertEqual(len(rows), 155)
+            self.assertEqual(len(rows), 154)
             self.assertEqual(len([r for r in rows if r['effort'] in ("Jan '25", '0902', 'June 2026')]), 0)
             self.assertTrue(all(r['model_version'] for r in rows))
             excluded = json.loads((dest / 'free-sidecar.json').read_text())['excluded_non_paid_or_unusable']
