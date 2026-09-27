@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "request_id": "95a3ddbc-5d8d-4985-9c6d-1a73c251e0f4",
+  "created_at": "2026-09-27T04:39:34.508828+00:00",
+  "product_sha": "076c7ca1bf0971c2391be6b43f5abf1b8dc6f4d5",
+  "operation": "recompute",
+  "parameters": {
+    "gpt_factor": 18,
+    "grok_factor": 16,
+    "min_score": 0,
+    "min_score_reason": "用戶確認：同版本全候選情境比較；Contributor effort 身份修復驗收",
+    "max_cost": null
+  },
+  "source_snapshot": {
+    "commit": "076c7ca1bf0971c2391be6b43f5abf1b8dc6f4d5",
+    "path": "runs/2026-09-26-general-grok16/candidates.csv"
+  }
+}
