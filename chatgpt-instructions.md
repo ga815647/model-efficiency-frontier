@@ -10,6 +10,8 @@
 
 ## 結報
 
+9/27後續目標Chat v2驗收已通過：使用者帶回run `36355372202-1`成功結報，OpenCode另核對request／product／publication、v2推薦及HTML artifact雜湊。完整證據見下方同一驗收帳的最新段；覆蓋下段「本次不新增Chat端實測」的較早狀態。既有通過能力直接沿用，無需重做問卷；live fresh來源缺值仍獨立。
+
 固定視窗v2產品 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已發布main並讀回；OpenCode控制端已驗證recompute `36341140428-1` 成功及refresh `36341142058-1` 因Inkling／MiniMax-M2.7 task cost缺值失敗、診斷發布且成功pointer未推進，非live fresh成功或產品回歸。固定publication／來源／HTML雜湊見 `docs/superpowers/notes/2026-09-27-window-knee-acceptance.md`。本次不新增Chat端實測或Project安裝證明；請求仍v1，先辨識固定結果schema再結報。原bootstrap定位不變，不需因改制重貼；settings安裝狀態仍獨立確認。
 
 - **v2**：只讀 `anchors.highest_retained_score`（最強保留檔）與 `anchors.lowest_retained_cost`（最低情境成本保留檔），再給已選好的 `ladder`。兩入口僅final非Claude，可同一行或皆null；從缺時不從cut／excluded補位。沒有middle／平衡或最高CP省錢入口。政策 `cp-new-high-window-v1` 保留CP-new-high後跨family固定2分視窗精簡，不保送最高分。`selection_trace` 解釋cut→final代表；`upgrade` 僅連向下一較低分非Claude保留行，Claude的 `comparison_only=true` 僅比較。`grade_b_effects` 是去掉全部B後A行保留差異，包含間接影響，不等於某單一B的唯一因果。硬2分邊界、缺窗中性及逐次選擇仍會跳變，不能宣稱完全穩健。

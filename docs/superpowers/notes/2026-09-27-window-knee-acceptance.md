@@ -1,5 +1,18 @@
 # 固定視窗 v2 發布與雲端驗收帳
 
+## 最新：目標Chat v2端到端驗收通過
+
+2026-09-27使用者帶回Chat實測結報（自報處理時間3m11s），完成recompute提交、查run、固定結果讀回及HTML下載入口。OpenCode另以GitHub API核對下列固定物件，並下載artifact驗雜湊；此增量覆蓋下方「未新增Chat端實測」的較早狀態。
+
+- 產品 `fdabaad096b1dbd4dfcd0ef3a49faf86a980ac0e`；request `ab8e82a1-b8da-48af-b5f0-9ec1c6541caa`；request commit `12bd4b11b0fe12b0f3dbe70fa8eb0473f5822cbc`，唯一parent為產品、唯一added path為對應request JSON。
+- [run 36355372202](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36355372202)，attempt1、push、success，head_sha／branch逐項相符。
+- 固定publication `a9b3361f7aa6aba98a9adb337a2aac4d14a156c5`；目錄 `results/ab8e82a1-b8da-48af-b5f0-9ec1c6541caa/36355372202-1/`。
+- 公開validator驗result v2、policy `cp-new-high-window-v1`；155 statuses／19 chain／10 final，兩入口Astra xhigh與Luna low；Contributor max明確excluded並含Standard-only理由。
+- 參數逐項與request一致：18/16、min0、max_cost=null、理由「同版本全候選情境比較」；source locator為產品commit內9/26固定CSV。JSON／Markdown／HTML含相同final身份。
+- 下載artifact `report-ab8e82a1-b8da-48af-b5f0-9ec1c6541caa-36355372202-1`，HTML SHA-256與固定Git檔同為 `568c95c19795a6e84c4c2bb98f0da5002d29ca39e48ad8ee67c11157015c5d4b`。
+
+本次改制的Chat端到端驗收完成。當前live fresh缺cost仍為獨立來源問題；Project settings是否實際貼上、Chat直接附件能力不由這次結報推定，也不作此次改制再開驗收的門檻。
+
 日期：2026-09-27。**v2已發布；真實recompute成功，真實refresh按既有來源成本缺口失敗並完成診斷發布驗收。** 不是live fresh成功，也不是產品回歸。
 產品／phase A文件 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已由控制端非force推送main並以GitHub API讀回相同SHA；發布前確認main為祖先。產品基準 `eb3ecf1` 的覆核及phase A文件獨立覆核均已通過。此次是OpenCode控制端雲端驗收，不新增目標Chat端實測或Project settings安裝證明。規格：[固定視窗設計](../specs/2026-09-27-window-knee-production-design.md)；契約：[request v1／result v2](../../contracts/chat-ci.md)。
 
