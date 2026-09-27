@@ -34,8 +34,21 @@ _EVIDENCE = {'leaderboard.html', 'grok_release.html', 'muse_release.html',
               'missing_candidates.json', 'source_map.json', 'api_diagnostic.json',
               'api_envelopes.json'}
 _FILES = {'result.json', 'report.md', 'report.html', 'snapshot/candidates.csv',
-          'snapshot/free-sidecar.json', 'snapshot/run-notes.md'} | {
-              'snapshot/evidence/' + name for name in _EVIDENCE}
+           'snapshot/free-sidecar.json', 'snapshot/run-notes.md'} | {
+               'snapshot/evidence/' + name for name in _EVIDENCE}
+# refresh_snapshot fetches/parses the models page before these validations. A
+# failed result with one of these codes cannot legitimately predate that proof.
+# Previous-inventory parsing is the sole listed stage before availability.json.
+_POST_PROOF_REFRESH_ERRORS = {
+    'previous_inventory_missing', 'missing_candidate', 'invalid_measurement',
+    'markup_drift', 'model_markup_drift', 'model_shape_drift', 'invalid_identity',
+    'conflicting_slug', 'release_shape_drift', 'release_missing', 'version_missing',
+    'version_disagreement', 'crosscheck_mismatch', 'model_missing',
+    'training_terms_changed', 'pricing_markup', 'pricing_semantics', 'pricing_missing',
+    'components_missing', 'components_inconsistent', 'effort_ambiguous',
+    'api_diagnostic_failed', 'api_envelope_invalid', 'api_pagination_limit',
+    'api_version_drift',
+}
 
 
 def _pairs(items):
@@ -115,6 +128,14 @@ def _capability_evidence(files, envelope, source_map=None):
     needed = {base + name for name in ('models.html', 'meta_models.json', 'sources.json')}
     present = needed & files.keys()
     audit_path = base + 'availability.json'
+    # Error codes come from the runner's exception boundary; a failed envelope's
+    # operation field is untrusted and may be null, even for a refresh failure.
+    late_codes = ({error['code'] for error in envelope['errors']} if
+                  envelope['status'] == 'failed' else set())
+    if late_codes & _POST_PROOF_REFRESH_ERRORS and (
+            needed - files.keys() or
+            audit_path not in files and late_codes != {'previous_inventory_missing'}):
+        raise PublishError('missing_capability_evidence')
     if present == {base + 'models.html'} and audit_path not in files and source_map is None:
         return  # Fetch completed but semantic parsing may have failed before proof.
     if not present and audit_path not in files:

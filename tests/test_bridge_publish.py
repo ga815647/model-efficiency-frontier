@@ -19,6 +19,66 @@ def git(repo, *args):
 
 
 class PublishTests(unittest.TestCase):
+    def test_late_missing_candidate_cannot_publish_without_proof_or_with_unparsed_models(self):
+        from test_refresh_sources import FIX, URLS
+        from scripts.refresh_snapshot import refresh_snapshot
+        from scripts.aa_public import SourceError
+        pages = {URLS[name]: (FIX / name).with_suffix('.html').read_bytes() for name in URLS}
+        before = pages[URLS['leader']]
+        pages[URLS['leader']] = before.replace(b'intelligenceIndexCostPerTask\\":0.4637245706928438',
+                                               b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
+        self.assertNotEqual(before, pages[URLS['leader']])
+        previous = json.loads((Path(__file__).resolve().parents[1] /
+                              'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        for removed in ('all_proof', 'leave_unparsed_models', 'untrusted_operation'):
+            with self.subTest(removed=removed):
+                output = self.base / ('late-' + removed)
+                output.mkdir()
+                with self.assertRaises(SourceError) as caught:
+                    refresh_snapshot(output / 'snapshot', previous=previous, fetch=pages.__getitem__)
+                self.assertEqual(caught.exception.code, 'missing_candidate')
+                req = dict(request_data(), operation='refresh')
+                execution = {'request_commit_sha': 'b' * 40, 'run_id': '804', 'run_attempt': 1,
+                             'run_url': 'https://github.com/example/actions/runs/804'}
+                result = make_envelope(
+                    req, execution, calculation=None,
+                    errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])
+                if removed == 'untrusted_operation':
+                    result['operation'] = None
+                (output / 'result.json').write_text(json.dumps(result))
+                evidence = output / 'snapshot/evidence'
+                for name in ('models.html', 'meta_models.json', 'sources.json', 'availability.json'):
+                    (evidence / name).unlink()
+                if removed == 'leave_unparsed_models':
+                    (evidence / 'models.html').write_text('<li>fake, no parsed proof</li>')
+                with self.assertRaisesRegex(PublishError, 'missing_capability_evidence'):
+                    publish_result(output, remote=str(self.remote))
+        self.assertNotEqual(subprocess.run(['git', '-C', str(self.remote), 'rev-parse', '--verify',
+                                            'refs/heads/results'], capture_output=True).returncode, 0)
+
+    def test_preproof_models_parse_failure_remains_publishable_as_failure(self):
+        from test_refresh_sources import FIX, URLS
+        from scripts.refresh_snapshot import refresh_snapshot
+        from scripts.aa_public import SourceError
+        pages = {URLS[name]: (FIX / name).with_suffix('.html').read_bytes() for name in URLS}
+        pages[URLS['models']] = pages[URLS['models']].replace(b'available on Standard tier only',
+                                                             b'available on all tiers')
+        output = self.base / 'preproof-parse-failure'
+        output.mkdir()
+        with self.assertRaises(SourceError) as caught:
+            refresh_snapshot(output / 'snapshot', previous=None, fetch=pages.__getitem__)
+        self.assertEqual(caught.exception.code, 'model_capability_drift')
+        req = dict(request_data(), operation='refresh')
+        execution = {'request_commit_sha': 'b' * 40, 'run_id': '805', 'run_attempt': 1,
+                     'run_url': 'https://github.com/example/actions/runs/805'}
+        (output / 'result.json').write_text(json.dumps(make_envelope(req, execution, calculation=None,
+            errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])))
+        self.assertTrue((output / 'snapshot/evidence/models.html').exists())
+        self.assertFalse((output / 'snapshot/evidence/meta_models.json').exists())
+        tip = publish_result(output, remote=str(self.remote))
+        self.assertEqual(json.loads(git(self.remote, 'show',
+            f'{tip}:results/{req["request_id"]}/805-1/result.json'))['status'], 'failed')
+
     def test_preproof_models_fetch_failure_remains_publishable_as_failure(self):
         from test_refresh_sources import FIX, URLS
         from scripts.refresh_snapshot import refresh_snapshot
