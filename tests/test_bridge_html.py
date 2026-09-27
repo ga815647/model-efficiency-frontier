@@ -5,7 +5,7 @@ from html.parser import HTMLParser
 
 from bridge.html_report import render_html
 from test_bridge_result import SNAPSHOT, PARAMETERS, PROVENANCE
-from bridge.result import calculate_snapshot
+from bridge.result_v1 import calculate_snapshot
 
 
 class HTMLTests(unittest.TestCase):

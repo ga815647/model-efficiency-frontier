@@ -19,7 +19,7 @@ def git(repo, *args):
 
 
 class PublishTests(unittest.TestCase):
-    def test_late_missing_candidate_cannot_publish_without_proof_or_with_unparsed_models(self):
+    def test_late_missing_candidate_cannot_publish_without_proof_or_with_unparsed_models(self, make_api=make_envelope):
         from test_refresh_sources import FIX, URLS
         from scripts.refresh_snapshot import refresh_snapshot
         from scripts.aa_public import SourceError
@@ -40,7 +40,7 @@ class PublishTests(unittest.TestCase):
                 req = dict(request_data(), operation='refresh')
                 execution = {'request_commit_sha': 'b' * 40, 'run_id': '804', 'run_attempt': 1,
                              'run_url': 'https://github.com/example/actions/runs/804'}
-                result = make_envelope(
+                result = make_api(
                     req, execution, calculation=None,
                     errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])
                 if removed == 'untrusted_operation':
@@ -56,7 +56,7 @@ class PublishTests(unittest.TestCase):
         self.assertNotEqual(subprocess.run(['git', '-C', str(self.remote), 'rev-parse', '--verify',
                                             'refs/heads/results'], capture_output=True).returncode, 0)
 
-    def test_preproof_models_parse_failure_remains_publishable_as_failure(self):
+    def test_preproof_models_parse_failure_remains_publishable_as_failure(self, make_api=make_envelope):
         from test_refresh_sources import FIX, URLS
         from scripts.refresh_snapshot import refresh_snapshot
         from scripts.aa_public import SourceError
@@ -71,7 +71,7 @@ class PublishTests(unittest.TestCase):
         req = dict(request_data(), operation='refresh')
         execution = {'request_commit_sha': 'b' * 40, 'run_id': '805', 'run_attempt': 1,
                      'run_url': 'https://github.com/example/actions/runs/805'}
-        (output / 'result.json').write_text(json.dumps(make_envelope(req, execution, calculation=None,
+        (output / 'result.json').write_text(json.dumps(make_api(req, execution, calculation=None,
             errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])))
         self.assertTrue((output / 'snapshot/evidence/models.html').exists())
         self.assertFalse((output / 'snapshot/evidence/meta_models.json').exists())
@@ -79,7 +79,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(json.loads(git(self.remote, 'show',
             f'{tip}:results/{req["request_id"]}/805-1/result.json'))['status'], 'failed')
 
-    def test_preproof_models_fetch_failure_remains_publishable_as_failure(self):
+    def test_preproof_models_fetch_failure_remains_publishable_as_failure(self, make_api=make_envelope):
         from test_refresh_sources import FIX, URLS
         from scripts.refresh_snapshot import refresh_snapshot
         from scripts.aa_public import SourceError
@@ -98,7 +98,7 @@ class PublishTests(unittest.TestCase):
         req = dict(request_data(), operation='refresh')
         execution = {'request_commit_sha': 'b' * 40, 'run_id': '803', 'run_attempt': 1,
                      'run_url': 'https://github.com/example/actions/runs/803'}
-        (output / 'result.json').write_text(json.dumps(make_envelope(req, execution, calculation=None,
+        (output / 'result.json').write_text(json.dumps(make_api(req, execution, calculation=None,
             errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])))
         self.assertFalse((output / 'snapshot/evidence/models.html').exists())
         tip = publish_result(output, remote=str(self.remote))
@@ -262,10 +262,6 @@ class PublishTests(unittest.TestCase):
                 with self.assertRaises(PublishError):
                     publish_result(output, remote=str(self.remote))
 
-    @classmethod
-    def setUpClass(cls):
-        cls.calculation, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
-
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -274,13 +270,15 @@ class PublishTests(unittest.TestCase):
         git(self.base, 'init', '--bare', '-q', str(self.remote))
 
     def output(self, *, run='100', attempt=1, operation='recompute', status='success',
-               created='2026-09-26T12:00:00+00:00', request=None):
+               created='2026-09-26T12:00:00+00:00', request=None, schema_version=2):
         dest = self.base / f'out-{run}-{attempt}-{operation}-{status}'
         dest.mkdir()
         req = dict(request_data(), operation=operation, created_at=created)
         if request:
             req['request_id'] = request
-        calculation = dict(self.calculation)
+        from bridge import result, result_v1
+        api = result_v1 if schema_version == 1 else result
+        calculation, _ = api.calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
         if operation == 'refresh':
             fresh, _ = self.valid_refresh_output()
             csv = (fresh / 'snapshot/candidates.csv').read_bytes()
@@ -290,15 +288,15 @@ class PublishTests(unittest.TestCase):
             (dest / 'snapshot/candidates.csv').write_bytes(csv)
             for name in ('source_map.json', 'version.json'):
                 (dest / 'snapshot/evidence' / name).write_bytes((fresh / 'snapshot/evidence' / name).read_bytes())
-            calculation, _ = calculate_snapshot(dest / 'snapshot/candidates.csv', PARAMETERS,
+            calculation, _ = api.calculate_snapshot(dest / 'snapshot/candidates.csv', PARAMETERS,
                                                 dict(PROVENANCE, source_locator=calculation['source_snapshot']))
         execution = {'request_commit_sha': 'b' * 40, 'run_id': run, 'run_attempt': attempt,
                      'run_url': 'https://github.com/example/actions/runs/' + run}
         if status == 'failed':
-            envelope = make_envelope(req, execution, calculation=None,
+            envelope = api.make_envelope(req, execution, calculation=None,
                                      errors=[{'code': 'test_failure', 'message': 'test'}])
         else:
-            envelope = make_envelope(req, execution, calculation=calculation, errors=[])
+            envelope = api.make_envelope(req, execution, calculation=calculation, errors=[])
             (dest / 'report.md').write_text('# Report\n')
             (dest / 'report.html').write_text('<!doctype html><title>Report</title>')
         (dest / 'result.json').write_text(json.dumps(envelope))

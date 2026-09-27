@@ -7,7 +7,8 @@ import unittest
 from pathlib import Path
 
 from test_bridge_result import SNAPSHOT, PARAMETERS, PROVENANCE, recompute_data
-from bridge.result import calculate_snapshot, make_envelope, validate_envelope
+from bridge.result_v1 import calculate_snapshot, make_envelope
+from bridge.result import validate_envelope
 from bridge.result_v2 import calculate_v2, make_v2_envelope
 
 EXECUTION = dict(request_commit_sha='b'*40, run_id='9753', run_attempt=1,
@@ -157,7 +158,7 @@ class V2ResultTests(unittest.TestCase):
         step['strength'] = -0.5
         self.assertEqual(validate_envelope(env), env)
 
-    def test_v1_defaults_and_legacy_cut_remain_readable(self):
+    def test_explicit_v1_and_legacy_cut_remain_readable(self):
         from bridge import result_v1
         calc, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
         env = make_envelope(recompute_data(), EXECUTION, calculation=calc, errors=[])

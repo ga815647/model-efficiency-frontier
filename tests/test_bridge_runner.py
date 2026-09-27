@@ -9,7 +9,6 @@ import unittest
 from pathlib import Path
 
 from bridge.runner import execute_request, materialize_snapshot
-from bridge.result import calculate_snapshot, make_envelope
 from test_bridge_request import request_data
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,7 +62,7 @@ class RunnerTests(unittest.TestCase):
         return execute_request(req, execution=execution, repository=self.repo,
                                output=output, fetch=no_network), output
 
-    def publish_refresh_fixture(self, *, pointer=True, omit_slug=False):
+    def publish_refresh_fixture(self, *, pointer=True, omit_slug=False, schema_version=1):
         # A real results branch containing a successful fresh result and its
         # committed CSV/evidence, without invoking public network fetching.
         git(self.repo, 'branch', 'results')
@@ -106,12 +105,14 @@ class RunnerTests(unittest.TestCase):
                       'caveats': ['Public version inferred from release pages',
                                   'Contributor GRADE-B cache-write assumption']}
         params = request_data()['parameters']
-        calculation, _ = calculate_snapshot(snapshot / 'candidates.csv', params, provenance)
+        from bridge import result, result_v1
+        api = result_v1 if schema_version == 1 else result
+        calculation, _ = api.calculate_snapshot(snapshot / 'candidates.csv', params, provenance)
         fresh_req = dict(request_data(), product_sha=self.product)
         fresh_execution = {'request_commit_sha': git(self.repo, 'rev-parse', 'HEAD'),
                            'run_id': '777', 'run_attempt': 1,
                            'run_url': 'https://github.com/example/actions/runs/777'}
-        result = make_envelope(fresh_req, fresh_execution, calculation=calculation, errors=[])
+        result = api.make_envelope(fresh_req, fresh_execution, calculation=calculation, errors=[])
         (target / 'result.json').write_text(json.dumps(result))
         if pointer:
             (self.repo / 'latest-refresh.json').write_text(json.dumps({
@@ -134,7 +135,10 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual((output / 'snapshot/candidates.csv').read_bytes(), original)
         self.assertEqual(hashlib.sha256((output / 'snapshot/candidates.csv').read_bytes()).hexdigest(),
                          hashlib.sha256(original).hexdigest())
-        self.assertIn(envelope['picks']['strong']['identity'], (output / 'report.html').read_text())
+        self.assertEqual(envelope['schema_version'], 2)
+        self.assertEqual(len(envelope['ladder']), 10)
+        self.assertIn(envelope['anchors']['highest_retained_score']['identity'],
+                      (output / 'report.html').read_text())
         self.assertEqual(json.loads((output / 'result.json').read_text()), envelope)
 
     def test_fixed_commit_rejects_later_conflicting_evidence(self):

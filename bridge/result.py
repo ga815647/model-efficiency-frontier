@@ -1,9 +1,16 @@
-"""Versioned result reader; generation remains v1 until runner cutover."""
-from . import result_v1, result_v2
+"""Generate window-policy v2 results and read both published result versions."""
+from . import result_v1, result_v2, window_report
 
 ResultError = result_v1.ResultError
-calculate_snapshot = result_v1.calculate_snapshot
-make_envelope = result_v1.make_envelope
+
+
+def calculate_snapshot(csv_path, parameters, provenance):
+    calculation = result_v2.calculate_v2(csv_path, parameters, provenance)
+    return calculation, window_report.render_markdown(calculation)
+
+
+def make_envelope(request, execution, *, calculation, errors):
+    return result_v2.make_v2_envelope(request, execution, calculation=calculation, errors=errors)
 
 
 def validate_envelope(envelope):

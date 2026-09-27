@@ -9,7 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 
-from bridge.result import calculate_snapshot, make_envelope, validate_envelope
+from bridge.result_v1 import calculate_snapshot, make_envelope
+from bridge.result import validate_envelope
 from test_bridge_request import request_data
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -145,7 +145,7 @@ def run_cli(*args):
 
 class InputAndComputationTests(unittest.TestCase):
     def test_historical_invalid_contributor_max_never_reaches_frozen_math(self):
-        from bridge.result import calculate_snapshot
+        from bridge.result_v1 import calculate_snapshot
         from test_bridge_result import PARAMETERS, PROVENANCE
         source = Path(__file__).resolve().parents[1] / 'runs/2026-09-26-general-grok16/candidates.csv'
         payload, report = calculate_snapshot(source, PARAMETERS, PROVENANCE)
