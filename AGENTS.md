@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-09-27 Contributor max 身份錯誤（最新資料更正）**：用戶指出 Muse Spark 1.3 Contributor 不提供 max；已直接取得 `https://dev.meta.ai/docs/models`，官方明載 max「available on Standard tier only」。禁止將 Standard max 分數／用量套 Contributor 費率製造可用 identity；`Muse Spark 1.3 max Meta Contributor` 不得推薦或參與新比較。舊快照保留為歷史錯誤證據，不回寫；xhigh 不得代入 max 分數。現行取得程式只驗 model/plan 價格、未驗 effort 可用性，修復尚待進行。排除該行後的歷史情境試算為154候選／19個CP新高點；同一候選轉折法得10點，見 probe 更正段。先前以該行淘汰 Astra medium／Sol max 的結論撤回，不能只從舊結果刪掉 Muse 一列。
+
 > **2026-09-27 用戶最新糾正（覆蓋下方純雙軸改制方向）**：這張表的前提一直是 **Score 由高至低，向下只有 CP_adj 創新高才留**。目前討論要改的是這條鏈上過密檔位的後續剔除／直接推薦，不能擅自取消 CP-new-high 改用全候選 Pareto。用戶不接受最高分必保留，也不接受「近分群一律留最便宜」造成固定選最低分；需要直接選好而非只折疊資料讓用戶自行判斷。`2026-09-27-tradeoff-production-design.md` 已標記需修訂，不可照原稿實作。正式剔除／推薦細則尚未定案；既有已部署數學未改，試版保留為歷史探索。
 
 > **同日比較範圍補充**：使用者明確提醒 Astra 要與 Sol 等其他模型一起比較。第二階段也沿全 family 混排的 CP-new-high 鏈評估，不按模型／family 分組、不保證每家各留一檔。Astra 內部案例只供說明，不能單獨據此定最終推薦；Contributor／Grok 等已入鏈 identity 同樣參與，來源分組及 B caveat 維持。

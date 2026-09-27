@@ -4,6 +4,8 @@
 
 ## 工具與三個固定版本
 
+**9/27 能力增量覆蓋下段的「僅可見／待Task8」狀態：**使用者已帶回本私人庫的實際request提交、push run查詢及成功／失敗結果讀回，OpenCode另核對固定Git結果，見`docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md`。沿用已通過能力，不重做問卷；下段介面參數仍有效，驗收狀態是9/26歷史。
+
 下列是**使用者提供的 2026-09-26 ChatGPT 端證據**：在另一私人庫實測 `mcp__GitHub__fetch_file(repository_full_name, path, ref, encoding="utf-8")` 完整讀取（不傳 start/end_line）、`mcp__GitHub__fetch(url="https://api.github.com/repos/{owner}/{repo}/commits/{ref}")` 解析 commit、`mcp__GitHub__fetch` GET `/repos/{owner}/{repo}/actions/runs` 與 `/actions/runs/{run_id}`。`mcp__GitHub__create_branch(repository_full_name, branch_name, sha)`、`mcp__GitHub__create_file(repository_full_name, path, content, message, branch)` 僅工具可見，**未在本庫實測寫入**；前者 `sha` 與 `base_ref` 二選一，後者 `content` 是 UTF-8 字串、回傳 `result.commit_sha`。無 workflow_dispatch 或任意 REST POST；`mcp__GitHub__fetch_commit_workflow_runs(repo_full_name, commit_sha)` 僅 PR-triggered 第一頁，不用來找一般 push run。GET-only `fetch` 不能寫入。新私人庫 access、push、讀回仍需 Task 8 驗證。
 
 每次對話任務 GET `/commits/main` 的 `sha` 得**產品 commit**；以該 SHA 完整讀 `chatgpt-instructions.md`、本契約及必要規則。同一任務不在讀到一半改用新 main。`fetch_file` 回傳 `sha` 是 **blob SHA**，不是產品／請求／發佈 commit。`request_commit_sha` 來自 create_file 的 `result.commit_sha` 或 GET 分支 HEAD；結果的 commit 須另 GET `/commits/results` 或查該 run 發佈摘要取得並固定。三者不能互換。
@@ -38,6 +40,8 @@
 建立唯一 `efficiency-run/<request_id>`：`create_branch(..., sha=product_sha)`；GET `/commits/efficiency-run/<request_id>` 驗 HEAD 為 product SHA，然後 `create_file(..., path="bridge/requests/<request_id>.json", content=<JSON字串>, message=<說明>, branch=<該分支>)`。只新增該檔；新 commit 唯一 parent 必等於 `product_sha`，diff 僅 `A bridge/requests/<request_id>.json`。請求分支 push 觸發 Actions；不用建立第二個 request 來「催」一次執行。若 create_file 回應遺失，先以**原分支及精確 path**讀回，GET 分支 HEAD/commit，核對 JSON bytes/identity、parent 與 sole added path；一致則採用已存在 commit 繼續查 run，不一致停止並報衝突。確認未提交且仍指向原 product SHA、原 path 不存在才可用**同一** ID/path 重試；不能盲目重試或用新的 ID 隱藏未知結果。
 
 ## 查 run、固定發佈與讀回
+
+Contributor 身份修復新增取得證據：`snapshot/evidence/models.html`、`meta_models.json`、`availability.json`，並在 `sources.json` 記官方models來源雜湊。新refresh先驗effort可用性，再換價；已取得的能力證據在成功及失敗發布均驗證。早於修復的成功快照仍可讀取／重算，原CSV保留；修正後計算把其中不可用的Muse Spark1.3 Contributor max明確列為excluded。詳見 `docs/superpowers/notes/2026-09-27-contributor-effort-correction.md` 的發布及驗收狀態。
 
 查 `/actions/runs?event=push&head_sha=<request_commit_sha>`（依 GitHub API 實際支援的篩選，否則分頁列表逐筆篩）並查 `/actions/runs/{run_id}`；要求 `event=push`、`head_sha=request_commit_sha`、`head_branch=efficiency-run/<request_id>`，核對 `run_id` 和 `run_attempt`。不要使用 PR-only helper、單看「最新」run、或以 request ID 字串搜尋冒充關聯。未完成則在可用工具預算內有限次查詢，不能承諾背景通知；保留 ID／run URL 供下次續查。
 

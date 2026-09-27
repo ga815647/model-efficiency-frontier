@@ -1,5 +1,9 @@
 # 原 CP-new-high 鏈：跨模型轉折精簡試算
 
+> **同日資料更正，覆蓋下方原試算：**使用者指出 Contributor 不支援 max；OpenCode 直接取得 [官方模型文件](https://dev.meta.ai/docs/models)，其 Muse Spark 1.3 說明明載 `"max" level for extended reasoning (available on Standard tier only)`。原候選 `Muse Spark 1.3 max Meta Contributor` 是錯誤的跨plan/effort身份，撤回其推薦及作為剔除證據的效力。GRADE-B換價不證明檔位可用。
+
+排除該錯誤 identity 後，從原 CSV 的記憶體副本重跑 frozen CP-new-high 及下列同一候選轉折規則（18/16、min0、eps2/.05），得 **154候選→19個CP新高點→10個試算保留點**：Claude Opus5.5 max（僅比較）、GPT-6 Astra xhigh、Astra medium、Sol max、Sol high、Sol medium、Luna max、Luna high、Luna medium、Luna low。Astra medium與Sol max恢復，原試算Astra low也因新鄰點重新判斷而不保留。這是以已核對可用性更正的歷史情境試算，不是新取數；原CSV未改。以下原表只保留作錯誤分析，不再視為有效推薦。生產取數 effort 可用性驗證仍待修復。
+
 日期：2026-09-27。**候選判準的探索結果，未批准為正式演算法、未更換部署。** 此文件不恢復已撤回的全候選 Pareto 改制草案。
 
 ## 輸入與不變前提
