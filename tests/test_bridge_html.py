@@ -9,6 +9,14 @@ from bridge.result import calculate_snapshot
 
 
 class HTMLTests(unittest.TestCase):
+    def test_v2_policy_dispatches_to_two_anchor_report(self):
+        from bridge.result_v2 import calculate_v2
+        payload = calculate_v2(SNAPSHOT, PARAMETERS, PROVENANCE)
+        page = render_html(payload)
+        self.assertIn('最強保留檔', page)
+        self.assertEqual(page.count('data-rank="'), 10)
+        self.assertNotIn('三檔推薦', page)
+
     @classmethod
     def setUpClass(cls):
         cls.payload, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)

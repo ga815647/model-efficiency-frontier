@@ -21,6 +21,10 @@ def _row(row, rank):
 
 def render_html(calculation: dict) -> str:
     """Render only payload data: no network, JavaScript, or recalculation."""
+    from .result_v2 import POLICY
+    if calculation.get('selection_policy') == POLICY:
+        from .window_report import render_html as render_window_html
+        return render_window_html(calculation)
     ladder = calculation['ladder']
     picks = calculation['picks']
     statuses = calculation['candidate_statuses']
