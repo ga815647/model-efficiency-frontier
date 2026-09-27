@@ -1,6 +1,6 @@
 # Chat → CI 契約（request v1／result v2＋歷史v1；2026-09-27）
 
-此文件描述**本地實作**，不是遠端／Chat Project 已安裝證明。私人目標 `ga815647/model-efficiency-frontier`；產品 `main`，發佈 `results`；不得同步或恢復已移往用戶垃圾桶父頁的 Notion 頁，不部署網站。`bridge/request.py`、`bridge/result.py`、`bridge/runner.py`、`bridge/publish.py` 和 `.github/workflows/chat-execution.yml` 是精確欄位與驗證的實作來源。
+此文件描述**已發布v2實作**；2026-09-27 OpenCode控制端完成雲端重算成功與預期來源缺口失敗診斷驗收，詳見 [v2驗收帳](../superpowers/notes/2026-09-27-window-knee-acceptance.md)。不代表live fresh成功、新Chat端實測或Chat Project settings已安裝。私人目標 `ga815647/model-efficiency-frontier`；產品 `main`，發佈 `results`；不得同步或恢復已移往用戶垃圾桶父頁的 Notion 頁，不部署網站。`bridge/request.py`、`bridge/result.py`、`bridge/runner.py`、`bridge/publish.py` 和 `.github/workflows/chat-execution.yml` 是精確欄位與驗證的實作來源。
 
 ## 工具與三個固定版本
 
@@ -41,7 +41,7 @@
 
 ## 查 run、固定發佈與讀回
 
-**版本範圍：**下方原有「成功 envelope」欄位清單中的 `picks` 及原row欄位描述是**歷史v1**；v2的完整差異與成功／失敗契約見下一節。當前 `eb3ecf1` 是已覆核本地v2實作，遠端發布／關聯讀回仍待完成，見 [驗收草稿](../superpowers/notes/2026-09-27-window-knee-acceptance.md)。依固定結果的 `schema_version` 判讀，不依pointer名称猜版本。
+**版本範圍：**下方原有「成功 envelope」欄位清單中的 `picks` 及原row欄位描述是**歷史v1**；v2的完整差異與成功／失敗契約見下一節。產品 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已發布並關聯讀回：recompute `36341140428-1` 成功，固定publication為 `912e9e1df03a2e9d829d6a5c5d06b67d0e1a8a3d`；refresh `36341142058-1` 來源成本缺值失敗，固定publication為 `667062064abc45e467b1058e3565d360018f0a4f`。見 [驗收帳](../superpowers/notes/2026-09-27-window-knee-acceptance.md)。依固定結果的 `schema_version` 判讀，不依pointer名称猜版本。
 
 Contributor 身份修復新增取得證據：`snapshot/evidence/models.html`、`meta_models.json`、`availability.json`，並在 `sources.json` 記官方models來源雜湊。新refresh先驗effort可用性，再換價；已取得的能力證據在成功及失敗發布均驗證。早於修復的成功快照仍可讀取／重算，原CSV保留；修正後計算把其中不可用的Muse Spark1.3 Contributor max明確列為excluded。詳見 `docs/superpowers/notes/2026-09-27-contributor-effort-correction.md` 的發布及驗收狀態。
 
@@ -82,6 +82,6 @@ v2 row精確欄位：`identity`, `model`, `effort`, `score`, `cost_orig`, `cost_
 - trace的step從1起；removed按當時Score降序，每個cut只移除一次。support僅 `full_window`／`neutral_missing_window`，後者strength=0，不外插；完整視窗strength可負。剩餘鏈左右各2分log-CP插值後逐次重算，以strength、CP、Score降序及identity字典序選代表；剛好2分不替代，不按相鄰距離串群。最終相鄰分差至少2分。
 - B行照常參戰且標GRADE／推導假設；去除全部可用B後以相同兩階段診斷A行是否仍保留，`grade_b_effects`只記狀態改變者，無可用B則空陣列。winner為A仍可能受B插值或第一階段間接影響，不能解釋成單一B唯一因果。硬邊界與逐次選擇仍敏感，非完全穩健保證。
 
-v2失敗 `status="failed"`、`errors=[{"code":...,"message":...},...]`，僅共有根欄位，無ladder／anchors／candidate_statuses／selection_trace等成功衍生欄位；無效transport可有null身份及不完整請求資訊。保留原關聯驗證及失敗處理，不以舊成功補位。當前真實fresh最後已驗證因Inkling／MiniMax-M2.7 task cost缺值而失敗；修算法不授權略過候選或沿用舊價。失敗診斷證據仍需發布且不推進成功pointer；新的真實fresh結果需遠端驗收後更新狀態。
+v2失敗 `status="failed"`、`errors=[{"code":...,"message":...},...]`，僅共有根欄位，無ladder／anchors／candidate_statuses／selection_trace等成功衍生欄位；無效transport可有null身份及不完整請求資訊。保留原關聯驗證及失敗處理，不以舊成功補位。當前真實refresh `36341142058-1` 已驗證因Inkling／MiniMax-M2.7 task cost缺值而失敗，錯誤碼 `missing_candidate`；當次原頁、能力／退出及缺值診斷已發布，無成功快照或報表，兩個成功pointer皆未因失敗推進。這是既有來源缺口，不是live fresh成功或產品回歸；修算法不授權略過候選或沿用舊價。後續新的真實fresh結果仍須逐次驗收。
 
 JSON、Markdown與HTML消費同一主結果，完整呈現Grok／Contributor狀態、cut/excluded理由及B影響；renderer不重新選檔或抓來源。歷史輸出不回寫，新結果固定於新的request/run路徑。v2成功refresh可作後續固定重算來源，v1成功refresh仍可讀／重算，所有來源hash、版本、inventory及能力證據檢查延續。

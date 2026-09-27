@@ -1,10 +1,10 @@
 # Model Efficiency Frontier
 
-**本地 v2 已完成；遠端驗收待完成。** `feat/window-knee` 的產品 `eb3ecf1` 已實作並覆核固定視窗階梯，229項本地測試通過；本次文件尚不代表 main 已發布 v2。見 [v2 驗收草稿與待辦](docs/superpowers/notes/2026-09-27-window-knee-acceptance.md)。下方16階連結是歷史 v1 證據。
+**v2已發布，雲端重算成功；真實fresh仍受來源成本缺值阻擋。** 產品 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已發布main並讀回，229項本地測試通過。[v2重算run](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36341140428) 的10階結果、兩入口及HTML artifact已關聯核對；[refresh run](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36341142058) 保存Inkling／MiniMax-M2.7缺task-cost診斷並維持failed，未推進成功pointer，非產品回歸。完整定位見 [v2驗收帳](docs/superpowers/notes/2026-09-27-window-knee-acceptance.md)；本份phase B文件待控制端覆核／推送。下方16階連結是歷史 v1 證據。
 
 新 Chat CI 計算使用 **CP-new-high → 全 family 混排的固定2分視窗精簡**，無最高分保送。只從 final 非Claude行取「最強保留檔」與「最低情境成本保留檔」兩入口；可相同，無符合行時從缺。Claude僅比較，cut指向最終代表並附trace；非Claude相鄰保留檔附升級分差、成本倍率及成本差。GRADE-B照常參戰，另列去除全部B後A行保留變化，非單一B因果證明。硬2分邊界、缺窗中性0及逐次選擇仍可能跳變。
 
-請求仍 `schema_version=1`，新結果為v2；合法v1結果仍按舊三picks語義讀取，不手推成v2、不自動重算。新結果位置為 `results/<request_id>/<run_id>-<attempt>/{result.json,report.md,report.html}`（須完成遠端驗收後取得真實固定commit及ID；目前無v2雲端連結）。9/26固定快照本地重算為155稽核行、154可用身份、19個CP鏈點、10個保留檔，兩入口為Astra xhigh／Luna low；此數量不套用未來fresh。Git指示發布後沿用原Project bootstrap，不需因本次改制重貼；settings安裝狀態仍獨立確認。
+請求仍 `schema_version=1`，新結果為v2；合法v1結果仍按舊三picks語義讀取，不手推成v2、不自動重算。新成功結果位置為 `results/<request_id>/<run_id>-<attempt>/{result.json,report.md,report.html}`；[固定v2報表](https://github.com/ga815647/model-efficiency-frontier/blob/912e9e1df03a2e9d829d6a5c5d06b67d0e1a8a3d/results/04fce363-c20c-4832-bd34-dc0117239ff4/36341140428-1/report.md) 為9/26固定快照的雲端重算：155稽核行、154可用身份、19個CP鏈點、10個保留檔，兩入口為Astra xhigh／Luna low；不是新取數，此數量不套用未來fresh。此次OpenCode驗收不冒充新的Chat端實測。Git指示已發布，沿用原Project bootstrap，不需因本次改制重貼；settings安裝狀態仍獨立確認。
 
 > **9/27 身份更正：**歷史155行快照及先前試版含不可用的 **Muse Spark 1.3 Contributor max**；官方max僅限Standard。引用舊輸出須附 [更正說明](docs/superpowers/notes/2026-09-27-contributor-effort-correction.md)，選型須排除該行後重算整條鏈。
 
