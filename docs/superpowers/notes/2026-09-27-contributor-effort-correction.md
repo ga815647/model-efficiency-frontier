@@ -29,4 +29,6 @@
 
 控制端另跑 `ladder_extra.py` 原155行快照至 `/tmp/opencode/model-efficiency-corrected-ladder.md`：16階；非法max在CP計算前excluded，理由包含官方URL及2026-09-27核對日；xhigh維持自己的分數／成本，依CP規則excluded。原run輸出未覆寫。本地bare-Git測試涵蓋五來源、154行成功fixture與失敗refresh證據發布；fixture不等同即時fresh成功。
 
+補強提交 `d62cfd8` 封住後期失敗刪光能力證據仍可發布的漏洞：`missing_candidate`須保有完整證據，真正早期抓取／解析失敗仍可發布診斷。原覆核者最終spec／quality gate通過；控制端重跑全套 **169 tests，28.127秒，全部通過**。
+
 雲端部署／重算驗收待追加；目前仍不能宣稱當前fresh成功。
