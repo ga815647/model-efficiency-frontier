@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "operation": "refresh",
+  "status": "failed",
+  "request_id": "bf70e74b-bd05-424c-9afd-5b8258bdffb9",
+  "request_commit_sha": "86d1fe9cafb210fb9fbcd415b53c710e09180821",
+  "product_sha": "575f78fbdb8acc0c2ec5c2490cd08a503f8aace2",
+  "created_at": "2026-09-27T18:34:15.434770+00:00",
+  "run_id": "36341142058",
+  "run_attempt": 1,
+  "run_url": "https://github.com/ga815647/model-efficiency-frontier/actions/runs/36341142058",
+  "source_snapshot": null,
+  "parameters": {
+    "gpt_factor": 18,
+    "grok_factor": 16,
+    "min_score": 0,
+    "min_score_reason": "用戶確認：同版本全候選情境比較；固定視窗正式改制驗收",
+    "max_cost": null
+  },
+  "source_dates": [],
+  "errors": [
+    {
+      "code": "missing_candidate",
+      "message": "missing_candidate: https://artificialanalysis.ai/leaderboards/models: inkling,minimax-m2-7"
+    }
+  ]
+}
