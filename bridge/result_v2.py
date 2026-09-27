@@ -39,6 +39,8 @@ def _parameters(params):
 def calculate_v2(csv_path: Path, parameters: dict, provenance: dict) -> dict:
     """Validate source bytes and provenance before invoking the window calculator."""
     v1._provenance(provenance)
+    if provenance['benchmark'] != 'AA-Intelligence-Index':
+        raise ResultError('unsupported_benchmark')
     locator = provenance['source_locator']
     if locator.get('kind') == 'acquired' and hashlib.sha256(
             Path(csv_path).read_bytes()).hexdigest().lower() != locator['sha256'].lower():
@@ -266,6 +268,8 @@ def _validate(envelope):
                             version_status=envelope['version_status'], cost_basis=envelope['cost_basis'],
                             source_dates=envelope['source_dates'], source_locator=envelope['source_snapshot'],
                             caveats=envelope['caveats']))
+        if envelope['benchmark'] != 'AA-Intelligence-Index':
+            raise ResultError('unsupported_benchmark')
         if (set(envelope['source_snapshot']) == {'commit', 'path'}) != (envelope['operation'] == 'recompute'):
             raise ResultError('operation_source_mismatch')
         _parameters(envelope['parameters'])

@@ -212,6 +212,30 @@ class V2ResultTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_envelope(dict(env, operation='recompute'))
 
+    def test_homogeneous_non_general_source_is_rejected(self):
+        with SNAPSHOT.open(newline='', encoding='utf-8') as f:
+            rows = [dict(row, benchmark='Coding') for row in csv.DictReader(f)]
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'candidates.csv'
+            with path.open('w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+                writer.writeheader()
+                writer.writerows(rows)
+            with self.assertRaisesRegex(ValueError, 'unsupported_benchmark'):
+                calculate_v2(path, PARAMETERS, dict(PROVENANCE, benchmark='Coding'))
+
+    def test_non_general_success_envelope_is_rejected(self):
+        env = self.envelope()
+        env['benchmark'] = 'Coding'
+        with self.assertRaisesRegex(ValueError, 'unsupported_benchmark'):
+            validate_envelope(env)
+
+    def test_v1_non_general_history_remains_readable(self):
+        calc, _ = calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
+        env = make_envelope(recompute_data(), EXECUTION, calculation=calc, errors=[])
+        env['benchmark'] = 'Coding'
+        self.assertEqual(validate_envelope(env), env)
+
     def test_factor_uses_same_identity_predicate_as_source_adjustment(self):
         with SNAPSHOT.open(newline='', encoding='utf-8') as f:
             row = next(r for r in csv.DictReader(f) if r['identity'].startswith('GPT-'))
