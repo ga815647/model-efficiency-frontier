@@ -2160,5 +2160,7 @@
       "witness": "GPT-6 Luna low AA-public published-price"
     }
   ],
-  "source": "runs/2026-09-26-general-grok16/candidates.csv"
+  "source": "runs/2026-09-26-general-grok16/candidates.csv",
+  "source_sha256": "e3916f8405904154f0e1dc648588bb08ce92f483cd616ba9be0ff2e5c726ed22",
+  "source_snapshot": "2026-09-26-general-grok16/candidates.csv (public inferred v4.3.2)"
 }

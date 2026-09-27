@@ -6,6 +6,7 @@ AA cost estimator. The only price transformation is ladder_extra.adjust_rows.
 """
 
 import argparse
+import hashlib
 import html
 import json
 import math
@@ -14,6 +15,9 @@ import sys
 from pathlib import Path
 
 from ladder_extra import adjust_rows, grade_of, load_rows, _is_claude
+
+APPROVED_SOURCE_SHA256 = "e3916f8405904154f0e1dc648588bb08ce92f483cd616ba9be0ff2e5c726ed22"
+APPROVED_SOURCE_ID = "2026-09-26-general-grok16/candidates.csv (public inferred v4.3.2)"
 
 
 def _dominates(a, b):
@@ -44,20 +48,21 @@ def analyze(rows, *, min_score, eps_score):
     by_cost = sorted(frontier, key=lambda r: (r["_cost"], -r["_score"], r["identity"]))
     upgrades = {}
     cheaper = None
+    previous_price = None
     for r in by_cost:
-        if cheaper is not None and r["_cost"] > cheaper["_cost"]:
-            delta = r["_score"] - cheaper["_score"]
-            upgrades[r["identity"]] = dict(cheaper_identity=cheaper["identity"],
+        # Advance only on a new price group; all peers at the new price use
+        # the previous strictly cheaper group, never another same-price peer.
+        if cheaper is None or r["_cost"] > cheaper["_cost"]:
+            previous_price, cheaper = cheaper, r
+        if previous_price is not None:
+            delta = r["_score"] - previous_price["_score"]
+            upgrades[r["identity"]] = dict(cheaper_identity=previous_price["identity"],
                                            delta_score=delta,
-                                           cost_multiple=r["_cost"] / cheaper["_cost"],
-                                           delta_cost_adj=r["_cost"] - cheaper["_cost"],
+                                           cost_multiple=r["_cost"] / previous_price["_cost"],
+                                           delta_cost_adj=r["_cost"] - previous_price["_cost"],
                                            within_noise=delta < eps_score)
         else:
             upgrades[r["identity"]] = None
-        # Equal-cost peers are equivalent and compare against the same cheaper
-        # point, not against each other.
-        if cheaper is None or r["_cost"] > cheaper["_cost"]:
-            cheaper = r
     retained = []
     for r in by_cost:
         item = _item(r)
@@ -119,6 +124,7 @@ def _upgrade_text(item):
 
 
 def render_markdown(result, source):
+    """Render a trusted approved-snapshot result (not a generic CSV adapter)."""
     c = result["counts"]
     factor = _num(result["policy"].get("factor", 18))
     grok_factor = _num(result["policy"].get("grok_factor", 16))
@@ -158,6 +164,7 @@ def render_markdown(result, source):
 
 
 def render_html(result, source):
+    """Render a trusted approved-snapshot result (not a generic CSV adapter)."""
     c = result["counts"]
     factor = _h(_num(result["policy"].get("factor", 18)))
     grok_factor = _h(_num(result["policy"].get("grok_factor", 16)))
@@ -264,18 +271,26 @@ def main(argv=None):
     try:
         if out.exists():
             raise ValueError(f"output directory already exists: {out}")
+        source_hash = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
+        if source_hash != APPROVED_SOURCE_SHA256:
+            raise ValueError("input is not the approved 2026-09-26 snapshot (SHA-256 mismatch)")
         rows = adjust_rows(load_rows(args.input), factor=args.factor,
                            grok_factor=args.grok_factor)
         result = analyze(rows, min_score=args.min_score, eps_score=args.eps_score)
         result["policy"].update(factor=args.factor, grok_factor=args.grok_factor,
                                 min_score_reason=args.min_score_reason)
         result["source"] = str(args.input)
+        result["source_sha256"] = source_hash
+        result["source_snapshot"] = APPROVED_SOURCE_ID
         md = render_markdown(result, args.input)
         page = render_html(result, args.input)
         readme = ("# 雙軸取捨：非正式歷史快照試驗\n\n"
                   "開啟 [report.html](report.html) 看自包含視覺報告；[report.md](report.md) "
                   "為完整文字表，[result.json](result.json) 為全精度機器可讀數據。"
                   "這不是正式 ladder / 三 picks；沒有抓取新資料或改寫原 run。\n\n"
+                  f"來源身分：`{APPROVED_SOURCE_ID}`；原始位元組 SHA-256 "
+                  f"`{source_hash}`。只接受這份固定快照的完全相同位元組（複本可用）；"
+                  "HTML／Markdown 中的 9/26 推定版本說明僅適用此來源。\n\n"
                   "## 重算（請用新目錄，不覆寫本快照）\n\n"
                   "```sh\npython3 scripts/tradeoff_trial.py "
                   f"--input {args.input} --output-dir /tmp/opencode/tradeoff-replay "
