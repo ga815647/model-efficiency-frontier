@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-09-27 轉折公式改善試算（最新，未切正式）**：使用者要求改善極小分差敏感度並複驗。分母floor／smooth及局部chord均未改善整體；較好的候選為剩餘混合CP鏈上左右各2分的log-CP插值增益比，缺完整雙側視窗給中性0、不外插。原Astra max+0.25／xhigh−0.25反例消失，但新增high+0.25會由xhigh＋medium改high。相同全154逐行擾動中，非Claude名單改變數（每組308）由原2／4／0／2變2／3／0／2（Score±.1／±.25、Cost±1%／±5%），只屬有限改善。基準仍9個非Claude原名單，Claude比較行由max改xhigh。證據、未採候選及剩餘敏感性見 `experiments/2026-09-27-cp-chain-regularized/`。尚未批准正式公式、spec或部署；維持CP-new-high第一階段與正式16階。
+
 > **2026-09-27 精簡方向與敏感度（最新設計狀態）**：使用者已接受探討「不到2分可由較值得選的轉折點代表」，不是正式算法／書面spec批准。更正身份後19點鏈的敏感度試算：1.75–2.0門檻同留10點，2.1–2.5少Astra medium；其與Sol max僅差2.042794。逐行Score±0.25假設中，Astra max升0.25會讓第二階段由xhigh／medium改選max／high（第一階段成員不變），故不能宣稱原始斜率轉折公式穩健。建議保留2分替代原則、先處理極小分差放大，再定公式；尚未新增平滑規則或改正式16階。可重現探針及證據見 `experiments/2026-09-27-cp-chain-sensitivity/`；非新取數、非AA信賴區間。
 
 > **2026-09-27 Contributor 身份修復已發布／雲端驗收**：修復 `365e699`＋`3b4313a`＋`d62cfd8` 已隨產品 `076c7ca` 發布main，獨立覆核通過、控制端169測試通過。重算run `36294948064`成功：保留155行歷史稽核、154行可用身份，非法max在CP前excluded，正式仍16階；新推薦規則尚未實施。最新更正重算結果固定commit `bbb5fadaf04633aae0e6849f9fbb74924a5040ad`，路徑 `results/95a3ddbc-5d8d-4985-9c6d-1a73c251e0f4/36294948064-1/`。fresh `36294949623`仍因Inkling／MiniMax-M2.7 cost缺值失敗，已保存models原頁、解析限制及精確舊身份退出證據；不是fresh成功。下段「修復待進行」為修復前歷史，現由本段覆蓋。完整驗收見 `docs/superpowers/notes/2026-09-27-contributor-effort-correction.md`。
