@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "request_id": "04fce363-c20c-4832-bd34-dc0117239ff4",
+  "created_at": "2026-09-27T18:34:13.696944+00:00",
+  "product_sha": "575f78fbdb8acc0c2ec5c2490cd08a503f8aace2",
+  "operation": "recompute",
+  "parameters": {
+    "gpt_factor": 18,
+    "grok_factor": 16,
+    "min_score": 0,
+    "min_score_reason": "用戶確認：同版本全候選情境比較；固定視窗正式改制驗收",
+    "max_cost": null
+  },
+  "source_snapshot": {
+    "commit": "575f78fbdb8acc0c2ec5c2490cd08a503f8aace2",
+    "path": "runs/2026-09-26-general-grok16/candidates.csv"
+  }
+}
