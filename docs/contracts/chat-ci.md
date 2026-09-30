@@ -1,8 +1,8 @@
 # Chat → CI 契約（request v1／result v2＋歷史v1；2026-09-27）
 
-**9/30增量狀態：來源對帳分支本地驗證完成，尚待整條分支最終覆核／正式發布／live驗收。** Task1–4及issue #2獨立覆核通過；issue #2短續接pre-write disclosure另有10/10離線consumer GREEN。Task5新跑276tests、75保護物件、保存9/30五頁SHA／離線取數v2報表對比及固定9/26控制均通過，不是live證據。使用者已授權控制端在整條分支最終覆核乾淨後非force發布、執行live refresh與固定重算驗收；尚未進行，不是等待另一輪一般實作授權。此節記錄分支契約，不把下方舊產品失敗改稱成功；新版目標Chat退出摘要／短續接路由與settings仍分開驗收。見 [9/30驗收帳](../superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md)。
+**9/30增量已發布／OpenCode雲端驗收通過。** 產品 `c68f3de9423b165b0ed46ca22f9d676cc424c4ee` 最終修正再覆核通過，已非force發布main並讀回；279 tests、75保護物件及9/26控制通過。真實refresh `36698853013-1`、固定該9/30來源的recompute `36699959889-1` 均success：105paid／15chain／9final、Sol6.1 xhigh／Luna low；兩份HTML artifact各自與固定Git報告bytes相同，重算不替換latest-refresh。issue #2已發布的pre-write disclosure有獨立10/10離線consumer GREEN及review，不等於新版目標Chat實測或settings安裝。下方舊產品失敗仍為歷史證據，bootstrap不改，未自動close issues。完整三SHA／來源／hash見 [9/30驗收帳](../superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md)。
 
-此文件描述**已發布v2實作**；2026-09-27 OpenCode控制端完成雲端重算成功與預期來源缺口失敗診斷驗收，詳見 [v2驗收帳](../superpowers/notes/2026-09-27-window-knee-acceptance.md)。不代表live fresh成功、新Chat端實測或Chat Project settings已安裝。私人目標 `ga815647/model-efficiency-frontier`；產品 `main`，發佈 `results`；不得同步或恢復已移往用戶垃圾桶父頁的 Notion 頁，不部署網站。`bridge/request.py`、`bridge/result.py`、`bridge/runner.py`、`bridge/publish.py` 和 `.github/workflows/chat-execution.yml` 是精確欄位與驗證的實作來源。
+此文件描述**已發布v2實作**；2026-09-27 OpenCode控制端完成雲端重算成功與預期來源缺口失敗診斷驗收，詳見 [v2驗收帳](../superpowers/notes/2026-09-27-window-knee-acceptance.md)；該次未證明live fresh成功，9/30修復後的真實fresh證據見上方增量。新Chat端實測與Chat Project settings安裝仍獨立確認。私人目標 `ga815647/model-efficiency-frontier`；產品 `main`，發佈 `results`；不得同步或恢復已移往用戶垃圾桶父頁的 Notion 頁，不部署網站。`bridge/request.py`、`bridge/result.py`、`bridge/runner.py`、`bridge/publish.py` 和 `.github/workflows/chat-execution.yml` 是精確欄位與驗證的實作來源。
 
 ## 工具與三個固定版本
 

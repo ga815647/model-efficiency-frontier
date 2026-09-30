@@ -1,8 +1,8 @@
 # 模型效率前線｜Chat 日常指示
 
-**9/30分支狀態（尚未發布）：**來源對帳及退出摘要已本地驗證、Task4獨立覆核通過；issue #2短續接pre-write disclosure已完成10/10離線consumer GREEN及獨立覆核，不等於新版目標Chat或settings驗收。整條分支最終覆核發現兩項共同proof缺口，已作本地修正，待控制端限定再覆核；尚不能宣稱最終乾淨。控制端已獲授權於整條分支最終覆核乾淨後非force發布並做live／固定重算驗收，尚未執行。不得以本檔修改聲稱main已更新、新fresh成功、新版目標Chat或settings已接受。完整狀態見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
+**9/30修復已發布：**來源對帳及退出摘要產品 `c68f3de` 經最終修正再覆核通過，已非force發布main並讀回。OpenCode已驗真實refresh及該9/30來源的固定recompute成功：105付費候選／15chain／9final，兩入口Sol6.1 xhigh／Luna low，HTML artifact與固定Git報告bytes相同。issue #2短續接pre-write disclosure已發布，另有10/10離線consumer GREEN及獨立覆核；新版目標Chat實測與settings安裝仍獨立未確認，不用OpenCode驗收替代。bootstrap不改，不需因本次Git指示更新重貼。完整證據見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
 
-先遵守 Project settings 的私人 repo、ref 與授權邊界：每次任務將 `main` 解析成**一個產品 commit**，完整讀同版此檔與 `docs/contracts/chat-ci.md` 和需要的規則；不可用或不一致就停止相關操作、說明缺口。不以本檔覆蓋 bootstrap 的固定入口，亦不把 Git push 誤稱 Project settings 已更新。詳細欄位、工具、結果讀回及恢復流程以同版契約為準。9/27 使用者提供本庫 Chat 請求提交、查 run 與成功／失敗結果讀回的實測，已由 OpenCode 另核對 GitHub 結果；沿用已通過能力，不重做問卷。當前 refresh 的來源缺值另見 `docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md`，既有成功重算不代表 fresh 成功。
+先遵守 Project settings 的私人 repo、ref 與授權邊界：每次任務將 `main` 解析成**一個產品 commit**，完整讀同版此檔與 `docs/contracts/chat-ci.md` 和需要的規則；不可用或不一致就停止相關操作、說明缺口。不以本檔覆蓋 bootstrap 的固定入口，亦不把 Git push 誤稱 Project settings 已更新。詳細欄位、工具、結果讀回及恢復流程以同版契約為準。9/27 使用者提供本庫 Chat 請求提交、查 run 與成功／失敗結果讀回的實測，已由 OpenCode 另核對 GitHub 結果；沿用已通過能力，不重做問卷。9/27來源缺值失敗保留於 `docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md`；9/30修復後另有真實fresh成功證據，不把歷史成功重算當成新取數。
 
 ## 對談路由
 
@@ -14,9 +14,9 @@
 
 ## 結報
 
-9/27後續目標Chat v2驗收已通過：使用者帶回run `36355372202-1`成功結報，OpenCode另核對request／product／publication、v2推薦及HTML artifact雜湊。完整證據見下方同一驗收帳的最新段；覆蓋下段「本次不新增Chat端實測」的較早狀態。既有通過能力直接沿用，無需重做問卷；live fresh來源缺值仍獨立。
+9/27後續目標Chat v2驗收已通過：使用者帶回run `36355372202-1`成功結報，OpenCode另核對request／product／publication、v2推薦及HTML artifact雜湊。完整證據見下方同一驗收帳的最新段；覆蓋下段「本次不新增Chat端實測」的較早狀態。既有通過能力直接沿用，無需重做問卷；9/30的來源修復與OpenCode雲端驗收是另一次增量，不冒稱新版目標Chat實測。
 
-固定視窗v2產品 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已發布main並讀回；OpenCode控制端已驗證recompute `36341140428-1` 成功及refresh `36341142058-1` 因Inkling／MiniMax-M2.7 task cost缺值失敗、診斷發布且成功pointer未推進，非live fresh成功或產品回歸。固定publication／來源／HTML雜湊見 `docs/superpowers/notes/2026-09-27-window-knee-acceptance.md`。本次不新增Chat端實測或Project安裝證明；請求仍v1，先辨識固定結果schema再結報。原bootstrap定位不變，不需因改制重貼；settings安裝狀態仍獨立確認。
+歷史9/27固定視窗v2產品 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已發布main並讀回；OpenCode控制端當時驗證recompute `36341140428-1` 成功及refresh `36341142058-1` 因Inkling／MiniMax-M2.7 task cost缺值失敗、診斷發布且成功pointer未推進，非當時live fresh成功或產品回歸。固定publication／來源／HTML雜湊見 `docs/superpowers/notes/2026-09-27-window-knee-acceptance.md`；9/30新成功定位見本檔頂部驗收帳。請求仍v1，先辨識固定結果schema再結報。原bootstrap定位不變，settings安裝狀態仍獨立確認。
 
 - **v2**：只讀 `anchors.highest_retained_score`（最強保留檔）與 `anchors.lowest_retained_cost`（最低情境成本保留檔），再給已選好的 `ladder`。兩入口僅final非Claude，可同一行或皆null；從缺時不從cut／excluded補位。沒有middle／平衡或最高CP省錢入口。政策 `cp-new-high-window-v1` 保留CP-new-high後跨family固定2分視窗精簡，不保送最高分。`selection_trace` 解釋cut→final代表；`upgrade` 僅連向下一較低分非Claude保留行，Claude的 `comparison_only=true` 僅比較。`grade_b_effects` 是去掉全部B後A行保留差異，包含間接影響，不等於某單一B的唯一因果。硬2分邊界、缺窗中性及逐次選擇仍會跳變，不能宣稱完全穩健。
 - **v1**：只按歷史 `picks.strong`／`middle`／`cheap` 與舊梯表語義讀取，明示歷史v1；不由Chat手推兩入口、改標v2或自動送重算。收到明確重算意圖才依契約使用已核對的新產品。未知版本／混用欄位拒絕。

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-refresh-reconciliation-design.md`（使用者於書面審閱請求後回覆「繼續」，已確認；執行者必讀全篇）。
 
-**Status:** 使用者審阅計畫並釐清每次退役／缺值判定後回覆「可以了」，計畫已批准，開始產品實作。沿用既有 Subagent-driven，不重問執行方法。Issue #2 沿前述已確認的 bounded 短設計另外實作／驗收，不混入本計畫來源子系統。尚未授權正式發布或提交雲端驗收請求。
+**Status:** 五任務及獨立Issue #2 bounded實作／覆核完成；整條分支單輪最終修正再覆核乾淨，產品c68f3de已依使用者後續「直接做完」授權非force發布main。真實refresh36698853013-1、固定新來源recompute36699959889-1、報告／artifact及pointer核對皆通過。279tests及75保護物件通過，無待實作項；目標Chat新版routing實測與settings安裝仍獨立待確認，不自動close issues、不改bootstrap。以下原計畫的私有介面草圖以驗收帳所載五項controller裁定及canonical identity/date最終修正為準；closeout只更新狀態，不再加功能或新覆核。完整證據見`docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
 
 ## Global Constraints
 
@@ -85,7 +85,7 @@ with ledger.open('x', encoding='utf-8') as stream:
 - `tracked_public_slugs(source_map: dict|None, fallback: set[str]) -> set[str]`：合法新版取 tracked；legacy 用 fallback；新版 shape／policy 不合法報 `SourceError('previous_inventory_missing', LEADERBOARD, ...)`，不忽略坏欄。
 - `source_exit_caveats(records: list[dict], reconciliation: dict) -> list[str]`：只披露 P 中本次退役／缺价的身份，按 slug 排序，不修改輸入。
 
-- [ ] **1. Write parsed-record helper and state/sequence tests.** Fixture helper 保留 Decimal、None 與 boolean，不預先把坏值 coercion：
+- [x] **1. Write parsed-record helper and state/sequence tests.** Fixture helper 保留 Decimal、None 與 boolean，不預先把坏值 coercion：
 
 ```python
 from decimal import Decimal
@@ -125,8 +125,8 @@ def test_estimated_missing_score_zero_and_unknown_are_precise(self):
 
 `TestCase` imports `deepcopy`、上述 helper 及本 task 所有 interfaces。再加有成本但 deprecated=true、非退役成本恢復、未追蹤新缺分数／估計值不阻擋、已退役即使 estimated/score/cost 都缺也優先退休、arrays sorted/unique、P/U/R 公式、輸入不 mutation，以及未知 reconciliation policy 不能 legacy fallback。
 
-- [ ] **2. RED.** Run `python3 -m unittest discover -s tests -p 'test_refresh_inventory.py' -v`；預期 missing module／functions。deprecated parser 測試用現有 `flight_record()` 及真實欄位，對 `True,False,None`／缺欄成功，對 `0,1,'false',{},[]` 逐一預期 `invalid_measurement`，不能只測 helper。
-- [ ] **3. Implement pure functions and optional boolean.** 順序不允許從 cost 推定退休：
+- [x] **2. RED.** Run `python3 -m unittest discover -s tests -p 'test_refresh_inventory.py' -v`；預期 missing module／functions。deprecated parser 測試用現有 `flight_record()` 及真實欄位，對 `True,False,None`／缺欄成功，對 `0,1,'false',{},[]` 逐一預期 `invalid_measurement`，不能只測 helper。
+- [x] **3. Implement pure functions and optional boolean.** 順序不允許從 cost 推定退休：
 
 ```python
 if item.get('deprecated') is True:
@@ -165,8 +165,8 @@ return dict(missing=sorted(previous - set(status)),
                             if status[slug]['state'] == 'observed_unusable'
                             and status[slug]['reason'] != 'missing_task_cost'))
 ```
-- [ ] **4. GREEN and regression.** Run `python3 -m unittest discover -s tests -p 'test_refresh_inventory.py' -v`、`python3 -m unittest discover -s tests -p 'test_refresh_sources.py' -v`，確認新 core 與舊來源測試通過；此 task 不變更 producer 的 lost 判定。
-- [ ] **5. Commit.** `git add scripts/refresh_inventory.py scripts/aa_public.py tests/refresh_inventory_fixtures.py tests/test_refresh_inventory.py tests/test_refresh_sources.py`；`git diff --cached --check`；`git commit -m 'feat: model observed usable and retired public candidates'`。
+- [x] **4. GREEN and regression.** Run `python3 -m unittest discover -s tests -p 'test_refresh_inventory.py' -v`、`python3 -m unittest discover -s tests -p 'test_refresh_sources.py' -v`，確認新 core 與舊來源測試通過；此 task 不變更 producer 的 lost 判定。
+- [x] **5. Commit.** `git add scripts/refresh_inventory.py scripts/aa_public.py tests/refresh_inventory_fixtures.py tests/test_refresh_inventory.py tests/test_refresh_sources.py`；`git diff --cached --check`；`git commit -m 'feat: model observed usable and retired public candidates'`。
 
 ## Task 2: Strict Proof Validation and Trusted Policy Decoder
 
@@ -178,7 +178,7 @@ return dict(missing=sorted(previous - set(status)),
 - Extend `validate_fresh_inventory(data, source_map, envelope, *, error_code, refresh_policy: str|None=None, evidence: dict[str,bytes]|None=None, expected_previous_slugs: set[str]|None=None) -> None`。保留舊 callers 的合法 legacy 檢查；new policy 必須有 proof，新 map 不得在 legacy mode 被當成合格。
 - Fixture helpers `flight(records: list[dict]) -> bytes`、`inventory_bundle(records: list[dict], previous_slugs: set[str]) -> tuple[bytes,dict,dict,dict[str,bytes]]`；返回 CSV bytes、source_map、成功 v2 envelope、以檔名索引的 evidence。這是 validator unit fixture，不聲稱經完整版本／Meta取得流程。
 
-- [ ] **1. Add Flight serializer and proof unit bundle.** Decimal 以 raw JSON number 發出，不能用 `default=str` 使 measurement 變成字串：
+- [x] **1. Add Flight serializer and proof unit bundle.** Decimal 以 raw JSON number 發出，不能用 `default=str` 使 measurement 變成字串：
 
 ```python
 def numeric_json(value):
@@ -221,7 +221,7 @@ envelope = make_envelope(request_data(), dict(request_commit_sha='b' * 40,
 return data, mapping, envelope, evidence
 ```
 
-- [ ] **2. Write valid proof and tamper tests, then RED.**
+- [x] **2. Write valid proof and tamper tests, then RED.**
 
 ```python
 def test_current_cost_exclusion_is_proven_not_invented(self):
@@ -249,7 +249,7 @@ def test_decimal_difference_cannot_hide_behind_equal_float(self):
 ```
 
 另逐一 tamper raw/hash/parsed/estimated/deprecated/reason/P/disclosure；移除新版 block／evidence、把 null 改旧 cost、把 null 當 zero、legacy mode 帶新版 map、缺退出 caveat都拒絕。decoder 对 `None` 与精确 marker 成功，對 `{"policy":true}`、重複 policy、未知policy、額外key、坏 bytes拒絕。Run `python3 -m unittest discover -s tests -p 'test_bridge_inventory.py' -v` 及 `-p 'test_source_policy.py' -v`；預期缺新 keyword/module/function。
-- [ ] **3. Implement strict decoding and shared validation.** 保留原 paid checks，new mode 再執行：
+- [x] **3. Implement strict decoding and shared validation.** 保留原 paid checks，new mode 再執行：
 
 ```python
 parsed = parse_leaderboard(evidence['leaderboard.html'].decode('utf-8'))
@@ -269,8 +269,8 @@ if rec != build_reconciliation(parsed, previous) or any(blocking_candidates(rec)
 ```
 
 `strict_json(data:bytes)->object` 是本 task 在 `bridge/inventory.py` 新增的 private helper，object_pairs_hook 拒絕 duplicate keys、parse_constant 拒絕 NaN/Infinity。比較前先要求六欄精確、arrays 是 sorted unique strings、status_by_slug shape精確（不能靠 Python `True==1` 過檢）。source date 要與 envelope、public CSV 與 source_by_slug 一致；U 恰好等於 inventory／source_by_slug／CSV public slugs；excluded 與所有非 U parsed record 的 reason一致。以 Decimal 比 CSV 原始 score/cost 與 parsed 原值，不先float；保留原 envelope float relational checks。每個 expected exit caveat 恰好一次且不能冒造同 prefix 的額外退出；Meta／Contributor 原檢查不移除。
-- [ ] **4. GREEN and legacy regression.** Run 新兩檔、`python3 -m unittest discover -s tests`。本 task 尚無產品 marker／producer切換，現有 legacy fixtures 應仍過檢。
-- [ ] **5. Commit.** Stage 本 task 六個具體檔案（含 fixture helper），`git diff --cached --check`，commit `feat: validate observed inventory proof and product policy bytes`。
+- [x] **4. GREEN and legacy regression.** Run 新兩檔、`python3 -m unittest discover -s tests`。本 task 尚無產品 marker／producer切換，現有 legacy fixtures 應仍過檢。
+- [x] **5. Commit.** Stage 本 task 六個具體檔案（含 fixture helper），`git diff --cached --check`，commit `feat: validate observed inventory proof and product policy bytes`。
 
 ## Task 3: One Integration Switch Across Acquisition, Git Reads and Publication
 
@@ -284,7 +284,7 @@ if rec != build_reconciliation(parsed, previous) or any(blocking_candidates(rec)
 - Extend `publish_result(output, *, remote, branch='results', source_repository:Path|None=None, trusted_product_sha:str|None=None) -> str`。success refresh（包括 legacy）必須有可信 context；缺 context拒絕。failed／recompute 不為此新增不必要來源模式門檻。
 - Publisher CLI新增 `--source-repository` 與 `--product-sha-file`。二者只來自 workflow 常量路徑／verified handoff，不是 request fields；product SHA 不由 envelope 自報決定。
 
-- [ ] **1. Create new minimized fixture from fixed primary values.** 不改 `failed-two-costs-flight.html`。以其中四個 Grok／Muse anchors 的 parsed values，加以下 exact records 用 Task 2 Flight serializer產生新檔（creator改為各真實creator），MiniMax flag=true、Inkling flag=false，GPT五檔flags皆false：
+- [x] **1. Create new minimized fixture from fixed primary values.** 不改 `failed-two-costs-flight.html`。以其中四個 Grok／Muse anchors 的 parsed values，加以下 exact records 用 Task 2 Flight serializer產生新檔（creator改為各真實creator），MiniMax flag=true、Inkling flag=false，GPT五檔flags皆false：
 
 ```python
 gpt = [
@@ -299,7 +299,7 @@ old = [record('inkling', name='Inkling (xhigh)', score='24.9847810999384', cost=
 ```
 
 provenance JSON 記 fixed publication `ef77e1fff6980164aac5c0610ead7eff26bcd671`、run36666859368-1、original leaderboard hash `b030c6f00885a629ab46d6ec83ea06fd5ecb8b828f91721f23bfa6b4a46df648`、新 fixture 自己的hash及「選取原值、重新生成最小 Flight transport，非完整原頁」。原頁曾獨立 hash 驗證；如需再核對從固定Git原檔讀，不必重新抓現在頁來改fixture。`refresh_pages()` 測試helper取新leader＋既有四份grok/muse/meta/models fixtures，禁網。
-- [ ] **2. Write acquisition red tests and real Git context helpers.**
+- [x] **2. Write acquisition red tests and real Git context helpers.**
 
 ```python
 def test_fresh_current_inventory_succeeds_without_old_cost(self):
@@ -347,8 +347,8 @@ def product_context(base, previous, *, new_policy):
 ```
 
 每個subtest使用獨立temp base避免已存在repo；產物的request.product_sha改為回傳SHA。`publish` wrapper使用 `publish_result(output, remote=str(self.remote), source_repository=context[0], trusted_product_sha=context[1])`，failure仍保留無context發布路徑。
-- [ ] **3. RED targeted suite.** Run source、runner、publish、workflow四檔；新success test應因舊 missing_candidate失敗，可信context／CLI tests應因缺參數或沒有policy接線失敗。
-- [ ] **4. Switch producer and preserve diagnostics.** `_previous_slugs` 原Contributor身份解析保留；只以 `tracked_public_slugs(previous, legacy_slugs)` 覆寫public追蹤集合。取得／保存models proof及version／pricing不移序。解析完建立rec，以 `classify_record` 篩 U，非U保留 precise reason；不要對已退役垃圾行強迫解析無用effort。
+- [x] **3. RED targeted suite.** Run source、runner、publish、workflow四檔；新success test應因舊 missing_candidate失敗，可信context／CLI tests應因缺參數或沒有policy接線失敗。
+- [x] **4. Switch producer and preserve diagnostics.** `_previous_slugs` 原Contributor身份解析保留；只以 `tracked_public_slugs(previous, legacy_slugs)` 覆寫public追蹤集合。取得／保存models proof及version／pricing不移序。解析完建立rec，以 `classify_record` 篩 U，非U保留 precise reason；不要對已退役垃圾行強迫解析無用effort。
 
 ```python
 rec = build_reconciliation(records, prev_slugs)
@@ -367,7 +367,7 @@ if any(blocked.values()):
 `source_map` 在producer內先以已完成的included／excluded／availability、contributor=[]與public inventory初始化；成功完成Contributor段後覆寫contributor／efforts。`save_missing_diagnostics(slugs, records)`／`save_unusable_diagnostics(slugs, records, rec)` 是此 task 的局部 helpers，closure 使用evidence path；前者沿原三遍核對欄位只寫真missing，後者新寫 `unusable_candidates.json`，每項 slug、當次record、精確reason，不能偽造manual review已完成。兩種同時存在都保存，primary code按上方順序，但完整報告不能遺漏另一種。new artifact加入publisher whitelist；present_candidate_unusable加入post-models-proof codes。
 
 成功source map／sidecar／notes用同一分類，return provenance.caveats追加 Task 1 摘要。Contributor max仍先 unavailable再換價，精確previous退休證據不改。9/26 fixture中若其他paid行原已deprecated=true，測試期待數量要從當次U導出，不為維持154硬保送；固定9/26重算155稽核／10final不變。
-- [ ] **5. Wire trusted policy and frozen predecessor through three consumers.** `_refresh_policy` 先 `_commit`／ancestor確認，以 `_has_file`區分真正缺檔，以 `_read`拒絕symlink/nonblob；只decoder bytes，不import Git產品程式。materialize／_previous 用來源原 envelope.product_sha，不用本次計算product來判旧snapshot；new模式讀同一固定publication的三份extra evidence。
+- [x] **5. Wire trusted policy and frozen predecessor through three consumers.** `_refresh_policy` 先 `_commit`／ancestor確認，以 `_has_file`區分真正缺檔，以 `_read`拒絕symlink/nonblob；只decoder bytes，不import Git產品程式。materialize／_previous 用來源原 envelope.product_sha，不用本次計算product來判旧snapshot；new模式讀同一固定publication的三份extra evidence。
 
 在 `bridge/runner.py` 新增兩個Git讀取helpers，供兩個runner consumers與bootstrap publisher共用；publisher已import result／inventory，runner不import publish，因此不形成循環：
 
@@ -443,10 +443,10 @@ print(publish_result(args.output, remote=args.remote, branch=args.branch,
 ```
 
 上段讀handoff放在 `args = parser.parse_args(argv)` 之後；`publish_result`先把兩參數傳到 `_output_files`。固定product來源讀普通Gitblob，不直接讀可能被working tree變更的marker。
-- [ ] **6. Complete regression matrix and GREEN.** 保留并重定向原late-failure proof tamper tests：原nullcost不再fail，就用真正missing slug／estimated tracked或版本完整性錯誤觸發失敗，再測刪models/hash/audit被拒；不能直接刪掉这些測試。
+- [x] **6. Complete regression matrix and GREEN.** 保留并重定向原late-failure proof tamper tests：原nullcost不再fail，就用真正missing slug／estimated tracked或版本完整性錯誤觸發失敗，再測刪models/hash/audit被拒；不能直接刪掉这些測試。
 
 覆蓋：new產品剝除rec/raw/parsed/hash拒絕、可信handoff新SHA但envelope冒用oldSHA拒絕、marker symlink／duplicateJSON／未知policy拒絕、valid legacy v1/v2 markerabsent讀取與排隊發布成功、newrefresh→_previous→新fixed recompute成功、newrecompute用oldrefresh不要求newproof、floor/cap改變final不改追蹤、latest-success重算不替代latest-refresh、failed新碼仍要求models proof、早期fetch/parsefailure仍可發布、empty_paid/empty ladder邊界。Run `python3 -m unittest discover -s tests`，全套green才提交。
-- [ ] **7. Commit.** Stage Task 3 file map列出的產品與pipeline／新fixture檔（fixturehelper也列明），`git diff --cached --check`，commit `fix: reconcile present missing-cost candidates without stale prices`。不得在此中途push main。
+- [x] **7. Commit.** Stage Task 3 file map列出的產品與pipeline／新fixture檔（fixturehelper也列明），`git diff --cached --check`，commit `fix: reconcile present missing-cost candidates without stale prices`。不得在此中途push main。
 
 ## Task 4: Visible Source Exits and Contract Documentation
 
@@ -456,7 +456,7 @@ print(publish_result(args.output, remote=args.remote, branch=args.branch,
 - Consumes: 既有calculation.caveats中由Task1生成的 `DISCLOSURE_PREFIX` 退出摘要；没有新result欄位。
 - Produces: `_source_exits(calculation:dict) -> list[str]`，只filter prefix，不重新判retired、不抓來源、不排序候選。
 
-- [ ] **1. Write placement and escaping red tests.**
+- [x] **1. Write placement and escaping red tests.**
 
 ```python
 def test_source_exit_is_visible_before_ladder_and_escaped(self):
@@ -472,7 +472,7 @@ def test_source_exit_is_visible_before_ladder_and_escaped(self):
 ```
 
 在既有 `test_window_report.py` TestCase 中沿用 `calculate_v2` 生成的 `self.payload`，不另mock selector；same JSON兩種退出皆被顯示，无exit时不產生空警告區，其他B／係數／版本caveat仍完整。測試import Task1的 `DISCLOSURE_PREFIX`；renderer從 `scripts.refresh_inventory` import同一常量。Run `python3 -m unittest discover -s tests -p 'test_window_report.py' -v`，預期摘要仍只在footer或没有summary section。
-- [ ] **2. Implement projection only.**
+- [x] **2. Implement projection only.**
 
 ```python
 def _source_exits(calculation):
@@ -497,8 +497,8 @@ exits = _source_exits(calculation)
 exit_section = ('<section class="panel" data-family="source-exits"><h2>本次來源退出</h2><ul>' +
                 ''.join('<li>' + _html(line) + '</li>' for line in exits) + '</ul></section>') if exits else ''
 ```
-- [ ] **3. Update docs and acceptance ledger precisely.** 契約新增新policy／proof／tracked語義與旧產品可信legacy辨識；Chat結報近結論顯示來源退出、不當free或永久退休、不手估cost。保留历史fresh失敗記錄，頂部新增「分支實作本地已驗、尚待正式發布／live驗收」狀態；未有雲端結果前不得寫live已成功。README入口分清固定9/26與newfresh；AGENTS保持当前狀態SSOT；不動bootstrap、不建立Notion同步。issue#2路由guard此task不偷偷實作或宣稱驗收。
-- [ ] **4. Commit.** Stage本task具體文件，`git diff --cached --check`，commit `feat: disclose current source exclusions beside recommendations`。
+- [x] **3. Update docs and acceptance ledger precisely.** 契約新增新policy／proof／tracked語義與旧產品可信legacy辨識；Chat結報近結論顯示來源退出、不當free或永久退休、不手估cost。保留历史fresh失敗記錄，頂部新增「分支實作本地已驗、尚待正式發布／live驗收」狀態；未有雲端結果前不得寫live已成功。README入口分清固定9/26與newfresh；AGENTS保持当前狀態SSOT；不動bootstrap、不建立Notion同步。issue#2路由guard此task不偷偷實作或宣稱驗收。
+- [x] **4. Commit.** Stage本task具體文件，`git diff --cached --check`，commit `feat: disclose current source exclusions beside recommendations`。
 
 ## Task 5: Whole-Branch Verification, Integration and Live Acceptance
 
@@ -514,14 +514,14 @@ test "${#execution_base}" -eq 40
 git diff --exit-code "$execution_base" -- runs scripts/compute_frontier.py scripts/ladder.py scripts/ladder_extra.py experiments tests/fixtures/refresh/failed-two-costs-flight.html tests/fixtures/refresh/leader.html tests/fixtures/refresh/grok.html tests/fixtures/refresh/muse.html tests/fixtures/refresh/meta.html tests/fixtures/refresh/models.html tests/fixtures/refresh/README.json
 ```
 - [x] **2. Verify real fixed historical recompute is unchanged.** 本地v2控制155statuses／154usable／19chain／10final及Astra xhigh／Luna low不變，JSON／MD／HTML identity order一致，CSV原bytes不變。用既有runner測試／本地受控request以原9/26固定CSV、18/16、min0、無cap重算；不得手改原檔。核對155 statuses／154身份可用／19chain／10final、兩入口Astra xhigh／Luna low、不可用Contributor max excluded、source date仍9/26。newfresh的pool與final不套此名單。
-- [ ] **3. Independent whole-branch review.** 按 selected subagent-driven skill先完成每task spec/quality review，再 request whole-branch review；review只讀所有diff與完整spec/plan，特别看可信context、legacy downgrade、null-cost no-substitution、tracked continuation、source-only摘要escape。修feedback先 receiving-code-review／TDD／再全驗，不把reviewer一句完成當證據。
-- [ ] **4. Integration decision.** 使用 finishing-a-development-branch 呈現整合選項，按使用者選擇走PR／merge／發布。未獲具體發布授權前，不push main、不建立驗收request、不close issue；任何push不得force或刪既有分支。若選PR，cloud驗收保持待PR合併與發布，不能先宣稱修復已上線。
-- [ ] **5. Live refresh after approved publication.** 先解析main固定新產品，驗Gitpolicy marker與發布SHA。驗收請求擬沿用9/30實際refresh情境：`gpt_factor=18,grok_factor=16,min_score=0,min_score_reason="同版本全候選情境比較",max_cost=null`；發布／驗收時確認沿用這組floor與理由，未確認不另造floor。
+- [x] **3. Independent whole-branch review.** 按 selected subagent-driven skill先完成每task spec/quality review，再 request whole-branch review；review只讀所有diff與完整spec/plan，特别看可信context、legacy downgrade、null-cost no-substitution、tracked continuation、source-only摘要escape。修feedback先 receiving-code-review／TDD／再全驗，不把reviewer一句完成當證據。
+- [x] **4. Integration decision.** 使用 finishing-a-development-branch 呈現整合選項，按使用者選擇走PR／merge／發布。未獲具體發布授權前，不push main、不建立驗收request、不close issue；任何push不得force或刪既有分支。若選PR，cloud驗收保持待PR合併與發布，不能先宣稱修復已上線。
+- [x] **5. Live refresh after approved publication.** 先解析main固定新產品，驗Gitpolicy marker與發布SHA。驗收請求擬沿用9/30實際refresh情境：`gpt_factor=18,grok_factor=16,min_score=0,min_score_reason="同版本全候選情境比較",max_cost=null`；發布／驗收時確認沿用這組floor與理由，未確認不另造floor。
 
 在任何request Git write前明示「operation=refresh，重新取得當次公開來源，不重用9/26快照」。建立UUIDv4唯一requestbranch/file、parent=newproduct、soleA requestpath、created_at有timezone，不改schema；查到run與attempt後固定publication讀回CSV原始bytes算SHA、raw／parsed／分類、v2result／報表／HTMLartifactbytes、pointer排序。對今天實際看到的已退休／缺價候選照實核對，不能硬要求來源仍恰好兩個缺口。
 
 success時GPT-6.1五檔若當次仍完整可用，均在候選並有各自source row；final由算法選，不以五檔全留作成功門檻。若另有source/version/proof問題，保存精確faileddiagnostic、成功pointer不因失敗推進，不用fixture或舊成功補位。另跑新成功refresh的固定recompute验证完整證據鏈，不重新fetch來源。
-- [ ] **6. Close out evidence and status.** 固定product／request／publication三SHA、runID/attempt、source日期／version、退出原因、test/review證據與artifacthash写ledger；更新README／AGENTS／契約為實際發布及cloud結果。OpenCode驗收、目標Chat讀新版及route實測、Projectsettings安裝各自回報；沿用已通過connector能力、不重問整包盤點。完成#1驗收後才按選定issue流程結案；#2須獨立route驗收，不能一併冒稱closed。
+- [x] **6. Close out evidence and status.** 固定product／request／publication三SHA、runID/attempt、source日期／version、退出原因、test/review證據與artifacthash写ledger；更新README／AGENTS／契約為實際發布及cloud結果。OpenCode驗收、目標Chat讀新版及route實測、Projectsettings安裝各自回報；沿用已通過connector能力、不重問整包盤點。完成#1驗收後才按選定issue流程結案；#2須獨立route驗收，不能一併冒稱closed。
 
 ## Self-Review Coverage
 
@@ -537,4 +537,4 @@ success時GPT-6.1五檔若當次仍完整可用，均在候選並有各自source
 - [x] Interface consistency：v2fixture從 `bridge.result` 生成；report測試沿現有 `self.payload`／`self.views`；新Git／CLI介面均有宣告及接線位置。
 - [x] Review Focus：五項均已分配Task1–4測例，包括Decimal小差、legacy降級、固定前次與source-only escape。
 
-使用者已對計畫及判定說明回覆「可以了」，依已選Subagent-driven逐項執行；進度以各task checkbox與驗收帳為準。實作批准不是正式發布授權。
+使用者已對計畫及判定說明回覆「可以了」，依已選Subagent-driven逐項完成；其後「直接做完給我去chat說開始」另授權既定main交付及planned雲端驗收，已完成。最新「能不能收尾就趕緊收尾」要求停止擴張：只記錄實際證據並交付，不再加功能或review loop；無settings或自動issue結案授權。
