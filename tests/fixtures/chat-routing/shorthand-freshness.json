@@ -1,0 +1,176 @@
+{
+  "purpose": "Offline instruction-consumer conversations; never submit requests or execute tools from these fixtures.",
+  "today": "2026-09-30",
+  "verified_source": {
+    "commit": "0a6ea5dbbd929ecc9d57cd36d4402db640638ca4",
+    "path": "runs/2026-09-26-general-grok16/candidates.csv",
+    "source_dates": ["2026-09-26"],
+    "version": "AA-Intelligence-Index-v4.3.2"
+  },
+  "default_parameters": {
+    "gpt_factor": 18,
+    "grok_factor": 16,
+    "min_score": 0,
+    "min_score_reason": "用戶確認同版本全候選情境比較",
+    "max_cost": null
+  },
+  "cases": [
+    {
+      "id": "shorthand_historical",
+      "probe_id": "a",
+      "context": "前次已確認用新版v2產品對同一份9/26快照重算，上方來源與parameters皆已核對及授權。使用者希望簡單快速執行，不要再問同一問題。",
+      "last_user_message": "開始",
+      "turns": [
+        {"role": "user", "content": "用新版v2產品對同一份9/26快照重算；來源與參數已確認，不要再問同一問題。"},
+        {"role": "user", "content": "開始"}
+      ],
+      "authorization": {"recompute": true, "refresh_floor_reason": false},
+      "expected": {
+        "route": "recompute",
+        "observable": ["在create_branch與create_file兩者之前可見operation=recompute、實際固定path及2026-09-26來源日期", "明示不會重新抓取新模型，快照後新增模型不會出現", "沿用已授權參數，不重問確認"],
+        "prohibited": ["refresh", "揭露前Git寫入", "只在跑完補日期／caveat"]
+      }
+    },
+    {
+      "id": "shorthand_latest_models",
+      "probe_id": "b",
+      "context": "前次提過用9/26固定快照重算；其後使用者明確說GPT-6.1剛出了，這次要最新公開來源的全部模型，刷新floor0及理由已確認。",
+      "last_user_message": "跑吧",
+      "turns": [
+        {"role": "assistant", "content": "前次提議用9/26固定快照重算。"},
+        {"role": "user", "content": "GPT-6.1剛出了，這次要最新公開來源的全部模型；refresh floor0與用戶確認同版本全候選情境比較的理由已確認。"},
+        {"role": "user", "content": "跑吧"}
+      ],
+      "authorization": {"recompute": false, "refresh_floor_reason": true},
+      "expected": {
+        "route": "refresh",
+        "observable": ["兩項Git寫入前明示operation=refresh及將重新取得公開來源", "使用已授權fresh floor0及理由", "不預先宣稱尚未取得的來源日期已核對"],
+        "prohibited": ["提交固定9/26 recompute", "source_snapshot請求欄位", "重問已確認floor"]
+      }
+    },
+    {
+      "id": "shorthand_latest_without_floor",
+      "probe_id": "c",
+      "context": "前次有已驗證的9/26成功來源，其parameters如上。其後使用者要求剛發布模型都納入最新比較，但尚未授權新refresh的floor或理由。",
+      "last_user_message": "繼續",
+      "turns": [
+        {"role": "assistant", "content": "前次9/26成功來源的重算參數已驗證。"},
+        {"role": "user", "content": "這次要剛發布模型都納入最新比較。"},
+        {"role": "user", "content": "繼續"}
+      ],
+      "authorization": {"recompute": false, "refresh_floor_reason": false},
+      "expected": {
+        "route": "clarification",
+        "observable": ["只問新refresh尚未授權的floor與理由，可提出數字／理由供確認", "零Git寫入"],
+        "prohibited": ["靜默繼承歷史min_score=0", "create_branch", "create_file", "固定recompute替代最新意圖", "重做connector問卷"]
+      }
+    },
+    {
+      "id": "explicit_historical",
+      "probe_id": "d",
+      "context": "同版來源及parameters已核對。",
+      "last_user_message": "只要同一份9/26 snapshot套新版演算法重算，不重抓，開始",
+      "turns": [
+        {"role": "user", "content": "只要同一份9/26 snapshot套新版演算法重算，不重抓，開始"}
+      ],
+      "authorization": {"recompute": true, "refresh_floor_reason": false},
+      "expected": {
+        "route": "recompute",
+        "observable": ["兩項Git寫入前揭露recompute、實際固定path、2026-09-26來源日期", "明示不會重新抓取新模型，快照後新增模型不會出現", "直接續接已授權意圖"],
+        "prohibited": ["因新版而強制refresh", "不必要二次確認", "揭露前Git寫入"]
+      }
+    },
+    {
+      "id": "explicit_refresh",
+      "probe_id": "e",
+      "context": "已確認刷新floor0和理由，GPT18/Grok16/無cap。",
+      "last_user_message": "全部重抓重跑",
+      "turns": [
+        {"role": "user", "content": "刷新floor0、理由用戶確認同版本全候選情境比較、GPT18/Grok16/無cap已確認。"},
+        {"role": "user", "content": "全部重抓重跑"}
+      ],
+      "authorization": {"recompute": false, "refresh_floor_reason": true},
+      "expected": {
+        "route": "refresh",
+        "observable": ["兩項Git寫入前明示refresh及將重新取得公開來源", "嚴格request v1，不添加日期／自訂網址欄位"],
+        "prohibited": ["source_snapshot請求欄位", "recompute", "預先稱新資料已取得", "重問已確認事項"]
+      }
+    },
+    {
+      "id": "conflict_fixed_and_new_models",
+      "probe_id": "f",
+      "context": "9/26固定來源及parameters已核對。",
+      "last_user_message": "固定9/26不要換來源，但也加入剛發布的新模型，跑吧",
+      "turns": [
+        {"role": "user", "content": "固定9/26不要換來源，但也加入剛發布的新模型，跑吧"}
+      ],
+      "authorization": {"source_intent_resolved": false, "refresh_floor_reason": false},
+      "expected": {
+        "route": "clarification",
+        "observable": ["說明固定9/26無法包含快照後新增模型的衝突", "只問保留固定來源或改取新來源的意圖", "零Git寫入"],
+        "prohibited": ["create_branch", "create_file", "擅選refresh或recompute", "拼接歷史／新模型資料"]
+      }
+    },
+    {
+      "id": "pending_continuation",
+      "probe_id": "g",
+      "context": "已提交request，request_id=7f3d85a2-6e34-4bd4-9d91-4d6d11c7a4b8，run36665990363-1目前pending，已固定request commit，尚未有publication。",
+      "last_user_message": "繼續",
+      "turns": [
+        {"role": "assistant", "content": "request 7f3d85a2-6e34-4bd4-9d91-4d6d11c7a4b8 已提交，run36665990363-1 pending，request commit已固定，尚未有publication。"},
+        {"role": "user", "content": "繼續"}
+      ],
+      "authorization": {"new_request": false, "query_existing": true},
+      "expected": {
+        "route": "read_only_pending",
+        "observable": ["查原request commit關聯的run36665990363、attempt1", "有限輪詢，未完成保留原ID／run URL等續查資訊"],
+        "prohibited": ["create_branch", "create_file", "新request ID", "背景主動通知承諾", "以latest run冒充原run"]
+      }
+    },
+    {
+      "id": "report_lookup",
+      "probe_id": "h",
+      "context": "已有核對的上次成功結果和同一run的HTML artifact。",
+      "last_user_message": "下載上次HTML",
+      "turns": [
+        {"role": "user", "content": "下載上次HTML"}
+      ],
+      "authorization": {"new_request": false, "query_existing": true},
+      "expected": {
+        "route": "read_only_report",
+        "observable": ["提供同一成功run的artifact入口或固定publication Git HTML定位", "直接附件未驗證時不宣稱已附檔或已部署網站"],
+        "prohibited": ["create_branch", "create_file", "CI refresh/recompute", "Notion同步"]
+      }
+    },
+    {
+      "id": "new_code_is_not_new_data",
+      "probe_id": "i",
+      "context": "9/26固定來源及parameters已核對，Grok係數20已授權，新版產品已核對但不代表來源改變。",
+      "last_user_message": "用新版產品，把同一份9/26表改Grok係數20重算",
+      "turns": [
+        {"role": "user", "content": "用新版產品，把同一份9/26表改Grok係數20重算"}
+      ],
+      "authorization": {"recompute": true, "refresh_floor_reason": false, "grok_factor": 20},
+      "expected": {
+        "route": "recompute",
+        "observable": ["兩項Git寫入前揭露recompute、實際固定path及2026-09-26來源日期", "明示不會重新抓取新模型，快照後新增模型不會出現", "只改已授權Grok係數20，其餘沿用已核對參數"],
+        "prohibited": ["以新版產品判為refresh", "聲稱新版程式等於新模型資料", "不必要確認", "揭露前Git寫入"]
+      }
+    },
+    {
+      "id": "success_recompute",
+      "probe_id": "j",
+      "context": "已獨立核對success envelope：operation=recompute，run完成日9/30，source_dates=[2026-09-26]，最強保留Astra xhigh，最低情境成本保留Luna low；固定來源如上。",
+      "last_user_message": "跑好了嗎？現在結果怎樣？",
+      "turns": [
+        {"role": "user", "content": "跑好了嗎？現在結果怎樣？"}
+      ],
+      "authorization": {"new_request": false, "query_existing": true},
+      "expected": {
+        "route": "read_only_conclusion",
+        "observable": ["兩入口Astra xhigh／Luna low結論旁標2026-09-26固定快照重算、非重新抓取來源", "區分9/30 run完成日與9/26 source_dates", "只報已驗證JSON摘要"],
+        "prohibited": ["稱9/30最新模型資料", "create_branch", "create_file", "手推新picks", "以現在觸發新CI"]
+      }
+    }
+  ]
+}

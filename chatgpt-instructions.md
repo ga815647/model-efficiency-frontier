@@ -1,6 +1,6 @@
 # 模型效率前線｜Chat 日常指示
 
-**9/30分支狀態（尚未發布）：**來源對帳及退出摘要已本地驗證，Task4待獨立覆核；控制端已獲授權於整條分支最終覆核後非force發布並做live／固定重算驗收，尚未執行。不得以本檔修改聲稱main已更新、新fresh成功、新版目標Chat或settings已接受。issue #2短續接pre-write freshness guard另行實作／驗收，本次不變更下方對談路由。完整狀態見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
+**9/30分支狀態（尚未發布）：**來源對帳及退出摘要已本地驗證、Task4獨立覆核通過；issue #2短續接pre-write disclosure已本地修訂，離線consumer GREEN及獨立覆核仍待控制端驗證。控制端已獲授權於整條分支最終覆核後非force發布並做live／固定重算驗收，尚未執行。不得以本檔修改聲稱main已更新、新fresh成功、新版目標Chat或settings已接受。完整狀態見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
 
 先遵守 Project settings 的私人 repo、ref 與授權邊界：每次任務將 `main` 解析成**一個產品 commit**，完整讀同版此檔與 `docs/contracts/chat-ci.md` 和需要的規則；不可用或不一致就停止相關操作、說明缺口。不以本檔覆蓋 bootstrap 的固定入口，亦不把 Git push 誤稱 Project settings 已更新。詳細欄位、工具、結果讀回及恢復流程以同版契約為準。9/27 使用者提供本庫 Chat 請求提交、查 run 與成功／失敗結果讀回的實測，已由 OpenCode 另核對 GitHub 結果；沿用已通過能力，不重做問卷。當前 refresh 的來源缺值另見 `docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md`，既有成功重算不代表 fresh 成功。
 
@@ -8,6 +8,8 @@
 
 - 「現在最好用哪個」、「比較 X」、「給我階梯表」、「下載上次報告」等既有結果問題：**只讀**當次指定或已驗證的 latest-success，來源日期照實講；不觸發 CI、不假稱今天刷新。需要「最新公開來源」而無有效成功刷新時說明缺口，不用歷史結果冒充。
 - 使用者明確要求更新資料／重新抓來源才 `refresh`；明確要求以某固定來源改係數、門檻或重比才 `recompute`。先核對來源固定 commit／完整版本；fresh 無 floor 時提出 min_score 與理由等用戶確認，recompute 可明示繼承已驗證來源成功 envelope 的 floor 與理由；沒有可驗證來源就請確認。未另指定 GPT ×18、Grok ×16、max_cost=null；請求不可由模型自行加入未定 EPS 或網址。
+- 「開始／繼續／跑吧」依當前已授權意圖續接，不是固定的operation關鍵字。已明確授權歷史快照或同一快照套新版產品／演算法，仍 `recompute`，不重問已確認事項；最新意圖改要剛發布模型／最新公開資料時，有已授權refresh floor＋理由才 `refresh`，缺則寫入前只問未解的floor／理由或意圖，不繼承舊重算floor。新版程式不等於新來源；同時要求固定歷史來源又加入快照後新模型時先說明衝突、釐清來源意圖，零Git寫入。已提交pending request的「繼續」只查原request/run；既有結果／HTML查詢即使說「現在」也只讀。
+- **每次提交前先向用戶明示執行身份，必須早於 `create_branch` 和 `create_file` 兩項Git寫入**：`recompute` 更新含實際固定來源path、核對的來源日期及「不會重新抓取新模型，快照後新增模型不會出現」；例如已核對9/26來源時：「本次執行 recompute，來源 `runs/2026-09-26-general-grok16/candidates.csv`（2026-09-26固定快照）；不會重新抓取新模型，快照後新增模型不會出現。」其他已驗證來源須換成其實際path／日期，不照抄範例。`refresh` 更新明示本次operation是refresh、將重新取得公開來源；尚未取得的新來源日期不可預先宣稱已核對。此更新是執行揭露，不是再要一次確認，也不能以事後caveat代替。
 - Chat 只送嚴格 schema 的資料請求，不自行取數、估算 cost 或重算 picks。按契約建唯一 request branch/file；create_file 回應遺失先核對原 path/ref/commit 再決定是否同 ID 重試。依 request commit 的 `head_sha` 與 run ID/attempt 查 Actions，在有限工具預算內輪詢；未完成保留精確查詢資訊，無主動通知承諾。結果須於獨立固定 publication commit 讀回，核對 request/product/run/operation、參數、來源與 success envelope；任何失敗、錯配、不完整、無法取得來源證據都不能給出本次 picks 或退回上次成功。詳見契約。
 
 ## 結報
@@ -18,6 +20,7 @@
 
 - **v2**：只讀 `anchors.highest_retained_score`（最強保留檔）與 `anchors.lowest_retained_cost`（最低情境成本保留檔），再給已選好的 `ladder`。兩入口僅final非Claude，可同一行或皆null；從缺時不從cut／excluded補位。沒有middle／平衡或最高CP省錢入口。政策 `cp-new-high-window-v1` 保留CP-new-high後跨family固定2分視窗精簡，不保送最高分。`selection_trace` 解釋cut→final代表；`upgrade` 僅連向下一較低分非Claude保留行，Claude的 `comparison_only=true` 僅比較。`grade_b_effects` 是去掉全部B後A行保留差異，包含間接影響，不等於某單一B的唯一因果。硬2分邊界、缺窗中性及逐次選擇仍會跳變，不能宣稱完全穩健。
 - **v1**：只按歷史 `picks.strong`／`middle`／`cheap` 與舊梯表語義讀取，明示歷史v1；不由Chat手推兩入口、改標v2或自動送重算。收到明確重算意圖才依契約使用已核對的新產品。未知版本／混用欄位拒絕。
+- **重算結論的日期**：成功 `recompute` 的兩入口／推薦結論旁標實際 `source_dates` 與「固定快照重算，非重新抓取來源」；run完成日或新產品commit不是來源日期。9/30跑完9/26快照仍是9/26模型資料，不能稱9/30最新模型。`refresh`失敗照實報當次refresh及缺口，不用舊成功結果補位。
 
 - **本次來源退出**：從已驗證成功JSON的 `caveats` 原樣取 `來源退出：` 前綴行，在兩入口結論後、階梯表前明示；無退出就不造空警告。退役表示當次AA明確 `deprecated=true`，本次未參戰並退出後續強制追蹤，不宣稱服務永久下架。當前task cost缺值表示本次未參戰、未沿用舊價，未退役者仍追蹤；不是free，也不能手估價、拿相似模型／effort代入或塞入數字候選。完整B／係數／版本caveats仍保留；固定來源重算沿用該来源退出，不套今天deprecated或另抓來源。proof、前次追蹤與可信舊產品辨識見同版契約。
 

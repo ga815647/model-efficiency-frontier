@@ -1,6 +1,6 @@
 # Chat → CI 契約（request v1／result v2＋歷史v1；2026-09-27）
 
-**9/30增量狀態：來源對帳分支本地已驗，尚待正式發布／live驗收。** Task1–3獨立覆核通過，Task4退出摘要／契約待獨立覆核。使用者已授權控制端在整條分支最終覆核乾淨後非force發布、執行live refresh與固定重算驗收；尚未進行，不是等待另一輪一般實作授權。此節記錄分支契約，不把下方舊產品失敗改稱成功；新版目標Chat退出摘要、issue #2短續接pre-write guard與settings仍分開驗收。見 [9/30驗收帳](../superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md)。
+**9/30增量狀態：來源對帳分支本地已驗，尚待正式發布／live驗收。** Task1–4獨立覆核通過；issue #2短續接pre-write disclosure本地已修訂，離線consumer GREEN與獨立覆核待控制端驗證。使用者已授權控制端在整條分支最終覆核乾淨後非force發布、執行live refresh與固定重算驗收；尚未進行，不是等待另一輪一般實作授權。此節記錄分支契約，不把下方舊產品失敗改稱成功；新版目標Chat退出摘要／短續接路由與settings仍分開驗收。見 [9/30驗收帳](../superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md)。
 
 此文件描述**已發布v2實作**；2026-09-27 OpenCode控制端完成雲端重算成功與預期來源缺口失敗診斷驗收，詳見 [v2驗收帳](../superpowers/notes/2026-09-27-window-knee-acceptance.md)。不代表live fresh成功、新Chat端實測或Chat Project settings已安裝。私人目標 `ga815647/model-efficiency-frontier`；產品 `main`，發佈 `results`；不得同步或恢復已移往用戶垃圾桶父頁的 Notion 頁，不部署網站。`bridge/request.py`、`bridge/result.py`、`bridge/runner.py`、`bridge/publish.py` 和 `.github/workflows/chat-execution.yml` 是精確欄位與驗證的實作來源。
 
@@ -24,6 +24,16 @@
 | `recompute` | 同上 | `source_snapshot: {"commit":"<40-hex>","path":"..."}` |
 
 `request_id` 是 canonical lower-case UUIDv4；`created_at` 是帶時區 ISO8601 秒（可小數秒；`Z` 或 ±HH:MM）；`product_sha` 是 40-hex commit。`parameters` **恰好**五欄：`gpt_factor`、`grok_factor` 有限正數；`min_score` 有限非負數；`min_score_reason` 非空白字串；`max_cost` 為 null 或有限正數。布林非數字。`source_snapshot.path` 僅 `runs/<segment>/candidates.csv` 或 `results/<uuid>/<run_id>-<attempt>/snapshot/candidates.csv`；對應 `commit` 必須固定，禁止 URL、跳脫、symlink 與未授權 Git 歷史。results 快照必須在同一固定 commit 的相鄰 `result.json` 為**成功 refresh**，路徑 request/run/attempt 和 CSV SHA-256 與 acquired locator 相符，version/inventory 證據亦須過檢。已歸檔 `runs/` 來源目前僅 runner 明確核准 `runs/2026-09-26-general-grok16/candidates.csv` 與其證據；別的歷史檔即使符合語法也不能承諾可重算。
+
+### 寫入前執行身份（對談要求，不新增schema欄位）
+
+按對話中當前已授權的來源意圖判斷，而非以「開始／繼續／跑吧／新版／現在」單字預設operation：
+
+- 明確歷史來源、同一快照改係數／門檻或套新版產品／演算法：`recompute`；已核對且已授權就直接續接，不重做確認問卷。新product SHA不代表新模型資料。
+- 最新意圖要求剛發布模型、當前全部模型或重新取得公開來源：已授權refresh參數（含floor＋理由）才 `refresh`，請求不含 `source_snapshot`。缺授權floor／理由或來源意圖未解，停在兩項Git寫入之前，只問缺的決策；固定重算已授權floor不自動授權fresh。要求固定9/26又加入快照後新模型是互斥來源要求，說明衝突後問要哪個，不寫入。
+- 已提交且pending的request續接：以原request commit／ID／run及attempt查詢，不建新request。「下載上次HTML」或查既有結果（含「現在」措辭）只讀；沿用有限輪詢、無背景通知及同ID冪等恢復規則。
+
+**在 `create_branch` 與 `create_file` 任一呼叫之前，先給用戶可見執行更新，核對它與將提交的JSON一致。** `recompute`更新必含operation、實際 `source_snapshot.path`、已核對來源日期及明文「不會重新抓取新模型，快照後新增模型不會出現」；例如實際選用9/26archive時：「本次執行 recompute，來源 `runs/2026-09-26-general-grok16/candidates.csv`（2026-09-26固定快照）；不會重新抓取新模型，快照後新增模型不會出現。」以另一成功refresh快照重算須使用該實際path及日期。來源固定commit照原契約核對；此揭露不是第二次確認，已授權就可提交。`refresh`更新必含operation及「將重新取得公開來源」，尚未取得的來源日期不冒稱已驗證；結報才使用實際取得日期。更新在兩次寫入之前可共用一次；若擬提交的operation／來源改變，重新核對及揭露。寫入後或跑完才補註不能替代本門檻。
 
 以下**僅示意 JSON**，UUID、兩個 SHA 和 snapshot commit 必須替換為真實固定值；不是已提交的 production 請求：
 
@@ -56,6 +66,8 @@ Contributor 身份修復新增取得證據：`snapshot/evidence/models.html`、`
 `status="failed"` 有 `errors: [{code,message},...]`，無 ladder/picks/benchmark 等成功欄位；允許 `request_id=null`（無效 transport 診斷）、`operation/created_at/parameters/source_snapshot` 不完整。先保留 `request_commit_sha`、run URL、錯誤碼與具體缺口，不對無效診斷身分套成功關聯規則，也絕不使用舊 picks。Actions 成功 + envelope 不完整／身份錯誤亦**不可交付**；Actions 失敗時即使有 envelope 只報失敗。
 
 成功同一次計算輸出 `report.md`、`report.html`（自包含單檔）與 JSON。HTML 在該 run 的 Actions artifact `report-<request_id>-<run_id>-<attempt>` 可下載，且 Git `results/<request_id>/<run_id>-<attempt>/report.html` 為耐久路徑；它不是公開 Pages 或網站。Chat 附件能力未驗證，不承諾直接在對話附檔；若無法直接附加，提供對應 Actions run/artifact 下載入口或固定 Git 檔定位，私人庫需授權登入。不要在 Notion 同步。
+
+成功 `recompute` 結報在anchors／推薦結論旁列實際 `source_dates`，明示「固定快照重算，非重新抓取來源」；例如run在9/30成功、來源9/26，推薦仍標2026-09-26快照，不以run時間／新版product commit稱當前新模型。fresh失敗回報實際失敗operation及診斷，不改成重算成功或拿舊結果補位。此對談要求與來源退出caveats同時保留，request v1／result v2／歷史v1及三個固定commit不變。
 
 ## result v2 精確欄位與遷移
 
