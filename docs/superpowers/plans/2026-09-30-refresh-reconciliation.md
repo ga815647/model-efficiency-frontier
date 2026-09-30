@@ -506,14 +506,14 @@ exit_section = ('<section class="panel" data-family="source-exits"><h2>本次來
 
 **Interfaces:** Consumes 已測的producer／validator／runner／publisher／reports；produces 固定本地測試證據、review結果與（經批准發布後）new cloud request/run/publication/source/artifact/pointers關聯。
 
-- [ ] **1. Fresh local verification and protected-file comparison.** 用 execution ledger 中起點SHA，不在中途重取HEAD冒充base。Run `python3 -m unittest discover -s tests`、`git diff --check`，再用下列命令驗保護檔diff必為空。記錄實際test數與exit，不沿用229或fixture-success作live證據。
+- [x] **1. Fresh local verification and protected-file comparison.** Task5本地新跑276tests／49.915s／OK，75個baseline mode/type/blob一致，protected diff及whitespace exit0；保存9/30五頁SHA及離線重播也通過，非live。詳見驗收帳。用 execution ledger 中起點SHA，不在中途重取HEAD冒充base。Run `python3 -m unittest discover -s tests`、`git diff --check`，再用下列命令驗保護檔diff必為空。記錄實際test數與exit，不沿用229或fixture-success作live證據。
 
 ```sh
 execution_base=$(sed -n 's/^Execution base: \([0-9a-f]\{40\}\)$/\1/p' docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md)
 test "${#execution_base}" -eq 40
 git diff --exit-code "$execution_base" -- runs scripts/compute_frontier.py scripts/ladder.py scripts/ladder_extra.py experiments tests/fixtures/refresh/failed-two-costs-flight.html tests/fixtures/refresh/leader.html tests/fixtures/refresh/grok.html tests/fixtures/refresh/muse.html tests/fixtures/refresh/meta.html tests/fixtures/refresh/models.html tests/fixtures/refresh/README.json
 ```
-- [ ] **2. Verify real fixed historical recompute is unchanged.** 用既有runner測試／本地受控request以原9/26固定CSV、18/16、min0、無cap重算；不得手改原檔。核對155 statuses／154身份可用／19chain／10final、兩入口Astra xhigh／Luna low、不可用Contributor max excluded、source date仍9/26。newfresh的pool與final不套此名單。
+- [x] **2. Verify real fixed historical recompute is unchanged.** 本地v2控制155statuses／154usable／19chain／10final及Astra xhigh／Luna low不變，JSON／MD／HTML identity order一致，CSV原bytes不變。用既有runner測試／本地受控request以原9/26固定CSV、18/16、min0、無cap重算；不得手改原檔。核對155 statuses／154身份可用／19chain／10final、兩入口Astra xhigh／Luna low、不可用Contributor max excluded、source date仍9/26。newfresh的pool與final不套此名單。
 - [ ] **3. Independent whole-branch review.** 按 selected subagent-driven skill先完成每task spec/quality review，再 request whole-branch review；review只讀所有diff與完整spec/plan，特别看可信context、legacy downgrade、null-cost no-substitution、tracked continuation、source-only摘要escape。修feedback先 receiving-code-review／TDD／再全驗，不把reviewer一句完成當證據。
 - [ ] **4. Integration decision.** 使用 finishing-a-development-branch 呈現整合選項，按使用者選擇走PR／merge／發布。未獲具體發布授權前，不push main、不建立驗收request、不close issue；任何push不得force或刪既有分支。若選PR，cloud驗收保持待PR合併與發布，不能先宣稱修復已上線。
 - [ ] **5. Live refresh after approved publication.** 先解析main固定新產品，驗Gitpolicy marker與發布SHA。驗收請求擬沿用9/30實際refresh情境：`gpt_factor=18,grok_factor=16,min_score=0,min_score_reason="同版本全候選情境比較",max_cost=null`；發布／驗收時確認沿用這組floor與理由，未確認不另造floor。
