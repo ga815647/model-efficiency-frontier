@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-09-30 issue #1 書面規格已確認、實作計畫待審（最新，尚未實作／發布）**：使用者在 `2026-09-30-refresh-reconciliation-design.md` 的書面審閱請求後回覆「繼續」，本規格已確認。五任務計畫位於 `docs/superpowers/plans/2026-09-30-refresh-reconciliation.md`，待審閱後沿用既有 Subagent-driven；涵蓋純來源分類、proof／可信policy、新producer与Git／發布接線、退出摘要及整體／雲端驗收。對談及文件批准不等於已修產品或授權force發布；產品仍為既有v2，fresh尚有舊hard guard。issue #2 的bounded短設計另行確認／驗收，不用#1結果替代。
+
 > **2026-09-30 issue #1 政策方向已確認、書面規格待審（最新，尚未實作／發布）**：使用者要求已淘汰的舊模型可退出，不能綁架整批 pipeline，並對「MiniMax-M2.7 當次 deprecated=true 排行退役；Inkling deprecated=false 但本次 task cost 缺值，明示排除、不擋其他有效模型」回覆「好」。新對帳分開 observed／usable／tracked／retired，不沿用舊價、不代入相似身份、保留當次證據；退役退出後續強制追蹤，缺價未退役者仍追蹤。規格位於 `docs/superpowers/specs/2026-09-30-refresh-reconciliation-design.md`，待書面審閱；產品仍是 `0a6ea5d` 的已發布v2，live fresh仍有舊硬阻擋，不能宣稱修復或更新成功。9/30固定失敗原頁五個hash已獨立驗證並重播；未修改產品229測試基線通過。`CONTEXT.md` 只記術語，不取代本檔政策。issue #2 的短續接freshness guard另行處理／驗收，不把#1方向確認當作兩項均已完成。
 
 > **2026-09-27 Chat v2驗收完成（最新）**：使用者带回目標Chat實測，run `36355372202-1` success，product `fdabaad`、request commit `12bd4b11b0fe12b0f3dbe70fa8eb0473f5822cbc`、publication `a9b3361f7aa6aba98a9adb337a2aac4d14a156c5`。OpenCode独立核对请求parent／唯一文件、run关联、v2 envelope、155/19/10、Astra xhigh／Luna low及非法Contributor max排除；下载HTML artifact与固定Git hash相同。本次固定视窗改制已完成Chat端到端验收，不再重做能力问卷。live fresh成本缺值为独立问题；settings安装／Chat直接附件不额外推定。详见v2验收帐最新段。

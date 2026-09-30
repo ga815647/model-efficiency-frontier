@@ -1,6 +1,6 @@
 # Fresh 候選對帳：舊模型退役與本次缺價退出，不綁架整批刷新
 
-日期：2026-09-30。**狀態：對談方向已確認，書面規格待使用者審閱；尚未批准實作計畫、改產品程式或發布修復。** 對應 [issue #1](https://github.com/ga815647/model-efficiency-frontier/issues/1)。本規格更換 fresh 來源候選對帳政策，不更換已發布 v2 的階梯數學；下方技術落地選擇屬本次書面審閱內容，不把方向確認當作文件批准。
+日期：2026-09-30。**狀態：使用者在書面規格審閱請求後回覆「繼續」，本規格已確認；實作計畫待審閱，尚未改產品程式或發布修復。** 對應 [issue #1](https://github.com/ga815647/model-efficiency-frontier/issues/1)。本規格更換 fresh 來源候選對帳政策，不更換已發布 v2 的階梯數學；批准來源是本次書面審閱，不是更早的政策方向確認。
 
 ## 1. 目的與已確認前提
 
@@ -117,4 +117,4 @@ Inkling 一次缺價仍留追蹤，恢復價格後可入列，不能排除一次
 
 Issue #2 是獨立的 Chat 短續接 freshness guard：寫 request 前明示 operation／固定來源日期與「不會抓新模型」，最新資料意圖不得直接沿用 pinned recompute；其 bounded 短設計已提出，不因本次 #1 政策確認就視為已實作／驗收。它不改 request schema，也不能用 #1 取數成功代替對談路由驗收。
 
-本規格先經使用者書面審閱。確認後才用 writing-plans 寫 #1 實作計畫，計畫審閱與執行方式確認後進 TDD／實作。#2 的短設計另行確認後按 bounded 流程處理，不另新增 architectural 規格。
+本規格已確認，writing-plans 寫 #1 [實作計畫](../plans/2026-09-30-refresh-reconciliation.md)；計畫待使用者審閱，執行方式沿用既有 Subagent-driven，審閱後才進 TDD／實作。#2 的短設計另行確認後按 bounded 流程處理，不另新增 architectural 規格。
