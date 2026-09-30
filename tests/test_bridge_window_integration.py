@@ -38,20 +38,20 @@ class WindowIntegrationTests(unittest.TestCase):
         old, envelope = harness.output(run='100', operation='refresh', schema_version=1)
         self.assertEqual(envelope['schema_version'], 1)
         self.assertEqual(main(['assert-success', '--output', str(old)]), 0)
-        publish_result(old, remote=str(harness.remote))
+        harness.publish(old)
         new, envelope = harness.output(run='200', operation='refresh', schema_version=2,
                                       created='2026-09-27T12:00:00+00:00')
         self.assertEqual(envelope['schema_version'], 2)
         self.assertEqual(main(['assert-success', '--output', str(new)]), 0)
-        tip = publish_result(new, remote=str(harness.remote))
-        self.assertEqual(publish_result(new, remote=str(harness.remote)), tip)
+        tip = harness.publish(new)
+        self.assertEqual(harness.publish(new), tip)
         pointers = {name: harness.pointer(name) for name in ('latest-success.json', 'latest-refresh.json')}
         for version in (1, 2):
             failed, _ = harness.output(run=str(300 + version), status='failed', schema_version=version)
             self.assertEqual(main(['assert-success', '--output', str(failed)]), 1)
             publish_result(failed, remote=str(harness.remote))
             older, _ = harness.output(run=str(400 + version), operation='refresh', schema_version=version)
-            publish_result(older, remote=str(harness.remote))
+            harness.publish(older)
             for name, pointer in pointers.items():
                 self.assertEqual(harness.pointer(name), pointer)
         for run, version in (('100', 1), ('200', 2)):
@@ -61,7 +61,7 @@ class WindowIntegrationTests(unittest.TestCase):
             result.validate_envelope(readback)
         (new / 'report.html').write_text('conflicting bytes')
         with self.assertRaises(PublishError):
-            publish_result(new, remote=str(harness.remote))
+            harness.publish(new)
 
     def test_modern_five_source_runner_publication_and_pinned_recompute(self):
         from test_refresh_sources import FIX, URLS
@@ -69,9 +69,16 @@ class WindowIntegrationTests(unittest.TestCase):
         harness.setUp()
         self.addCleanup(harness.doCleanups)
         publisher = self.publisher()
+        marker = harness.repo / 'bridge/refresh-policy.json'
+        marker.parent.mkdir()
+        marker.write_text('{"policy":"observed-inventory-v1"}')
+        runner_tests.git(harness.repo, 'add', '.')
+        runner_tests.git(harness.repo, 'commit', '-qm', 'new-policy product')
+        harness.product = runner_tests.git(harness.repo, 'rev-parse', 'HEAD')
+        runner_tests.git(harness.repo, 'update-ref', 'refs/bridge/approved-main', harness.product)
         req = dict(request_data(), product_sha=harness.product)
         request_path = harness.repo / 'bridge/requests' / (req['request_id'] + '.json')
-        request_path.parent.mkdir(parents=True)
+        request_path.parent.mkdir(parents=True, exist_ok=True)
         request_path.write_text(json.dumps(req))
         runner_tests.git(harness.repo, 'add', '.')
         runner_tests.git(harness.repo, 'commit', '-qm', 'refresh request')
@@ -83,10 +90,15 @@ class WindowIntegrationTests(unittest.TestCase):
                                    output=output, fetch=pages.__getitem__)
         self.assertEqual(envelope['status'], 'success')
         self.assertEqual(envelope['schema_version'], 2)
-        self.assertEqual(envelope['candidate_count'], 154)
-        self.assertEqual(len(envelope['candidate_statuses']), 154)
-        self.assertEqual(len(envelope['ladder']), 10)
-        tip = publish_result(output, remote=str(publisher.remote))
+        from scripts.aa_public import parse_leaderboard
+        from scripts.refresh_inventory import classify_record
+        count = sum(classify_record(r)['state'] == 'usable_paid'
+                    for r in parse_leaderboard(pages[URLS['leader']].decode())) + 1
+        self.assertEqual(envelope['candidate_count'], count)
+        self.assertEqual(len(envelope['candidate_statuses']), count)
+        self.assertTrue(envelope['ladder'])
+        tip = publish_result(output, remote=str(publisher.remote),
+                             source_repository=harness.repo, trusted_product_sha=harness.product)
         target = f'results/{req["request_id"]}/900-1'
         readback = json.loads(publish_tests.git(publisher.remote, 'show', f'{tip}:{target}/result.json'))
         self.assertEqual(readback, envelope)

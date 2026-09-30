@@ -38,6 +38,7 @@ class RunnerTests(unittest.TestCase):
         git(self.repo, 'add', '.')
         git(self.repo, 'commit', '-qm', 'product')
         self.product = git(self.repo, 'rev-parse', 'HEAD')
+        git(self.repo, 'update-ref', 'refs/bridge/approved-main', self.product)
         self.locator = {'commit': self.product, 'path': ARCHIVE + '/candidates.csv'}
 
     def submit(self, *, params=None, locator=None):
@@ -140,6 +141,151 @@ class RunnerTests(unittest.TestCase):
         self.assertIn(envelope['anchors']['highest_retained_score']['identity'],
                       (output / 'report.html').read_text())
         self.assertEqual(json.loads((output / 'result.json').read_text()), envelope)
+
+    def test_policy_uses_only_pinned_main_and_ordinary_product_blob(self):
+        from bridge import runner
+        marker = self.repo / 'bridge/refresh-policy.json'
+        marker.parent.mkdir()
+        marker.write_text('{"policy":"observed-inventory-v1"}')
+        git(self.repo, 'add', '.')
+        git(self.repo, 'commit', '-qm', 'approved B')
+        b = git(self.repo, 'rev-parse', 'HEAD')
+        git(self.repo, 'update-ref', 'refs/bridge/approved-main', b)
+        git(self.repo, 'checkout', '-q', '--detach', self.product)
+        self.assertEqual(runner._refresh_policy(self.repo, b), 'observed-inventory-v1')
+        self.assertIsNone(runner._refresh_policy(self.repo, self.product))
+        git(self.repo, 'checkout', '-q', '--detach', b)
+        marker.unlink()
+        self.assertEqual(runner._refresh_policy(self.repo, b), 'observed-inventory-v1')
+        marker.write_text('{"policy":"unknown"}')
+        git(self.repo, 'add', '.')
+        git(self.repo, 'commit', '-qm', 'unapproved successor')
+        x = git(self.repo, 'rev-parse', 'HEAD')
+        git(self.repo, 'update-ref', 'refs/remotes/origin/main', x)
+        with self.assertRaisesRegex(ValueError, 'source_product_not_authorized'):
+            runner._refresh_policy(self.repo, x)
+        git(self.repo, 'update-ref', '-d', 'refs/bridge/approved-main')
+        with self.assertRaises(ValueError):
+            runner._refresh_policy(self.repo, self.product)
+        blob = git(self.repo, 'rev-parse', b + ':bridge/refresh-policy.json')
+        git(self.repo, 'update-ref', 'refs/bridge/approved-main', blob)
+        with self.assertRaises(ValueError):
+            runner._refresh_policy(self.repo, self.product)
+
+    def test_invalid_policy_markers_and_unrelated_product_rejected(self):
+        from bridge import runner
+        for value in ('{"policy":"unknown"}', '{"policy":"observed-inventory-v1","policy":"observed-inventory-v1"}', 'symlink'):
+            with self.subTest(value=value):
+                marker = self.repo / 'bridge/refresh-policy.json'
+                marker.parent.mkdir(exist_ok=True)
+                marker.unlink(missing_ok=True)
+                if value == 'symlink':
+                    marker.symlink_to('../run-notes.md')
+                else:
+                    marker.write_text(value)
+                git(self.repo, 'add', '.')
+                git(self.repo, 'commit', '-qm', 'bad marker')
+                sha = git(self.repo, 'rev-parse', 'HEAD')
+                git(self.repo, 'update-ref', 'refs/bridge/approved-main', sha)
+                with self.assertRaises(ValueError):
+                    runner._refresh_policy(self.repo, sha)
+        git(self.repo, 'checkout', '-q', '--orphan', 'unrelated')
+        git(self.repo, 'commit', '-qm', 'unrelated', '--allow-empty')
+        with self.assertRaisesRegex(ValueError, 'source_product_not_authorized'):
+            runner._refresh_policy(self.repo, git(self.repo, 'rev-parse', 'HEAD'))
+
+    def new_product(self):
+        marker = self.repo / 'bridge/refresh-policy.json'
+        marker.parent.mkdir(exist_ok=True)
+        marker.write_text('{"policy":"observed-inventory-v1"}')
+        (self.repo / ARCHIVE / 'public_candidate_source_map.json').write_text(
+            json.dumps({'slugs': ['inkling', 'minimax-m2-7']}))
+        git(self.repo, 'add', '.')
+        git(self.repo, 'commit', '-qm', 'new product')
+        self.product = git(self.repo, 'rev-parse', 'HEAD')
+        git(self.repo, 'update-ref', 'refs/bridge/approved-main', self.product)
+
+    def fresh_request(self, params=None):
+        req = dict(request_data(), product_sha=self.product)
+        if params is not None:
+            req['parameters'] = params
+        path = self.repo / 'bridge/requests' / (UUID + '.json')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(req))
+        git(self.repo, 'add', '.')
+        git(self.repo, 'commit', '-qm', 'request')
+        execution = dict(request_commit_sha=git(self.repo, 'rev-parse', 'HEAD'), product_sha=self.product,
+                         branch='efficiency-run/' + UUID, run_id='new', run_attempt=1,
+                         run_url='https://github.com/example/actions/runs/new')
+        return req, execution
+
+    def test_new_refresh_previous_and_fixed_recompute_preserve_tracking(self):
+        from refresh_inventory_fixtures import refresh_pages
+        from bridge.runner import _previous
+        self.new_product()
+        req, execution = self.fresh_request()
+        output = Path(self.tmp.name) / 'new-output'
+        envelope = execute_request(req, execution=execution, repository=self.repo, output=output,
+                                   fetch=refresh_pages().__getitem__)
+        self.assertEqual(envelope['status'], 'success', envelope['errors'])
+        git(self.repo, 'checkout', '-q', '-b', 'results')
+        target = f'results/{UUID}/new-1'
+        import shutil
+        shutil.copytree(output, self.repo / target)
+        (self.repo / 'latest-refresh.json').write_text(json.dumps(dict(result_path=target + '/result.json',
+            request_commit_sha=execution['request_commit_sha'])))
+        git(self.repo, 'add', '.')
+        git(self.repo, 'commit', '-qm', 'new refresh publication')
+        publication = git(self.repo, 'rev-parse', 'HEAD')
+        previous = _previous(self.repo, self.product)
+        self.assertIn('inkling', previous['reconciliation']['tracked_slugs'])
+        self.assertNotIn('minimax-m2-7', previous['reconciliation']['tracked_slugs'])
+        git(self.repo, 'checkout', '-q', '--detach', self.product)
+        req, execution = self.submit(locator=dict(commit=publication, path=target + '/snapshot/candidates.csv'))
+        result, _ = self.run_request(req, execution)
+        self.assertEqual(result['status'], 'success', result['errors'])
+        self.assertEqual(result['caveats'], envelope['caveats'])
+
+    def test_new_product_recompute_legacy_source_does_not_require_new_proof(self):
+        self.publish_refresh_fixture(schema_version=2)
+        locator = dict(commit=git(self.repo, 'rev-parse', 'HEAD'), path=f'results/{UUID}/777-1/snapshot/candidates.csv')
+        git(self.repo, 'checkout', '-q', '--detach', self.product)
+        self.new_product()
+        req, execution = self.submit(locator=locator)
+        result, _ = self.run_request(req, execution)
+        self.assertEqual(result['status'], 'success', result['errors'])
+
+    def test_floor_cap_empty_ladder_does_not_change_tracking(self):
+        from refresh_inventory_fixtures import refresh_pages
+        self.new_product()
+        params = dict(request_data()['parameters'], min_score=100, min_score_reason='empty ladder boundary')
+        req, execution = self.fresh_request(params)
+        output = Path(self.tmp.name) / 'empty-ladder'
+        result = execute_request(req, execution=execution, repository=self.repo, output=output,
+                                 fetch=refresh_pages().__getitem__)
+        self.assertEqual(result['status'], 'success', result['errors'])
+        self.assertEqual(result['ladder'], [])
+        self.assertTrue(all(value is None for value in result['anchors'].values()))
+        rec = json.loads((output / 'snapshot/evidence/source_map.json').read_text())['reconciliation']
+        self.assertIn('inkling', rec['tracked_slugs'])
+        self.assertIn('gpt-6-1-sol', rec['tracked_slugs'])
+
+    def test_empty_paid_and_retired_unknown_effort_boundary(self):
+        from refresh_inventory_fixtures import refresh_pages, flight
+        from scripts.aa_public import LEADERBOARD, parse_leaderboard
+        self.new_product()
+        req, execution = self.fresh_request()
+        pages = refresh_pages()
+        rows = parse_leaderboard(pages[LEADERBOARD].decode())
+        for row in rows:
+            row['deprecated'] = True
+        rows[-1]['name'] = 'Retired (garbage unknown qualifier)'
+        pages[LEADERBOARD] = flight(rows)
+        output = Path(self.tmp.name) / 'empty-paid'
+        result = execute_request(req, execution=execution, repository=self.repo, output=output, fetch=pages.__getitem__)
+        self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['errors'][0]['code'], 'empty_paid')
+        self.assertFalse((output / 'report.html').exists())
 
     def test_fixed_commit_rejects_later_conflicting_evidence(self):
         req, execution = self.submit()

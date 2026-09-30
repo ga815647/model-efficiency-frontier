@@ -14,8 +14,12 @@ from urllib.parse import urlsplit
 
 from bridge.inventory import InventoryError, validate_fresh_inventory
 from bridge.result import validate_envelope
+from bridge.request import RequestError
 from scripts.meta_availability import MODELS_URL, parse_meta_models, unavailable_reason
 from scripts.aa_public import SourceError
+from bridge.runner import RunnerError, _refresh_policy, _previous, _legacy_workflow_context
+from scripts.refresh_snapshot import _previous_slugs
+from scripts.refresh_inventory import tracked_public_slugs
 import csv
 import io
 
@@ -31,7 +35,7 @@ _EVIDENCE = {'leaderboard.html', 'grok_release.html', 'muse_release.html',
                'meta_pricing.html', 'models.html', 'sources.json', 'meta_models.json',
                'availability.json', 'leaderboard_records.json',
               'releases.json', 'version.json', 'meta_pricing.json',
-              'missing_candidates.json', 'source_map.json', 'api_diagnostic.json',
+               'missing_candidates.json', 'unusable_candidates.json', 'source_map.json', 'api_diagnostic.json',
               'api_envelopes.json'}
 _FILES = {'result.json', 'report.md', 'report.html', 'snapshot/candidates.csv',
            'snapshot/free-sidecar.json', 'snapshot/run-notes.md'} | {
@@ -40,7 +44,7 @@ _FILES = {'result.json', 'report.md', 'report.html', 'snapshot/candidates.csv',
 # failed result with one of these codes cannot legitimately predate that proof.
 # Previous-inventory parsing is the sole listed stage before availability.json.
 _POST_PROOF_REFRESH_ERRORS = {
-    'previous_inventory_missing', 'missing_candidate', 'invalid_measurement',
+    'previous_inventory_missing', 'missing_candidate', 'present_candidate_unusable', 'invalid_measurement',
     'markup_drift', 'model_markup_drift', 'model_shape_drift', 'invalid_identity',
     'conflicting_slug', 'release_shape_drift', 'release_missing', 'version_missing',
     'version_disagreement', 'crosscheck_mismatch', 'model_missing',
@@ -205,7 +209,7 @@ def _push(repo, remote, branch, env):
     return _git(repo, 'push', remote, f'HEAD:refs/heads/{branch}', env=env, check=False).returncode == 0
 
 
-def _output_files(output):
+def _output_files(output, *, source_repository=None, trusted_product_sha=None, approved_main_sha=None):
     output = Path(output)
     if not output.is_dir() or not stat.S_ISDIR(output.lstat().st_mode):
         raise PublishError('invalid_output_directory')
@@ -273,9 +277,19 @@ def _output_files(output):
             elif 'snapshot/evidence/meta_models.json' in files:
                 _capability_evidence(files, envelope, source_map)
             try:
+                if source_repository is None or type(trusted_product_sha) is not str:
+                    raise PublishError('missing_trusted_product_context')
+                policy = _refresh_policy(source_repository, trusted_product_sha, approved_main_sha=approved_main_sha)
+                if envelope['product_sha'].lower() != trusted_product_sha.lower():
+                    raise PublishError('product_context_mismatch')
+                previous = _previous(source_repository, trusted_product_sha, approved_main_sha=approved_main_sha)
+                expected = tracked_public_slugs(previous, _previous_slugs(previous)[0])
+                proof = {name: files['snapshot/evidence/' + name] for name in
+                         ('leaderboard.html', 'leaderboard_records.json', 'sources.json')} if policy else None
                 validate_fresh_inventory(files['snapshot/candidates.csv'], source_map, envelope,
-                                         error_code='invalid_refresh_inventory')
-            except InventoryError as exc:
+                                         error_code='invalid_refresh_inventory', refresh_policy=policy,
+                                         evidence=proof, expected_previous_slugs=expected if policy else None)
+            except (RunnerError, SourceError, InventoryError, KeyError) as exc:
                 raise PublishError('invalid_refresh_inventory') from exc
         elif 'snapshot/candidates.csv' in files:
             # Recompute materializes a copy for diagnostics; the source remains pinned Git.
@@ -344,9 +358,13 @@ def _tip(repo, remote, branch, env):
     return tip
 
 
-def publish_result(output: Path, *, remote: str, branch: str = 'results') -> str:
+def publish_result(output: Path, *, remote: str, branch: str = 'results',
+                   source_repository: Path | None = None, trusted_product_sha: str | None = None,
+                   approved_main_sha: str | None = None) -> str:
     """Return publication SHA; retry contested fast-forward pushes at most three times."""
-    files, envelope, target = _output_files(output)
+    files, envelope, target = _output_files(output, source_repository=source_repository,
+                                            trusted_product_sha=trusted_product_sha,
+                                            approved_main_sha=approved_main_sha)
     if (type(branch) is not str or not _BRANCH.fullmatch(branch) or '..' in branch or
             branch.endswith(('/', '.')) or type(remote) is not str or not remote):
         raise PublishError('invalid_remote_or_branch')
@@ -395,8 +413,32 @@ def main(argv=None):
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--remote', required=True)
     parser.add_argument('--branch', default='results')
+    parser.add_argument('--source-repository', type=Path)
+    parser.add_argument('--product-sha-file', type=Path)
     args = parser.parse_args(argv)
-    print(publish_result(args.output, remote=args.remote, branch=args.branch))
+    trusted_sha = None
+    approved_main = None
+    if args.product_sha_file is not None and args.product_sha_file.exists():
+        try:
+            trusted_sha = args.product_sha_file.read_text(encoding='ascii').strip()
+        except (OSError, UnicodeError) as exc:
+            raise PublishError('invalid_product_handoff') from exc
+        if not re.fullmatch('[0-9a-fA-F]{40}', trusted_sha):
+            raise PublishError('invalid_product_handoff')
+    if args.source_repository is None and args.product_sha_file is None:
+        envelope = validate_envelope(_json((args.output / 'result.json').read_bytes()))
+        if envelope['status'] == 'success' and envelope['operation'] == 'refresh':
+            try:
+                event = os.environ.get('EVENT_SHA', '')
+                args.source_repository, trusted_sha, approved_main = _legacy_workflow_context(
+                    Path.cwd(), event_sha=event, ref_name=os.environ.get('EVENT_REF', ''))
+                if envelope['request_commit_sha'].lower() != event.lower():
+                    raise PublishError('event_result_mismatch')
+            except (RunnerError, RequestError, OSError, UnicodeError) as exc:
+                raise PublishError('missing_trusted_product_context') from exc
+    print(publish_result(args.output, remote=args.remote, branch=args.branch,
+                         source_repository=args.source_repository, trusted_product_sha=trusted_sha,
+                         approved_main_sha=approved_main))
     return 0
 
 

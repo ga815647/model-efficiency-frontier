@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import tempfile
+import subprocess
 from pathlib import Path
 
 from scripts.aa_public import LEADERBOARD, parse_leaderboard
@@ -89,4 +90,43 @@ def record(slug, *, name=None, score='40', cost='1', estimated=False, deprecated
     scalar = lambda value: Decimal(value) if type(value) is str else value
     return dict(slug=slug, name=name or slug, creator='Fixture',
                 score=scalar(score), cost_per_task=scalar(cost), is_estimated=estimated,
-                deprecated=deprecated, price1m_input=None, price1m_output=None, cache_hit_price=None)
+                 deprecated=deprecated, price1m_input=None, price1m_output=None, cache_hit_price=None)
+
+
+GPT_ENTRIES = [
+    ('gpt-6-1-sol', 'max', '51.8332597011541', '0.7241670655535033'),
+    ('gpt-6-1-sol-xhigh', 'xhigh', '51.0377679093761', '0.39286117158850653'),
+    ('gpt-6-1-sol-high', 'high', '50.2377777519769', '0.31914442375664703'),
+    ('gpt-6-1-sol-medium', 'medium', '47.7833271274065', '0.21370088267875537'),
+    ('gpt-6-1-sol-low', 'low', '42.0835618555848', '0.13075190869859377'),
+]
+
+
+def refresh_pages():
+    from scripts.refresh_snapshot import SOURCES
+    fix = Path(__file__).parent / 'fixtures/refresh'
+    names = ('current-inventory-2026-09-30-flight', 'grok', 'muse', 'meta', 'models')
+    return {url: (fix / (name + '.html')).read_bytes() for url, name in zip(SOURCES, names)}
+
+
+def product_context(base, previous, *, new_policy):
+    from scripts.refresh_inventory import POLICY
+    repo = Path(base) / ('source-new' if new_policy else 'source-legacy')
+    repo.mkdir()
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(repo), *args], stderr=subprocess.PIPE).decode().strip()
+    git('init', '-q')
+    git('config', 'user.name', 'Fixture')
+    git('config', 'user.email', 'fixture@example.com')
+    archive = repo / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json'
+    archive.parent.mkdir(parents=True)
+    archive.write_text(json.dumps(previous))
+    if new_policy:
+        marker = repo / 'bridge/refresh-policy.json'
+        marker.parent.mkdir()
+        marker.write_text(json.dumps({'policy': POLICY}))
+    git('add', '.')
+    git('commit', '-qm', 'trusted fixture product')
+    sha = git('rev-parse', 'HEAD')
+    git('update-ref', 'refs/bridge/approved-main', sha)
+    return repo, sha

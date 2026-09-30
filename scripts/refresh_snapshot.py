@@ -17,6 +17,8 @@ from scripts.aa_public import (GROK, LEADERBOARD, MUSE, SourceError,
 from scripts.fetch_aa import COLUMNS
 from scripts.meta_pricing import URL as META, parse_meta_pricing, rescale_contributor
 from scripts.meta_availability import MODELS_URL, parse_meta_models, unavailable_reason
+from scripts.refresh_inventory import (classify_record, build_reconciliation, blocking_candidates,
+                                       tracked_public_slugs, source_exit_caveats)
 
 SOURCES = (LEADERBOARD, GROK, MUSE, META, MODELS_URL)
 
@@ -201,6 +203,7 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
     _json(evidence / 'sources.json', {'checked_date': today, 'sha256_by_url': hashes})
     _json(evidence / 'meta_models.json', dict(capability, checked_date=today))
     prev_slugs, prev_efforts = _previous_slugs(previous)
+    prev_slugs = tracked_public_slugs(previous, prev_slugs)
     retirement = [{'identity': 'Muse Spark 1.3 max Meta Contributor', 'effort': 'max',
                    'source_url': MODELS_URL, 'checked_date': today,
                    'reason': unavailable_reason({'model': 'Muse Spark 1.3', 'effort': 'max',
@@ -217,10 +220,10 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
     _json(evidence / 'version.json', version)
     _json(evidence / 'meta_pricing.json', meta)
     included, excluded, rows = {}, [], []
+    rec = build_reconciliation(records, prev_slugs)
     for item in records:
         score, cost = item['score'], item['cost_per_task']
-        reason = ('estimated' if item['is_estimated'] else 'missing_score_or_cost' if score is None or cost is None
-                  else 'zero_cost' if Decimal(str(cost)) == 0 else None)
+        reason = classify_record(item)['reason']
         if reason:
             excluded.append({'slug': item['slug'], 'name': item['name'], 'reason': reason})
             continue
@@ -240,16 +243,34 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
                                f'source_date={today}; version inferred from both release pages and four exact pairs; '
                                'public first-party/provider median, not provider-specific; full-precision flight JSON'),
                      'ttft_s': '', 'time_per_task_s': ''})
-    lost = sorted(prev_slugs - included.keys())
-    if lost:
+    source_map = {'source_by_slug': included, 'excluded': excluded, 'availability': availability,
+                  'contributor': [], 'inventory': {'slugs': sorted(included), 'contributor_efforts': []},
+                  'reconciliation': rec}
+
+    def save_missing_diagnostics(slugs, records):
         current = {r['slug']: r for r in records}
         _json(evidence / 'missing_candidates.json', [
             {'slug': slug, 'local_snapshot_search': 'present in approved previous inventory',
              'leaderboard_source_check': current.get(slug, 'not present in current page'),
              'model_and_index_check': 'release/model page disambiguation required; not verified absent',
              'effort_id_disambiguation': 'manual review required; do not substitute similar effort/ID'}
-            for slug in lost])
-        raise SourceError('missing_candidate', LEADERBOARD, ','.join(lost))
+             for slug in slugs])
+
+    def save_unusable_diagnostics(slugs, records, rec):
+        current = {r['slug']: r for r in records}
+        _json(evidence / 'unusable_candidates.json', [
+            {'slug': slug, 'record': current[slug], 'reason': rec['status_by_slug'][slug]['reason']}
+            for slug in slugs])
+
+    blocked = blocking_candidates(rec)
+    if blocked['missing']:
+        save_missing_diagnostics(blocked['missing'], records)
+    if blocked['unusable']:
+        save_unusable_diagnostics(blocked['unusable'], records, rec)
+    if any(blocked.values()):
+        _json(evidence / 'source_map.json', source_map)
+        code = 'missing_candidate' if blocked['missing'] else 'present_candidate_unusable'
+        raise SourceError(code, LEADERBOARD, ','.join(blocked['missing'] or blocked['unusable']))
     contributors = []
     muse = next(r for r in releases if r['url'] == MUSE)['records']
     # Same-family all available efforts with measured public cost must have
@@ -313,10 +334,9 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
             for model, effort in lost_efforts])
         raise SourceError('missing_candidate', MUSE, 'previous Contributor identities lost: ' +
                           ','.join(f'{model or "unknown-model"}/{effort}' for model, effort in lost_efforts))
-    _json(evidence / 'source_map.json', {'source_by_slug': included, 'excluded': excluded,
-                                          'availability': availability,
-                                          'contributor': contributors, 'inventory': {'slugs': sorted(included),
-                                                                                  'contributor_efforts': sorted(r['effort'] for r in contributors)}})
+    source_map['contributor'] = contributors
+    source_map['inventory']['contributor_efforts'] = sorted(r['effort'] for r in contributors)
+    _json(evidence / 'source_map.json', source_map)
     diagnostic = _diagnostic(evidence, version['benchmark_version'])
     _json(evidence / 'api_diagnostic.json', diagnostic)
     buf = io.StringIO(newline='')
@@ -330,10 +350,12 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
         f'Contributor rows; {len(excluded)} excluded/unknown. Version {version["benchmark_version"]} '
         'inferred, not declared on leaderboard; release pages match four exact score/cost pairs. '
         'API diagnostic does not determine public version. Contributor assumes cache-write is ordinary input; '
-        'limits and training are notes, not ranking factors.\n')
+        'limits and training are notes, not ranking factors.\n' +
+        '\n'.join(source_exit_caveats(records, rec)) + '\n')
     return {'benchmark': 'AA-Intelligence-Index', 'benchmark_version': version['benchmark_version'],
             'version_status': 'inferred', 'cost_basis': 'api', 'source_dates': [today],
             'caveats': ['Public leaderboard version inferred by two explicit release pages and four exact pairs; not API envelope',
-                        'Contributor GRADE-B derived; cache-write charged at ordinary input rate is an assumption'],
+                         'Contributor GRADE-B derived; cache-write charged at ordinary input rate is an assumption'] +
+                        source_exit_caveats(records, rec),
             'source_locator': {'kind': 'acquired', 'path': 'snapshot/candidates.csv',
                                'sha256': hashlib.sha256(data).hexdigest()}}

@@ -16,7 +16,9 @@ from bridge.html_report import render_html
 from bridge.inventory import InventoryError, validate_fresh_inventory
 from bridge.request import RequestError, decode_request, validate_request
 from bridge.result import calculate_snapshot, make_envelope, validate_envelope
-from scripts.refresh_snapshot import refresh_snapshot, fetch_public
+from bridge.source_policy import PolicyError, decode_refresh_policy
+from scripts.refresh_snapshot import refresh_snapshot, fetch_public, _previous_slugs
+from scripts.refresh_inventory import tracked_public_slugs
 
 
 class RunnerError(ValueError):
@@ -70,6 +72,64 @@ def _json(repo, sha, path):
 
 def _has_file(repo, sha, path):
     return bool(_git(repo, 'ls-tree', sha, '--', path))
+
+
+def _refresh_policy(repository, product_sha, *, approved_main_sha=None):
+    """Authorize original product against execution-start main; never infer policy from maps."""
+    _commit(repository, product_sha)
+    authority = (approved_main_sha if approved_main_sha is not None else
+                 _git(repository, 'rev-parse', '--verify', 'refs/bridge/approved-main').decode().strip())
+    _commit(repository, authority)
+    if not _ancestor(repository, product_sha, authority):
+        raise RunnerError('source_product_not_authorized')
+    path = 'bridge/refresh-policy.json'
+    data = _read(repository, product_sha, path) if _has_file(repository, product_sha, path) else None
+    try:
+        return decode_refresh_policy(data)
+    except PolicyError as exc:
+        raise RunnerError('invalid_refresh_policy') from exc
+
+
+def _inventory_evidence(repository, publication_sha, prefix):
+    return {name: _read(repository, publication_sha, prefix + 'snapshot/evidence/' + name)
+            for name in ('leaderboard.html', 'leaderboard_records.json', 'sources.json')}
+
+
+def _legacy_workflow_context(bootstrap, *, event_sha, ref_name):
+    """Repeat the authenticated bootstrap gate, read-only, for the old CLI wire.
+
+    These paths are workflow constants, not output/request-controlled locators.
+    Bootstrap HEAD is its fixed approved-main checkout, never a moving ref.
+    """
+    bootstrap = Path(bootstrap)
+    source = bootstrap.parent / 'product'
+    handoff = bootstrap.parent / 'handoff'
+    _commit(bootstrap, event_sha)
+    parents = _git(bootstrap, 'rev-list', '--parents', '-n', '1', event_sha).decode().split()
+    if len(parents) != 2:
+        raise RunnerError('invalid_request_parents')
+    product = parents[1]
+    main = _git(bootstrap, 'rev-parse', 'HEAD').decode().strip()
+    _commit(bootstrap, main)
+    if not _ancestor(bootstrap, product, main):
+        raise RunnerError('product_not_on_main')
+    identity = ref_name.removeprefix('efficiency-run/') if ref_name.startswith('efficiency-run/') else ''
+    if not UUID.fullmatch(identity):
+        raise RunnerError('invalid_event_ref')
+    path = 'bridge/requests/' + identity + '.json'
+    if _git(bootstrap, 'diff-tree', '--no-commit-id', '--name-status', '-r', event_sha).decode().splitlines() != ['A\t' + path]:
+        raise RunnerError('invalid_changed_paths')
+    raw = _read(bootstrap, event_sha, path)
+    request = decode_request(raw.decode('utf-8'))
+    validate_request(request, branch=ref_name, parent_sha=product, changed_paths=[('A', path)])
+    if (handoff / 'product.sha').read_text(encoding='ascii').strip().lower() != product.lower() or (
+            handoff / 'request.json').read_bytes() != raw:
+        raise RunnerError('invalid_product_handoff')
+    if _git(source, 'rev-parse', 'HEAD').decode().strip().lower() != product.lower():
+        raise RunnerError('product_context_mismatch')
+    if _refresh_policy(source, product, approved_main_sha=main) is not None:
+        raise RunnerError('legacy_workflow_requires_legacy_product')
+    return source, product, main
 
 
 def _atomic(path, data):
@@ -139,10 +199,13 @@ def _historical(repo, sha, path, data):
             ]}
 
 
-def _fresh_inventory(data, source_map, envelope, *, error_code):
+def _fresh_inventory(data, source_map, envelope, *, error_code, refresh_policy=None,
+                     evidence=None, expected_previous_slugs=None):
     """Preserve RunnerError at the Git read boundary; share reconciliation."""
     try:
-        validate_fresh_inventory(data, source_map, envelope, error_code=error_code)
+        validate_fresh_inventory(data, source_map, envelope, error_code=error_code,
+                                 refresh_policy=refresh_policy, evidence=evidence,
+                                 expected_previous_slugs=expected_previous_slugs)
     except InventoryError as exc:
         raise RunnerError(error_code) from exc
 
@@ -180,7 +243,10 @@ def materialize_snapshot(locator: dict, repository: Path, output: Path) -> tuple
         version = _json(repository, sha, prefix + 'snapshot/evidence/version.json')
         if version.get('benchmark_version') != envelope['benchmark_version']:
             raise RunnerError('result_version_mismatch')
-        _fresh_inventory(data, inventory, envelope, error_code='result_inventory_mismatch')
+        policy = _refresh_policy(repository, envelope['product_sha'])
+        proof = _inventory_evidence(repository, sha, prefix) if policy else None
+        _fresh_inventory(data, inventory, envelope, error_code='result_inventory_mismatch',
+                         refresh_policy=policy, evidence=proof)
         provenance = {key: envelope[key] for key in ('benchmark', 'benchmark_version',
                       'version_status', 'cost_basis', 'source_dates', 'caveats')}
     provenance['source_locator'] = dict(locator)
@@ -208,7 +274,7 @@ def _transport(repo, request, execution):
     return validated
 
 
-def _previous(repo, product_sha):
+def _previous(repo, product_sha, *, approved_main_sha=None):
     # Resolve results once; subsequent reads use only that exact object ID.
     ref = subprocess.run(['git', '-C', str(repo), 'rev-parse', '--verify', 'refs/heads/results'],
                          capture_output=True)
@@ -244,7 +310,10 @@ def _previous(repo, product_sha):
                                        'sha256': hashlib.sha256(data).hexdigest()}:
         raise RunnerError('invalid_latest_refresh_source')
     inventory = _json(repo, tip, prefix + 'snapshot/evidence/source_map.json')
-    _fresh_inventory(data, inventory, envelope, error_code='invalid_latest_refresh_inventory')
+    policy = _refresh_policy(repo, envelope['product_sha'], approved_main_sha=approved_main_sha)
+    proof = _inventory_evidence(repo, tip, prefix) if policy else None
+    _fresh_inventory(data, inventory, envelope, error_code='invalid_latest_refresh_inventory',
+                     refresh_policy=policy, evidence=proof)
     return inventory
 
 
@@ -269,8 +338,11 @@ def execute_request(request: dict, *, execution: dict, repository: Path,
     try:
         validated = _transport(repository, request, execution)
         if validated['operation'] == 'refresh':
+            policy = _refresh_policy(repository, execution['product_sha'])
+            previous = _previous(repository, execution['product_sha'])
+            expected = tracked_public_slugs(previous, _previous_slugs(previous)[0])
             provenance = refresh_snapshot(output / 'snapshot',
-                                          previous=_previous(repository, execution['product_sha']), fetch=fetch)
+                                          previous=previous, fetch=fetch)
             source_path = output / 'snapshot/candidates.csv'
         else:
             if validated['source_snapshot']['path'].startswith('runs/') and not _ancestor(
@@ -279,6 +351,13 @@ def execute_request(request: dict, *, execution: dict, repository: Path,
             source_path, provenance = materialize_snapshot(validated['source_snapshot'], repository, output)
         calculation, report = calculate_snapshot(source_path, validated['parameters'], provenance)
         envelope = make_envelope(validated, execution, calculation=calculation, errors=[])
+        if validated['operation'] == 'refresh':
+            evidence = output / 'snapshot/evidence'
+            proof = {name: (evidence / name).read_bytes() for name in
+                     ('leaderboard.html', 'leaderboard_records.json', 'sources.json')} if policy else None
+            _fresh_inventory(source_path.read_bytes(), json.loads((evidence / 'source_map.json').read_bytes()),
+                             envelope, error_code='invalid_refresh_inventory', refresh_policy=policy,
+                             evidence=proof, expected_previous_slugs=expected if policy else None)
         html = render_html(calculation)
         _atomic(output / 'report.md', report.encode('utf-8'))
         _atomic(output / 'report.html', html.encode('utf-8'))

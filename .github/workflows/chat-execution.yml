@@ -54,9 +54,11 @@ jobs:
           path: product
           fetch-depth: 0
           persist-credentials: false
-      - name: Materialize local read-only results ref
+      - name: Pin execution-start approved main and read-only results context
         if: steps.prepare.outcome == 'success'
         run: |
+          approved_main=$(git -C product rev-parse --verify 'refs/remotes/origin/main^{commit}')
+          git -C product update-ref refs/bridge/approved-main "$approved_main"
           if git -C product show-ref --verify --quiet refs/remotes/origin/results; then
             git -C product update-ref refs/heads/results refs/remotes/origin/results
           fi
@@ -110,7 +112,8 @@ jobs:
               --run-attempt "$RUN_ATTEMPT" --output ../output
           fi
           publication=$(python3 -m bridge.publish --output ../output \
-            --remote "https://github.com/$REPOSITORY.git")
+            --remote "https://github.com/$REPOSITORY.git" \
+            --source-repository ../product --product-sha-file ../handoff/product.sha)
           echo "sha=$publication" >> "$GITHUB_OUTPUT"
           echo "Request: ${REQUEST_ID:-$REQUEST_REF}" >> "$GITHUB_STEP_SUMMARY"
           echo "Run: ${{ github.run_id }} attempt ${{ github.run_attempt }}" >> "$GITHUB_STEP_SUMMARY"

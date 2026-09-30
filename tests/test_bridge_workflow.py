@@ -15,6 +15,12 @@ def git(repo, *args):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_workflow_pins_main_and_transmits_verified_publication_context(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/chat-execution.yml').read_text()
+        self.assertIn('refs/remotes/origin/main^{commit}', workflow)
+        self.assertIn('update-ref refs/bridge/approved-main', workflow)
+        self.assertIn('--source-repository ../product --product-sha-file ../handoff/product.sha', workflow)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

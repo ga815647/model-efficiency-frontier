@@ -11,6 +11,7 @@ from scripts.meta_pricing import parse_meta_pricing, rescale_contributor
 from scripts.meta_availability import parse_meta_models, unavailable_reason, MODELS_URL
 from scripts.refresh_snapshot import refresh_snapshot, _diagnostic
 from scripts.refresh_snapshot import _model_effort
+from scripts.refresh_inventory import classify_record
 
 ROOT = Path(__file__).resolve().parents[1]
 FIX = ROOT / 'tests/fixtures/refresh'
@@ -26,6 +27,84 @@ def flight_record(raw):
 
 
 class RefreshSourcesTest(unittest.TestCase):
+    def test_current_minimized_fixture_provenance_and_exact_primary_values(self):
+        import hashlib
+        from refresh_inventory_fixtures import GPT_ENTRIES
+        raw = (FIX / 'current-inventory-2026-09-30-flight.html').read_bytes()
+        provenance = json.loads((FIX / 'current-inventory-2026-09-30.json').read_text())
+        self.assertEqual(provenance['fixture_sha256'], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(provenance['publication'], 'ef77e1fff6980164aac5c0610ead7eff26bcd671')
+        self.assertEqual(provenance['run'], '36666859368-1')
+        records = {r['slug']: r for r in parse_leaderboard(raw.decode())}
+        for slug, effort, score, cost in GPT_ENTRIES:
+            with self.subTest(slug=slug):
+                self.assertEqual(records[slug]['score'], Decimal(score))
+                self.assertEqual(records[slug]['cost_per_task'], Decimal(cost))
+                self.assertEqual(records[slug]['creator'], 'OpenAI')
+                self.assertIs(records[slug]['deprecated'], False)
+                self.assertIn('(' + effort + ')', records[slug]['name'])
+        self.assertIs(records['inkling']['deprecated'], False)
+        self.assertIs(records['minimax-m2-7']['deprecated'], True)
+
+    def test_fresh_current_inventory_succeeds_without_old_cost(self):
+        from refresh_inventory_fixtures import refresh_pages, GPT_ENTRIES
+        pages = refresh_pages()
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'fresh'
+            prov = refresh_snapshot(dest, previous={'slugs': ['inkling', 'minimax-m2-7']}, fetch=pages.__getitem__)
+            with (dest / 'candidates.csv').open(newline='') as stream:
+                rows = list(csv.DictReader(stream))
+            public = {r['model_version'] for r in rows if r['pricing_plan'] != 'Contributor'}
+            self.assertTrue({entry[0] for entry in GPT_ENTRIES}.issubset(public))
+            self.assertFalse({'inkling', 'minimax-m2-7'} & public)
+            rec = json.loads((dest / 'evidence/source_map.json').read_text())['reconciliation']
+            self.assertIn('inkling', rec['tracked_slugs'])
+            self.assertNotIn('minimax-m2-7', rec['tracked_slugs'])
+            self.assertTrue(any('未沿用舊價' in c for c in prov['caveats']))
+
+    def test_tracking_next_refresh_and_precise_blocking_diagnostics(self):
+        from refresh_inventory_fixtures import refresh_pages, flight
+        pages = refresh_pages()
+        records = parse_leaderboard(pages[URLS['leader']].decode())
+        for change in ('retired_absent', 'tracked_absent', 'restored', 'estimated', 'both'):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
+                current = [dict(r) for r in records if not (change in ('retired_absent', 'both') and r['slug'] == 'minimax-m2-7')]
+                if change in ('tracked_absent', 'both'):
+                    current = [r for r in current if r['slug'] != 'inkling']
+                if change in ('restored', 'estimated'):
+                    item = next(r for r in current if r['slug'] == 'inkling')
+                    item['cost_per_task'] = Decimal('1')
+                    item['is_estimated'] = change == 'estimated'
+                data = dict(pages, **{})
+                data[URLS['leader']] = flight(current)
+                dest = Path(temp) / 'snapshot'
+                previous = {'slugs': ['inkling']}
+                if change in ('tracked_absent', 'estimated', 'both'):
+                    with self.assertRaises(SourceError) as caught:
+                        refresh_snapshot(dest, previous=previous, fetch=data.__getitem__)
+                    self.assertEqual(caught.exception.code, 'present_candidate_unusable' if change == 'estimated' else 'missing_candidate')
+                    artifact = 'unusable_candidates.json' if change == 'estimated' else 'missing_candidates.json'
+                    self.assertTrue((dest / 'evidence' / artifact).exists())
+                    self.assertTrue((dest / 'evidence/source_map.json').exists())
+                else:
+                    refresh_snapshot(dest, previous=previous, fetch=data.__getitem__)
+
+    def test_missing_and_unusable_failures_both_preserve_precise_evidence(self):
+        from refresh_inventory_fixtures import refresh_pages, flight
+        pages = refresh_pages()
+        records = parse_leaderboard(pages[URLS['leader']].decode())
+        next(r for r in records if r['slug'] == 'inkling')['is_estimated'] = True
+        pages[URLS['leader']] = flight(records)
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'snapshot'
+            with self.assertRaises(SourceError) as caught:
+                refresh_snapshot(dest, previous={'slugs': ['absent', 'inkling']}, fetch=pages.__getitem__)
+            self.assertEqual(caught.exception.code, 'missing_candidate')
+            missing = json.loads((dest / 'evidence/missing_candidates.json').read_text())
+            unusable = json.loads((dest / 'evidence/unusable_candidates.json').read_text())
+            self.assertEqual([r['slug'] for r in missing], ['absent'])
+            self.assertEqual([(r['slug'], r['reason']) for r in unusable], [('inkling', 'estimated')])
+
     def test_deprecated_accepts_only_optional_boolean(self):
         base = {'slug': 'inkling', 'name': 'Inkling (xhigh)', 'shortName': 'Inkling',
                 'modelCreatorName': 'Thinking Machines', 'intelligenceIndex': 24.9847810999384,
@@ -91,7 +170,8 @@ class RefreshSourcesTest(unittest.TestCase):
             refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
             with (dest / 'candidates.csv').open() as stream:
                 rows = list(csv.DictReader(stream))
-            self.assertEqual(len(rows), 154)
+            self.assertEqual(len(rows), sum(classify_record(r)['state'] == 'usable_paid'
+                                          for r in parse_leaderboard(data[URLS['leader']].decode())) + 1)
             self.assertEqual([r['effort'] for r in rows if r['pricing_plan'] == 'Contributor'], ['xhigh'])
             self.assertTrue(any(r['effort'] == 'max' and r['pricing_plan'] == 'published-price' for r in rows))
             audit = json.loads((dest / 'evidence/availability.json').read_text())
@@ -102,13 +182,14 @@ class RefreshSourcesTest(unittest.TestCase):
             self.assertEqual((dest / 'evidence/models.html').read_bytes(), data[MODELS_URL])
             self.assertEqual(len(json.loads((dest / 'evidence/sources.json').read_text())['sha256_by_url']), 5)
 
-    def test_previous_max_retirement_audit_survives_unrelated_paid_cost_loss(self):
+    def test_previous_max_retirement_audit_survives_unrelated_missing_candidate(self):
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
         before = data[URLS['leader']]
         data[URLS['leader']] = before.replace(b'intelligenceIndexCostPerTask\\":0.4637245706928438',
                                                b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
         self.assertNotEqual(before, data[URLS['leader']])
         archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        archived['source_by_slug']['actually-missing'] = {}
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / 'snapshot'
             with self.assertRaises(SourceError) as caught:
@@ -223,8 +304,8 @@ class RefreshSourcesTest(unittest.TestCase):
             dest = Path(temp) / 'snapshot'
             refresh_snapshot(dest, previous=None, fetch=data.__getitem__)
             excluded = json.loads((dest / 'free-sidecar.json').read_text())['excluded_non_paid_or_unusable']
-            self.assertTrue(any(r['reason'] == 'missing_score_or_cost' for r in excluded))
-            self.assertIn({'slug': 'apodex-1-1', 'name': 'Apodex 1.1', 'reason': 'missing_score_or_cost'}, excluded)
+            self.assertTrue(any(r['reason'] == 'missing_task_cost' for r in excluded))
+            self.assertIn({'slug': 'apodex-1-1', 'name': 'Apodex 1.1', 'reason': 'missing_task_cost'}, excluded)
             self.assertFalse(any(r['reason'] == 'zero_cost' and r['slug'] == 'apodex-1-1' for r in excluded))
 
     def test_bad_scalar_fields_fail_with_slug_and_field(self):
@@ -293,36 +374,33 @@ class RefreshSourcesTest(unittest.TestCase):
         self.assertEqual(caught.exception.code, 'invalid_measurement')
         self.assertIn('grok-4-7-high: intelligenceIndexCostPerTask', str(caught.exception))
 
-    def test_undefined_prior_paid_cost_blocks_and_keeps_diagnostic(self):
+    def test_missing_prior_paid_score_blocks_and_keeps_diagnostic(self):
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
         before = data[URLS['leader']]
-        data[URLS['leader']] = before.replace(b'intelligenceIndexCostPerTask\\":0.4637245706928438',
-                                              b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
+        data[URLS['leader']] = before.replace(b'intelligenceIndex\\":26.4103686249117',
+                                              b'intelligenceIndex\\":\\"$undefined\\"', 1)
         self.assertNotEqual(before, data[URLS['leader']])
         archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / 'snapshot'
             with self.assertRaises(SourceError) as caught:
                 refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
-            self.assertEqual(caught.exception.code, 'missing_candidate')
-            missing = json.loads((dest / 'evidence/missing_candidates.json').read_text())
-            self.assertTrue(any(r['leaderboard_source_check']['cost_per_task'] is None for r in missing))
+            self.assertEqual(caught.exception.code, 'present_candidate_unusable')
+            missing = json.loads((dest / 'evidence/unusable_candidates.json').read_text())
+            self.assertTrue(any(r['record']['score'] is None and r['reason'] == 'missing_score' for r in missing))
             self.assertFalse((dest / 'candidates.csv').exists())
 
-    def test_saved_two_paid_missing_costs_block_without_host_fixture(self):
+    def test_saved_two_paid_missing_costs_are_disclosed_without_stale_prices(self):
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in ('grok', 'muse', 'meta', 'models')}
         data[URLS['leader']] = (FIX / 'failed-two-costs-flight.html').read_bytes()
         previous = {'slugs': ['inkling', 'minimax-m2-7']}
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / 'snapshot'
-            with self.assertRaises(SourceError) as caught:
-                refresh_snapshot(dest, previous=previous, fetch=data.__getitem__)
-            self.assertEqual(caught.exception.code, 'missing_candidate')
-            self.assertIn('inkling,minimax-m2-7', str(caught.exception))
-            missing = json.loads((dest / 'evidence/missing_candidates.json').read_text())
-            self.assertEqual({r['slug'] for r in missing}, {'inkling', 'minimax-m2-7'})
-            self.assertTrue(all(r['leaderboard_source_check']['cost_per_task'] is None for r in missing))
-            self.assertFalse((dest / 'candidates.csv').exists())
+            provenance = refresh_snapshot(dest, previous=previous, fetch=data.__getitem__)
+            self.assertEqual(len([c for c in provenance['caveats'] if '未沿用舊價' in c]), 2)
+            mapping = json.loads((dest / 'evidence/source_map.json').read_text())
+            self.assertFalse({'inkling', 'minimax-m2-7'} & set(mapping['inventory']['slugs']))
+            self.assertTrue((dest / 'candidates.csv').exists())
 
     def test_real_flight_and_version(self):
         rows = parse_leaderboard((FIX / 'leader.html').read_text())
@@ -426,7 +504,8 @@ class RefreshSourcesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             refresh_snapshot(Path(temp) / 'snapshot', previous=None, fetch=data.__getitem__)
             sidecar = json.loads((Path(temp) / 'snapshot/free-sidecar.json').read_text())
-            self.assertEqual(len([x for x in sidecar['excluded_non_paid_or_unusable'] if x['reason'] == 'zero_cost']), 4)
+            self.assertEqual(len([x for x in sidecar['excluded_non_paid_or_unusable'] if x['reason'] == 'zero_cost']),
+                             sum(classify_record(r)['reason'] == 'zero_cost' for r in rows))
 
     def test_api_envelopes_drift_separately_from_public(self):
         class Response:
@@ -506,18 +585,18 @@ class RefreshSourcesTest(unittest.TestCase):
             self.assertIn('pending', row['model_and_index_check'].lower())
             self.assertFalse((dest / 'candidates.csv').exists())
 
-    def test_prior_paid_model_losing_cost_key_blocks_publication(self):
+    def test_prior_paid_model_losing_score_blocks_publication(self):
         archived = json.loads((ROOT / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
         data = {URLS[k]: (FIX / k).with_suffix('.html').read_bytes() for k in URLS}
         data[URLS['leader']] = data[URLS['leader']].replace(
-            b'intelligenceIndexCostPerTask\\":0.4637245706928438',
-            b'intelligenceIndexCostPerTask_REMOVED\\":0.4637245706928438', 1)
+            b'intelligenceIndex\\":26.4103686249117',
+            b'intelligenceIndex\\":null', 1)
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / 'snapshot'
             with self.assertRaises(SourceError) as caught:
                 refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
-            self.assertEqual(caught.exception.code, 'missing_candidate')
-            self.assertTrue((dest / 'evidence/missing_candidates.json').exists())
+            self.assertEqual(caught.exception.code, 'present_candidate_unusable')
+            self.assertTrue((dest / 'evidence/unusable_candidates.json').exists())
             self.assertFalse((dest / 'candidates.csv').exists())
 
     def test_fresh_fixture_provenance(self):
@@ -537,11 +616,12 @@ class RefreshSourcesTest(unittest.TestCase):
             refresh_snapshot(dest, previous=archived, fetch=data.__getitem__)
             with (dest / 'candidates.csv').open() as stream:
                 rows = list(csv.DictReader(stream))
-            self.assertEqual(len(rows), 154)
+            self.assertEqual(len(rows), sum(classify_record(r)['state'] == 'usable_paid'
+                                          for r in parse_leaderboard(data[URLS['leader']].decode())) + 1)
             self.assertEqual(len([r for r in rows if r['effort'] in ("Jan '25", '0902', 'June 2026')]), 0)
             self.assertTrue(all(r['model_version'] for r in rows))
             excluded = json.loads((dest / 'free-sidecar.json').read_text())['excluded_non_paid_or_unusable']
-            self.assertTrue(any(row['reason'] == 'missing_score_or_cost' for row in excluded))
+            self.assertTrue(any(row['reason'] in ('missing_score', 'missing_task_cost') for row in excluded))
 
 
 if __name__ == '__main__':

@@ -12,6 +12,7 @@ from bridge.runner import _previous
 from bridge.runner import execute_request
 from test_bridge_request import request_data
 from test_bridge_result import SNAPSHOT, PARAMETERS, PROVENANCE
+from refresh_inventory_fixtures import product_context
 
 
 def git(repo, *args):
@@ -19,6 +20,263 @@ def git(repo, *args):
 
 
 class PublishTests(unittest.TestCase):
+    def test_success_refresh_requires_trusted_context(self):
+        output, _ = self.valid_refresh_output()
+        with self.assertRaisesRegex(PublishError, 'missing_trusted_product_context'):
+            publish_result(output, remote=str(self.remote))
+
+    def test_new_inventory_requires_complete_proof_and_handoff_equality(self):
+        from refresh_inventory_fixtures import product_context, refresh_pages
+        from scripts.refresh_snapshot import refresh_snapshot
+        from bridge.publish import _output_files
+        previous = {'slugs': ['inkling', 'minimax-m2-7']}
+        context = product_context(self.base, previous, new_policy=True)
+        output = self.base / 'new-proof'
+        output.mkdir()
+        provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=refresh_pages().__getitem__)
+        calculation, report = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
+        req = dict(request_data(), product_sha=context[1])
+        execution = dict(request_commit_sha=context[1], run_id='new-proof', run_attempt=1,
+                         run_url='https://github.com/example/actions/runs/new-proof')
+        envelope = make_envelope(req, execution, calculation=calculation, errors=[])
+        (output / 'result.json').write_text(json.dumps(envelope))
+        (output / 'report.md').write_text(report)
+        (output / 'report.html').write_text('<title>Report</title>')
+        kwargs = dict(source_repository=context[0], trusted_product_sha=context[1])
+        _output_files(output, **kwargs)
+        for name in ('leaderboard.html', 'leaderboard_records.json', 'sources.json'):
+            path = output / 'snapshot/evidence' / name
+            saved = path.read_bytes()
+            path.unlink()
+            with self.subTest(name=name), self.assertRaises(PublishError):
+                _output_files(output, **kwargs)
+            path.write_bytes(saved)
+        for name in ('leaderboard.html', 'leaderboard_records.json', 'sources.json'):
+            path = output / 'snapshot/evidence' / name
+            saved = path.read_bytes()
+            if name == 'leaderboard.html':
+                path.write_bytes(saved.replace(b'51.8332597011541', b'51.8332597011542'))
+            else:
+                parsed = json.loads(saved)
+                if name == 'leaderboard_records.json':
+                    parsed[0]['deprecated'] = True
+                else:
+                    from scripts.aa_public import LEADERBOARD
+                    parsed['sha256_by_url'][LEADERBOARD] = '0' * 64
+                path.write_text(json.dumps(parsed))
+            with self.subTest(tampered=name), self.assertRaises(PublishError):
+                _output_files(output, **kwargs)
+            path.write_bytes(saved)
+        path = output / 'snapshot/evidence/source_map.json'
+        saved = path.read_bytes()
+        mapping = json.loads(saved)
+        del mapping['reconciliation']
+        path.write_text(json.dumps(mapping))
+        with self.assertRaises(PublishError):
+            _output_files(output, **kwargs)
+        path.write_bytes(saved)
+        envelope['product_sha'] = 'a' * 40
+        (output / 'result.json').write_text(json.dumps(envelope))
+        with self.assertRaisesRegex(PublishError, 'product_context_mismatch'):
+            _output_files(output, **kwargs)
+
+    def test_queued_legacy_publication_validates_newer_original_product(self):
+        from refresh_inventory_fixtures import refresh_pages
+        from scripts.refresh_snapshot import refresh_snapshot
+        import shutil
+        from bridge.runner import materialize_snapshot
+        from bridge.publish import _output_files
+        output, harness = self.valid_refresh_output()
+        repo, a = harness.repo, harness.product
+        git(repo, 'checkout', '-q', '--detach', a)
+        marker = repo / 'bridge/refresh-policy.json'
+        marker.parent.mkdir(exist_ok=True)
+        marker.write_text('{"policy":"observed-inventory-v1"}')
+        (repo / 'runs/2026-09-26-general-grok16/public_candidate_source_map.json').write_text(
+            json.dumps({'slugs': ['inkling', 'minimax-m2-7']}))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'approved newer B')
+        b = git(repo, 'rev-parse', 'HEAD')
+        git(repo, 'update-ref', 'refs/bridge/approved-main', b)
+        # The released old workflow checks out newer main as bootstrap, verifies
+        # authenticated transport, and uses the original no-new-flags CLI.
+        bootstrap = self.base / 'bootstrap'
+        git(self.base, 'clone', '-q', str(repo), str(bootstrap))
+        git(bootstrap, 'checkout', '-q', '--detach', b)
+        git(bootstrap, 'config', 'user.name', 'Fixture')
+        git(bootstrap, 'config', 'user.email', 'fixture@example.com')
+        git(bootstrap, 'checkout', '-q', '--detach', a)
+        request = dict(request_data(), product_sha=a)
+        request_path = bootstrap / 'bridge/requests' / (request['request_id'] + '.json')
+        request_path.parent.mkdir(parents=True, exist_ok=True)
+        request_path.write_text(json.dumps(request))
+        git(bootstrap, 'add', '.')
+        git(bootstrap, 'commit', '-qm', 'authenticated queued A request')
+        event = git(bootstrap, 'rev-parse', 'HEAD')
+        git(bootstrap, 'checkout', '-q', '--detach', b)
+        from bridge.runner import verify_transport
+        handoff = self.base / 'handoff/product.sha'
+        self.assertTrue(verify_transport(bootstrap, event_sha=event,
+            ref_name='efficiency-run/' + request['request_id'], run_id='777', run_attempt=1,
+            output=self.base / 'prepare-output', product_sha_file=handoff))
+        result_path = output / 'result.json'
+        legacy_envelope = json.loads(result_path.read_text())
+        legacy_envelope['request_commit_sha'] = event
+        result_path.write_text(json.dumps(legacy_envelope))
+        # B itself passes actual five-source acquisition/publication validation,
+        # not merely an inventory-unit fixture masquerading as a publication.
+        git(repo, 'branch', '-D', 'results')
+        fresh_request = dict(request_data(), product_sha=b)
+        path = repo / 'bridge/requests' / (fresh_request['request_id'] + '.json')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(fresh_request))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'B refresh request')
+        fresh_execution = dict(request_commit_sha=git(repo, 'rev-parse', 'HEAD'), run_id='B-fresh', run_attempt=1,
+                               run_url='https://github.com/example/actions/runs/B-fresh')
+        fresh = self.base / 'B-output'
+        fresh.mkdir()
+        prov = refresh_snapshot(fresh / 'snapshot', previous={'slugs': ['inkling', 'minimax-m2-7']},
+                                fetch=refresh_pages().__getitem__)
+        calculation, report = calculate_snapshot(fresh / 'snapshot/candidates.csv', PARAMETERS, prov)
+        envelope = make_envelope(fresh_request, fresh_execution, calculation=calculation, errors=[])
+        (fresh / 'result.json').write_text(json.dumps(envelope))
+        (fresh / 'report.md').write_text(report)
+        (fresh / 'report.html').write_text('<title>B fresh</title>')
+        _output_files(fresh, source_repository=repo, trusted_product_sha=b)
+        data = (fresh / 'snapshot/candidates.csv').read_bytes()
+        mapping = json.loads((fresh / 'snapshot/evidence/source_map.json').read_text())
+        target = f'results/{envelope["request_id"]}/{envelope["run_id"]}-1'
+        git(repo, 'checkout', '-q', '-B', 'results', b)
+        dest = repo / target
+        shutil.copytree(fresh, dest)
+        (repo / 'latest-refresh.json').write_text(json.dumps(dict(result_path=target + '/result.json',
+            request_commit_sha=envelope['request_commit_sha'])))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'fixed B refresh predecessor')
+        publication = git(repo, 'rev-parse', 'HEAD')
+        git(repo, 'checkout', '-q', '--detach', a)
+        self.assertEqual(_previous(repo, a)['reconciliation'], json.loads(json.dumps(mapping['reconciliation'])))
+        locator = dict(commit=publication, path=target + '/snapshot/candidates.csv')
+        path, provenance = materialize_snapshot(locator, repo, self.base / 'B-materialized')
+        self.assertEqual(path.read_bytes(), data)
+        self.assertTrue(any('未沿用舊價' in caveat for caveat in provenance['caveats']))
+        # Handoff remains A; B is authorized only as the original predecessor product.
+        tip = publish_result(output, remote=str(self.remote), source_repository=repo, trusted_product_sha=a)
+        self.assertEqual(json.loads(git(self.remote, 'show', tip + ':' + f'results/{request_data()["request_id"]}/777-1/result.json'))['product_sha'], a)
+        git(repo, 'checkout', '-q', 'results')
+        (repo / target / 'snapshot/evidence/leaderboard.html').unlink()
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'missing new proof')
+        git(repo, 'checkout', '-q', '--detach', a)
+        with self.assertRaises(PublishError):
+            _output_files(output, source_repository=repo, trusted_product_sha=a)
+        # Restore complete B proof; old product checkout has no new authority ref.
+        git(repo, 'update-ref', 'refs/heads/results', publication)
+        git(repo, 'update-ref', '-d', 'refs/bridge/approved-main')
+        product = self.base / 'product'
+        repo.rename(product)
+        from bridge.publish import main
+        import os
+        old_cwd = Path.cwd()
+        try:
+            os.chdir(bootstrap)
+            env = dict(EVENT_SHA=event, EVENT_REF='efficiency-run/' + request['request_id'])
+            with patch.dict('os.environ', env):
+                self.assertEqual(main(['--output', str(output), '--remote', str(self.remote)]), 0)
+                legacy_envelope['request_commit_sha'] = a
+                result_path.write_text(json.dumps(legacy_envelope))
+                with self.assertRaisesRegex(PublishError, 'event_result_mismatch'):
+                    main(['--output', str(output), '--remote', str(self.remote)])
+                legacy_envelope['request_commit_sha'] = event
+                result_path.write_text(json.dumps(legacy_envelope))
+                # Neither an envelope SHA nor intact files replace verified transport.
+                with patch.dict('os.environ', {'EVENT_SHA': '0' * 40}):
+                    with self.assertRaises(PublishError):
+                        main(['--output', str(output), '--remote', str(self.remote)])
+                with patch.dict('os.environ', {'EVENT_REF': 'efficiency-run/not-a-uuid'}):
+                    with self.assertRaises(PublishError):
+                        main(['--output', str(output), '--remote', str(self.remote)])
+                request_handoff = self.base / 'handoff/request.json'
+                saved_request = request_handoff.read_bytes()
+                request_handoff.unlink()
+                with self.assertRaises(PublishError):
+                    main(['--output', str(output), '--remote', str(self.remote)])
+                request_handoff.write_bytes(saved_request)
+                handoff.write_text('0' * 40)
+                with self.assertRaises(PublishError):
+                    main(['--output', str(output), '--remote', str(self.remote)])
+        finally:
+            os.chdir(old_cwd)
+
+    def test_old_cli_cannot_downgrade_verified_new_product(self):
+        from bridge.runner import verify_transport
+        from bridge.publish import main
+        import os
+        bootstrap, b = product_context(self.base, {'slugs': []}, new_policy=True)
+        product = self.base / 'product'
+        git(self.base, 'clone', '-q', str(bootstrap), str(product))
+        request = dict(request_data(), product_sha=b)
+        path = bootstrap / 'bridge/requests' / (request['request_id'] + '.json')
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(request))
+        git(bootstrap, 'add', '.')
+        git(bootstrap, 'commit', '-qm', 'verified new request')
+        event = git(bootstrap, 'rev-parse', 'HEAD')
+        git(bootstrap, 'checkout', '-q', '--detach', b)
+        self.assertTrue(verify_transport(bootstrap, event_sha=event,
+            ref_name='efficiency-run/' + request['request_id'], run_id='777', run_attempt=1,
+            output=self.base / 'prepare', product_sha_file=self.base / 'handoff/product.sha'))
+        output, _ = self.valid_refresh_output()
+        envelope = json.loads((output / 'result.json').read_text())
+        envelope.update(product_sha=b, request_commit_sha=event)
+        (output / 'result.json').write_text(json.dumps(envelope))
+        old_cwd = Path.cwd()
+        try:
+            os.chdir(bootstrap)
+            with patch.dict('os.environ', dict(EVENT_SHA=event, EVENT_REF='efficiency-run/' + request['request_id'])):
+                with self.assertRaisesRegex(PublishError, 'missing_trusted_product_context'):
+                    main(['--output', str(output), '--remote', str(self.remote)])
+        finally:
+            os.chdir(old_cwd)
+
+    def test_publication_cli_validates_ascii_handoff_and_early_failure(self):
+        from bridge.publish import main
+        output, _ = self.output(status='failed')
+        missing = self.base / 'missing.sha'
+        argv = ['--output', str(output), '--remote', str(self.remote),
+                '--source-repository', str(self.base / 'missing-product'), '--product-sha-file', str(missing)]
+        self.assertEqual(main(argv), 0)
+        for raw in (b'not-a-sha', b'\xff', b'a' * 39):
+            missing.write_bytes(raw)
+            with self.subTest(raw=raw), self.assertRaisesRegex(PublishError, 'invalid_product_handoff'):
+                main(argv)
+
+    def test_present_unusable_failure_still_requires_complete_models_proof(self):
+        from refresh_inventory_fixtures import refresh_pages, flight
+        from scripts.refresh_snapshot import refresh_snapshot
+        from scripts.aa_public import SourceError, LEADERBOARD, parse_leaderboard
+        pages = refresh_pages()
+        records = parse_leaderboard(pages[LEADERBOARD].decode())
+        next(r for r in records if r['slug'] == 'inkling')['is_estimated'] = True
+        pages[LEADERBOARD] = flight(records)
+        output = self.base / 'unusable-failure'
+        output.mkdir()
+        with self.assertRaises(SourceError) as caught:
+            refresh_snapshot(output / 'snapshot', previous={'slugs': ['inkling']}, fetch=pages.__getitem__)
+        self.assertEqual(caught.exception.code, 'present_candidate_unusable')
+        execution = dict(request_commit_sha='b' * 40, run_id='unusable', run_attempt=1,
+                         run_url='https://github.com/example/actions/runs/unusable')
+        (output / 'result.json').write_text(json.dumps(make_envelope(request_data(), execution,
+            calculation=None, errors=[dict(code=caught.exception.code, message=str(caught.exception))])))
+        # Valid late diagnostic is appendable, including its new artifact.
+        tip = publish_result(output, remote=str(self.remote))
+        self.assertIn('unusable_candidates.json', git(self.remote, 'ls-tree', '-r', '--name-only', tip))
+        (output / 'snapshot/evidence/models.html').unlink()
+        with self.assertRaisesRegex(PublishError, 'missing_capability_evidence'):
+            publish_result(output, remote=str(self.remote))
+
+
     def test_late_missing_candidate_cannot_publish_without_proof_or_with_unparsed_models(self, make_api=make_envelope):
         from test_refresh_sources import FIX, URLS
         from scripts.refresh_snapshot import refresh_snapshot
@@ -30,6 +288,7 @@ class PublishTests(unittest.TestCase):
         self.assertNotEqual(before, pages[URLS['leader']])
         previous = json.loads((Path(__file__).resolve().parents[1] /
                               'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        previous['source_by_slug']['actually-missing'] = {}
         for removed in ('all_proof', 'leave_unparsed_models', 'untrusted_operation'):
             with self.subTest(removed=removed):
                 output = self.base / ('late-' + removed)
@@ -116,6 +375,7 @@ class PublishTests(unittest.TestCase):
         self.assertNotEqual(before, pages[URLS['leader']])
         previous = json.loads((Path(__file__).resolve().parents[1] /
                               'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
+        previous['source_by_slug']['actually-missing'] = {}
         for tamper in ('models', 'hash', 'audit_identity', 'partial', 'missing_audit'):
             with self.subTest(tamper=tamper):
                 output = self.base / ('failed-proof-' + tamper)
@@ -158,9 +418,10 @@ class PublishTests(unittest.TestCase):
                               'runs/2026-09-26-general-grok16/public_candidate_source_map.json').read_text())
         output = self.base / 'forged-success-retirement'
         output.mkdir()
+        context = product_context(self.base, previous, new_policy=True)
         provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=pages.__getitem__)
         calculation, _ = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
-        req = dict(request_data(), operation='refresh')
+        req = dict(request_data(), operation='refresh', product_sha=context[1])
         execution = {'request_commit_sha': 'b' * 40, 'run_id': '802', 'run_attempt': 1,
                      'run_url': 'https://github.com/example/actions/runs/802'}
         (output / 'result.json').write_text(json.dumps(make_envelope(req, execution, calculation=calculation, errors=[])))
@@ -175,7 +436,7 @@ class PublishTests(unittest.TestCase):
         mapping['availability'] = audit
         (evidence / 'source_map.json').write_text(json.dumps(mapping))
         with self.assertRaises(PublishError):
-            publish_result(output, remote=str(self.remote))
+            publish_result(output, remote=str(self.remote), source_repository=context[0], trusted_product_sha=context[1])
 
     def test_actual_five_source_refresh_and_failed_missing_cost_are_publishable(self):
         from test_refresh_sources import FIX, URLS
@@ -195,9 +456,14 @@ class PublishTests(unittest.TestCase):
                                                           b'intelligenceIndexCostPerTask\\":\\"$undefined\\"', 1)
                     self.assertNotEqual(source[URLS['leader']], before)
                 req = dict(request_data(), operation='refresh')
+                context_base = self.base / ('context-' + run)
+                context_base.mkdir()
+                context = product_context(context_base, previous, new_policy=True)
+                req['product_sha'] = context[1]
                 execution = {'request_commit_sha': 'b' * 40, 'run_id': run, 'run_attempt': 1,
                              'run_url': 'https://github.com/example/actions/runs/' + run}
                 if missing:
+                    previous = dict(previous, source_by_slug=dict(previous['source_by_slug'], **{'actually-missing': {}}))
                     with self.assertRaises(SourceError) as caught:
                         refresh_snapshot(output / 'snapshot', previous=previous, fetch=source.__getitem__)
                     self.assertEqual(caught.exception.code, 'missing_candidate')
@@ -206,13 +472,17 @@ class PublishTests(unittest.TestCase):
                 else:
                     provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=source.__getitem__)
                     calculation, report = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
-                    self.assertEqual(calculation['candidate_count'], 154)
-                    self.assertEqual(len(calculation['candidate_statuses']), 154)
+                    from scripts.aa_public import parse_leaderboard
+                    from scripts.refresh_inventory import classify_record
+                    count = sum(classify_record(r)['state'] == 'usable_paid'
+                                for r in parse_leaderboard(source[URLS['leader']].decode())) + 1
+                    self.assertEqual(calculation['candidate_count'], count)
+                    self.assertEqual(len(calculation['candidate_statuses']), count)
                     result = make_envelope(req, execution, calculation=calculation, errors=[])
                     (output / 'report.md').write_text(report)
                     (output / 'report.html').write_text('<!doctype html><title>Report</title>')
                 (output / 'result.json').write_text(json.dumps(result))
-                tip = publish_result(output, remote=str(self.remote))
+                tip = publish_result(output, remote=str(self.remote), source_repository=context[0], trusted_product_sha=context[1])
                 target = f'results/{req["request_id"]}/{run}-1'
                 self.assertEqual(json.loads(git(self.remote, 'show', f'{tip}:{target}/result.json'))['status'],
                                  'failed' if missing else 'success')
@@ -233,9 +503,12 @@ class PublishTests(unittest.TestCase):
             with self.subTest(tamper=tamper):
                 output = self.base / ('tampered-' + tamper)
                 output.mkdir()
+                context_base = self.base / ('tampered-context-' + tamper)
+                context_base.mkdir()
+                context = product_context(context_base, {'slugs': []}, new_policy=True)
                 provenance = refresh_snapshot(output / 'snapshot', previous=None, fetch=pages.__getitem__)
                 calculation, _ = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
-                req = dict(request_data(), operation='refresh')
+                req = dict(request_data(), operation='refresh', product_sha=context[1])
                 execution = {'request_commit_sha': 'b' * 40, 'run_id': '701', 'run_attempt': 1,
                              'run_url': 'https://github.com/example/actions/runs/701'}
                 (output / 'result.json').write_text(json.dumps(make_envelope(
@@ -260,7 +533,7 @@ class PublishTests(unittest.TestCase):
                         source_map['availability'] = audit
                         (evidence / 'source_map.json').write_text(json.dumps(source_map))
                 with self.assertRaises(PublishError):
-                    publish_result(output, remote=str(self.remote))
+                    publish_result(output, remote=str(self.remote), source_repository=context[0], trusted_product_sha=context[1])
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -268,6 +541,12 @@ class PublishTests(unittest.TestCase):
         self.base = Path(self.tmp.name)
         self.remote = self.base / 'remote.git'
         git(self.base, 'init', '--bare', '-q', str(self.remote))
+        self.contexts = {}
+
+    def publish(self, output):
+        context = self.contexts.get(output)
+        kwargs = dict(source_repository=context[0], trusted_product_sha=context[1]) if context else {}
+        return publish_result(output, remote=str(self.remote), **kwargs)
 
     def output(self, *, run='100', attempt=1, operation='recompute', status='success',
                created='2026-09-26T12:00:00+00:00', request=None, schema_version=2):
@@ -280,7 +559,9 @@ class PublishTests(unittest.TestCase):
         api = result_v1 if schema_version == 1 else result
         calculation, _ = api.calculate_snapshot(SNAPSHOT, PARAMETERS, PROVENANCE)
         if operation == 'refresh':
-            fresh, _ = self.valid_refresh_output()
+            fresh, harness = self.valid_refresh_output()
+            req['product_sha'] = harness.product
+            self.contexts[dest] = (harness.repo, harness.product)
             csv = (fresh / 'snapshot/candidates.csv').read_bytes()
             calculation['source_snapshot'] = {'kind': 'acquired', 'path': 'snapshot/candidates.csv',
                                                'sha256': hashlib.sha256(csv).hexdigest()}
@@ -322,6 +603,7 @@ class PublishTests(unittest.TestCase):
             path.write_bytes((source / name).read_bytes())
         (dest / 'report.md').write_text('# Report\n')
         (dest / 'report.html').write_text('<!doctype html><title>Report</title>')
+        self.contexts[dest] = (harness.repo, harness.product)
         return dest, harness
 
     def test_keyed_refresh_runner_publishes_api_body_for_success_and_diagnostic_failure(self):
@@ -335,9 +617,12 @@ class PublishTests(unittest.TestCase):
         archive.mkdir(parents=True)
         (archive / 'public_candidate_source_map.json').write_text(json.dumps({
             'inventory': {'slugs': [], 'contributor_efforts': []}}))
+        (repo / 'bridge').mkdir()
+        (repo / 'bridge/refresh-policy.json').write_text('{"policy":"observed-inventory-v1"}')
         git(repo, 'add', '.')
         git(repo, 'commit', '-qm', 'product')
         product = git(repo, 'rev-parse', 'HEAD')
+        git(repo, 'update-ref', 'refs/bridge/approved-main', product)
         request = dict(request_data(), product_sha=product)
         path = repo / 'bridge/requests' / (request['request_id'] + '.json')
         path.parent.mkdir(parents=True)
@@ -379,7 +664,7 @@ class PublishTests(unittest.TestCase):
                 evidence = output / 'snapshot/evidence/api_envelopes.json'
                 self.assertTrue(evidence.exists())
                 self.assertNotIn(b'test-key', evidence.read_bytes())
-                tip = publish_result(output, remote=str(self.remote))
+                tip = publish_result(output, remote=str(self.remote), source_repository=repo, trusted_product_sha=product)
                 target = f'results/{request["request_id"]}/{run}-1'
                 published = git(self.remote, 'show', f'{tip}:{target}/snapshot/evidence/api_envelopes.json')
                 self.assertEqual(json.loads(published), json.loads(evidence.read_text()))
@@ -414,13 +699,13 @@ class PublishTests(unittest.TestCase):
         inventory['inventory']['slugs'].pop()
         source_map.write_text(json.dumps(inventory))
         with self.assertRaises(PublishError):
-            publish_result(output, remote=str(self.remote))
+            self.publish(output)
         self.assertNotEqual(subprocess.run(['git', '-C', str(self.remote), 'rev-parse',
                                              '--verify', 'refs/heads/results'], capture_output=True).returncode, 0)
 
     def test_valid_published_fresh_inventory_is_usable_by_runner(self):
         output, harness = self.valid_refresh_output()
-        published = publish_result(output, remote=str(self.remote))
+        published = self.publish(output)
         pointer = self.pointer('latest-refresh.json')
         self.assertEqual(pointer['result_path'],
                          f'results/{request_data()["request_id"]}/777-1/result.json')
@@ -474,10 +759,10 @@ class PublishTests(unittest.TestCase):
 
     def test_pointer_order_and_failure(self):
         newer, _ = self.output(run='200', operation='refresh', created='2026-09-27T12:00:00+00:00')
-        publish_result(newer, remote=str(self.remote))
+        self.publish(newer)
         before = self.pointer('latest-refresh.json')
         older, _ = self.output(run='201', operation='refresh', created='2026-09-26T12:00:00+00:00')
-        publish_result(older, remote=str(self.remote))
+        self.publish(older)
         self.assertEqual(self.pointer('latest-refresh.json'), before)
         self.assertEqual(self.pointer('latest-success.json'), before)
         recompute, _ = self.output(run='202')
@@ -514,7 +799,7 @@ class PublishTests(unittest.TestCase):
         output, _ = self.output(operation='refresh')
         (output / 'snapshot/candidates.csv').write_text('changed')
         with self.assertRaises(PublishError):
-            publish_result(output, remote=str(self.remote))
+            self.publish(output)
         good, _ = self.output(run='101')
         (good / 'extra.txt').write_text('unapproved')
         with self.assertRaises(PublishError):
