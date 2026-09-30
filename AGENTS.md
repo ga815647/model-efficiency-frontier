@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-09-30 Task1–4分支本地進度（最新，未發布）**：Task1 `152ff0a`／239測試、Task2 `207d1d1`／252測試獨立spec及quality覆核通過；Task3 `6b37e66`＋`b27ee66`／274測試，原P與重複gate修正後獨立再覆核乾淨，Task2 expected-stderr Minor已解決。Task4只把共享 `來源退出：` caveats投影至anchors後／階梯前並更新契約，待控制端獨立覆核；不改selector、schema或issue #2路由。原P由source evidence精確三欄 `previous_inventory` Git locator及immutable introduction獨立驗證，不從本次map自證。使用者最新要求完成後可去Chat說「開始」，控制端已獲非force發布及live／固定重算驗收授權，須整條分支最終覆核乾淨後執行，尚未發布或新建雲端request。9/27與9/30真實fresh失敗仍為歷史證據；離線成功不等於live成功。issue #2 pre-write guard、新版目標Chat與settings驗收仍獨立待完成；bootstrap不改。詳見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。下方「不等於發布授權」為較早批准範圍，現已有上述有條件授權；無issue結案或settings編輯授權。
+
 > **2026-09-30 issue #1 計畫已批准、開始實作（最新，未發布）**：使用者在五任務計畫審閱及每次retired／missing_task_cost判定說明後回覆「可以了」，沿用Subagent-driven＋TDD，在既有`.worktrees/window-knee`／`docs/refresh-reconciliation`實作；固定execution base為`bcb70e1bf78079facf3525858f15c593bc855a7d`。issue #2按前述bounded短設計另做pre-write freshness guard與對談fixtures／路由驗收，不用#1取數成功替代。進度見`docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`；正式產品仍舊v2，尚未發布修復或建立新的雲端驗收request。實作批准不等於merge／push／發布／issue結案授權。
 
 > **2026-09-30 issue #1 書面規格已確認、實作計畫待審（最新，尚未實作／發布）**：使用者在 `2026-09-30-refresh-reconciliation-design.md` 的書面審閱請求後回覆「繼續」，本規格已確認。五任務計畫位於 `docs/superpowers/plans/2026-09-30-refresh-reconciliation.md`，待審閱後沿用既有 Subagent-driven；涵蓋純來源分類、proof／可信policy、新producer与Git／發布接線、退出摘要及整體／雲端驗收。對談及文件批准不等於已修產品或授權force發布；產品仍為既有v2，fresh尚有舊hard guard。issue #2 的bounded短設計另行確認／驗收，不用#1結果替代。

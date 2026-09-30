@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from bridge.result_v2 import calculate_v2
+from scripts.refresh_inventory import DISCLOSURE_PREFIX
 from test_bridge_result import SNAPSHOT, PARAMETERS, PROVENANCE
 
 
@@ -55,6 +56,42 @@ class WindowReportTests(unittest.TestCase):
             for value in ('2026-09-26', 'AA-Intelligence-Index-v4.3.2',
                           '推定', 'full-candidate comparison', '0.05', 'Privacy'):
                 self.assertIn(value, prefix)
+
+    def test_source_exits_are_visible_before_ladder_and_escaped(self):
+        payload = deepcopy(self.payload)
+        exits = [
+            DISCLOSURE_PREFIX + 'MiniMax-M2.7：當次 deprecated=true，排行退役。',
+            DISCLOSURE_PREFIX + '<img src=x onerror=alert(1)>|line\nnext：當前 task cost 缺值，本次未參戰，未沿用舊價。',
+        ]
+        payload['caveats'].extend(exits)
+        md, page = self.views(payload)
+        self.assertIn('## 本次來源退出', md)
+        self.assertIn('data-family="source-exits"', page)
+        self.assertLess(md.index('最低情境成本保留檔'), md.index('## 本次來源退出'))
+        self.assertLess(md.index('## 本次來源退出'), md.index('## 已選好階梯'))
+        self.assertLess(page.index('aria-label="保留檔入口"'), page.index('data-family="source-exits"'))
+        self.assertLess(page.index('data-family="source-exits"'), page.index('data-family="ladder"'))
+        md_summary = md.split('## 本次來源退出', 1)[1].split('## 已選好階梯', 1)[0]
+        html_summary = page.split('data-family="source-exits"', 1)[1].split('</section>', 1)[0]
+        for summary in (md_summary, html_summary):
+            self.assertLess(summary.index('MiniMax-M2.7'), summary.index('&lt;img src=x'))
+            self.assertIn('本次未參戰，未沿用舊價', summary)
+            self.assertNotIn('<img src=x', summary)
+        self.assertIn('&#124;line<br>next', md_summary)
+        self.assertIn(escape(exits[1]), html_summary)
+        # The summary supplements, rather than removes, the complete footer.
+        self.assertIn(escape(exits[0]), page.split('<h2>來源與限制</h2>', 1)[1])
+        self.assertEqual(payload['caveats'][-2:], exits)
+
+    def test_no_source_exits_means_no_empty_warning_and_other_caveats_remain(self):
+        payload = deepcopy(self.payload)
+        payload['caveats'].extend(['Ordinary B caveat', 'not-prefix ' + DISCLOSURE_PREFIX + 'not an exit'])
+        md, page = self.views(payload)
+        self.assertNotIn('## 本次來源退出', md)
+        self.assertNotIn('data-family="source-exits"', page)
+        for output in (md, page):
+            for value in ('Ordinary B caveat', 'not an exit', 'GRADE-B', 'Contributor ×1', '推定'):
+                self.assertIn(value, output)
 
     def test_upgrade_trace_and_b_diagnostic_are_payload_projections(self):
         payload = deepcopy(self.payload)

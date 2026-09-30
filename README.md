@@ -1,5 +1,7 @@
 # Model Efficiency Frontier
 
+**9/30 來源對帳修復：分支實作本地已驗，尚未正式發布／live驗收。** Task1–3已獨立覆核；Task4新增近結論的來源退出摘要，待獨立覆核。使用者已授權控制端在整條分支最終覆核乾淨後非force發布及執行新live refresh／固定重算驗收，並非仍待一般實作批准；這些遠端動作尚未進行。進度見 [9/30驗收帳](docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md)。新版來源政策只以當次 `deprecated=true` 退出排行及後續強制追蹤；未退役但缺task cost者本次明示排除、仍追蹤，不沿用舊價、不擋其他有效候選。新fresh須另有固定成功證據，不能用下方9/26快照重算或離線fixture成功替代；issue #2短續接pre-write路由仍另待實作／驗收。新版目標Chat與settings未因此視為已驗收。
+
 **v2已發布，雲端重算成功；真實fresh仍受來源成本缺值阻擋。** 產品 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已發布main並讀回，229項本地測試通過。[v2重算run](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36341140428) 的10階結果、兩入口及HTML artifact已關聯核對；[refresh run](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36341142058) 保存Inkling／MiniMax-M2.7缺task-cost診斷並維持failed，未推進成功pointer，非產品回歸。完整定位見 [v2驗收帳](docs/superpowers/notes/2026-09-27-window-knee-acceptance.md)。下方16階連結是歷史 v1 證據。
 
 新 Chat CI 計算使用 **CP-new-high → 全 family 混排的固定2分視窗精簡**，無最高分保送。只從 final 非Claude行取「最強保留檔」與「最低情境成本保留檔」兩入口；可相同，無符合行時從缺。Claude僅比較，cut指向最終代表並附trace；非Claude相鄰保留檔附升級分差、成本倍率及成本差。GRADE-B照常參戰，另列去除全部B後A行保留變化，非單一B因果證明。硬2分邊界、缺窗中性0及逐次選擇仍可能跳變。

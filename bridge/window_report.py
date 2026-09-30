@@ -7,6 +7,8 @@ Source URLs are deliberately plain text, never active links.
 from html import escape
 import re
 
+from scripts.refresh_inventory import DISCLOSURE_PREFIX
+
 
 _ANCHORS = (('highest_retained_score', '最強保留檔'),
             ('lowest_retained_cost', '最低情境成本保留檔'))
@@ -113,6 +115,10 @@ def _context(calculation):
     yield from calculation['caveats']
 
 
+def _source_exits(calculation: dict) -> list[str]:
+    return [line for line in calculation['caveats'] if line.startswith(DISCLOSURE_PREFIX)]
+
+
 def render_markdown(calculation: dict) -> str:
     """Render a v2 calculation without mutating it or recalculating identities."""
     lines = ['# 模型效率前線｜固定視窗階梯', '']
@@ -121,6 +127,10 @@ def render_markdown(calculation: dict) -> str:
     for key, title in _ANCHORS:
         row = calculation['anchors'][key]
         lines.append(f'- {title}：{_markdown(row["identity"]) if row else "從缺"}')
+    exits = _source_exits(calculation)
+    if exits:
+        lines.extend(['', '## 本次來源退出', ''])
+        lines.extend('- ' + _markdown(line) for line in exits)
     for _, title, columns, rows in _tables(calculation):
         lines.extend(['', '## ' + title, ''])
         if not rows:
@@ -184,11 +194,15 @@ def render_html(calculation: dict) -> str:
         sections.append(f'<section class="panel" data-family="{key}"><h2>{title} ({len(rows)})</h2>{table}</section>')
     context = ''.join(f'<li>{_html(line)}</li>' for line in _context(calculation))
     metadata = ''.join(f'<p class="intro">{_html(line)}</p>' for line in _metadata(calculation))
+    exits = _source_exits(calculation)
+    exit_section = ('<section class="panel" data-family="source-exits"><h2>本次來源退出</h2><ul>' +
+                    ''.join('<li>' + _html(line) + '</li>' for line in exits) + '</ul></section>') if exits else ''
     return f'''<!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>模型效率前線｜固定視窗階梯</title><style>{_CSS}</style></head><body><main>
 <header><h1>模型效率前線</h1><p class="intro">CP-new-high → 固定2分視窗 · Score降序 · Claude僅比較</p>{metadata}</header>
 <section class="cards" aria-label="保留檔入口">{''.join(cards)}</section>
+{exit_section}
 {''.join(sections)}
 <section class="panel"><h2>來源與限制</h2><ul>{context}</ul></section>
 </main></body></html>'''

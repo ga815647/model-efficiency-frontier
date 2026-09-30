@@ -1,5 +1,7 @@
 # Chat → CI 契約（request v1／result v2＋歷史v1；2026-09-27）
 
+**9/30增量狀態：來源對帳分支本地已驗，尚待正式發布／live驗收。** Task1–3獨立覆核通過，Task4退出摘要／契約待獨立覆核。使用者已授權控制端在整條分支最終覆核乾淨後非force發布、執行live refresh與固定重算驗收；尚未進行，不是等待另一輪一般實作授權。此節記錄分支契約，不把下方舊產品失敗改稱成功；新版目標Chat退出摘要、issue #2短續接pre-write guard與settings仍分開驗收。見 [9/30驗收帳](../superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md)。
+
 此文件描述**已發布v2實作**；2026-09-27 OpenCode控制端完成雲端重算成功與預期來源缺口失敗診斷驗收，詳見 [v2驗收帳](../superpowers/notes/2026-09-27-window-knee-acceptance.md)。不代表live fresh成功、新Chat端實測或Chat Project settings已安裝。私人目標 `ga815647/model-efficiency-frontier`；產品 `main`，發佈 `results`；不得同步或恢復已移往用戶垃圾桶父頁的 Notion 頁，不部署網站。`bridge/request.py`、`bridge/result.py`、`bridge/runner.py`、`bridge/publish.py` 和 `.github/workflows/chat-execution.yml` 是精確欄位與驗證的實作來源。
 
 ## 工具與三個固定版本
@@ -56,6 +58,28 @@ Contributor 身份修復新增取得證據：`snapshot/evidence/models.html`、`
 成功同一次計算輸出 `report.md`、`report.html`（自包含單檔）與 JSON。HTML 在該 run 的 Actions artifact `report-<request_id>-<run_id>-<attempt>` 可下載，且 Git `results/<request_id>/<run_id>-<attempt>/report.html` 為耐久路徑；它不是公開 Pages 或網站。Chat 附件能力未驗證，不承諾直接在對話附檔；若無法直接附加，提供對應 Actions run/artifact 下載入口或固定 Git 檔定位，私人庫需授權登入。不要在 Notion 同步。
 
 ## result v2 精確欄位與遷移
+
+### 9/30分支來源政策、proof與原始前次追蹤
+
+新產品固定標記 `bridge/refresh-policy.json` 精確為 `{"policy":"observed-inventory-v1"}`；可信policy由已授權固定產品Git commit的ordinary blob解碼，不能從untrusted source map自行宣稱新policy或legacy。標記缺席只有在已驗證的真正舊產品上下文才表示legacy；標記壞掉／未知policy不得降級。舊wire（沒有新flags）adapter仍使用同一唯讀驗證gate核對event、單parent、fixed main、UUID與唯一新增request path，驗證固定handoff及checkout相等後只容許marker-absent舊產品；新產品不能借old-wire繞過proof。
+
+分類優先序固定為 `deprecated → estimated → missing_score → missing_task_cost → zero_cost → usable_paid`。只依當次AA `deprecated=true` 退役；缺欄／null不推定，其他型別拒絕。未退役、非estimated、有有效score但缺task cost者本次排除，不擋其餘有效模型、仍追蹤；不沿用舊價、不代入successor或其他effort。前次追蹤者estimated／missing_score／zero_cost仍以 `present_candidate_unusable` 硬失敗；真正未觀測且無退出依據仍 `missing_candidate`，三遍核對證據照實保留。無paid候選仍 `empty_paid`；floor／cap排空仍可合法空階梯及null anchors。
+
+`snapshot/evidence/source_map.json` 的 `reconciliation` 分離observed（當次全部觀測）、usable（有效public paid）、tracked與retired。精確欄位是 `policy`, `previous_tracked_slugs`, `observed_slugs`, `tracked_slugs`, `retired_slugs`, `status_by_slug`；各slug array排序去重，status值恰為 `state`／`reason`。`tracked_slugs = (P ∪ U) − R`：P為獨立驗證原前次追蹤集合，U為本次usable public集合，R為當次明確retired。paid CSV的public部分／`inventory.slugs`／`source_by_slug`只含U，Contributor仍另按原有規則驗證；缺價及retired留來源證據／退出caveats，不造數字cost或新增 `candidate_statuses` 行。
+
+proof核對同一固定commit的 `leaderboard.html`、`sources.json` SHA-256、精確 `leaderboard_records.json` 重新解析結果、分類／reconciliation／excluded完整對帳、public score與task cost精度、CSV／result／source日期及 `來源退出：` caveats。原有版本、四個Grok／Muse精確crosschecks、官方models證據及Contributor max Standard-only guard不降級。request v1、result v2／歷史v1及row精確欄位全部不變。
+
+production新policy source map另有 **恰好三欄** 的 `previous_inventory`（不是request或result欄位）：
+
+```json
+{"product_sha":"<原refresh產品40-hex commit>","results_commit":null,"result_path":null}
+```
+
+上例僅示意initial無本地results的null型別，不是已提交證據。有本地results時 `results_commit` 為execution-start已固定的40-hex ordinary commit；有已驗證成功refresh pointer時 `result_path` 為該commit的 `latest-refresh.json` 精確result path。runner在取數前獨立固定此context；publisher獨立解析同一已本地context，要求locator完全相同，retry不以新publication tip替換。無本地results才容許null results commit；initial／archive fallback的path為null。非null commit但null path的recompute-only／orphan固定tree須掃描，若已有成功refresh却缺pointer則拒絕。archive永遠只取原授權產品commit的固定 `runs/2026-09-26-general-grok16/public_candidate_source_map.json`，不接受map自訂路徑或以本次P自證。
+
+固定source reader與前次reader均獨立解析locator並以導出的P驗proof；完整新policy predecessor遞迴驗證，真正legacy predecessor沿用paid-map檢查，不追補新locator。results predecessor必須是publication嚴格ancestor且不含本次result path；驗精確pointer path、ordinary commit／blob並拒絕duplicate JSON keys、cycle、非commit、自指或偽造context。原產品policy與locator固定在result唯一的immutable Git introduction，完整history要求唯一introduction，拒絕ambiguous／reintroduced，不能改寫較晚副本或換另一合法archive來抹掉P；append parent不是P權威。
+
+成功JSON的 `來源退出：` caveats由共享producer產生；Markdown在兩anchors後、階梯前列「本次來源退出」，HTML在cards後以escaped text列同區，完整footer不刪。Chat結論附近同樣原樣揭露：retired是當次排行退役並退出強制追蹤，不等於服務永久關閉；缺task cost不是free或退役，不手估cost。無退出不造空區。新成功refresh的固定重算保留該來源退出；9/26歷史重算不套今天deprecated或重新抓來源。issue #2實際pre-request freshness路由不由本節或fixture成功代替。
 
 `bridge/result.py` 新計算／envelope預設v2，`validate_envelope` 分派合法v1/v2，未知版本與混合欄位拒絕。request仍v1，五個parameters、唯一push分支與三個固定commit不變。新bootstrap可發布排隊中舊product生成的v1；runner、publisher、inventory、固定成功refresh來源及 `assert-success` 皆接受合法v1/v2。`latest-success`／`latest-refresh` 延續append-only與原排序規則；讀到v1不自動觸發重算、不把三picks或表格手推為v2。原Project bootstrap定位不變，無需因本次改制重貼；Git指示發布不證明settings安裝。
 

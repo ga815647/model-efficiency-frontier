@@ -1,5 +1,7 @@
 # 模型效率前線｜Chat 日常指示
 
+**9/30分支狀態（尚未發布）：**來源對帳及退出摘要已本地驗證，Task4待獨立覆核；控制端已獲授權於整條分支最終覆核後非force發布並做live／固定重算驗收，尚未執行。不得以本檔修改聲稱main已更新、新fresh成功、新版目標Chat或settings已接受。issue #2短續接pre-write freshness guard另行實作／驗收，本次不變更下方對談路由。完整狀態見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
+
 先遵守 Project settings 的私人 repo、ref 與授權邊界：每次任務將 `main` 解析成**一個產品 commit**，完整讀同版此檔與 `docs/contracts/chat-ci.md` 和需要的規則；不可用或不一致就停止相關操作、說明缺口。不以本檔覆蓋 bootstrap 的固定入口，亦不把 Git push 誤稱 Project settings 已更新。詳細欄位、工具、結果讀回及恢復流程以同版契約為準。9/27 使用者提供本庫 Chat 請求提交、查 run 與成功／失敗結果讀回的實測，已由 OpenCode 另核對 GitHub 結果；沿用已通過能力，不重做問卷。當前 refresh 的來源缺值另見 `docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md`，既有成功重算不代表 fresh 成功。
 
 ## 對談路由
@@ -16,6 +18,8 @@
 
 - **v2**：只讀 `anchors.highest_retained_score`（最強保留檔）與 `anchors.lowest_retained_cost`（最低情境成本保留檔），再給已選好的 `ladder`。兩入口僅final非Claude，可同一行或皆null；從缺時不從cut／excluded補位。沒有middle／平衡或最高CP省錢入口。政策 `cp-new-high-window-v1` 保留CP-new-high後跨family固定2分視窗精簡，不保送最高分。`selection_trace` 解釋cut→final代表；`upgrade` 僅連向下一較低分非Claude保留行，Claude的 `comparison_only=true` 僅比較。`grade_b_effects` 是去掉全部B後A行保留差異，包含間接影響，不等於某單一B的唯一因果。硬2分邊界、缺窗中性及逐次選擇仍會跳變，不能宣稱完全穩健。
 - **v1**：只按歷史 `picks.strong`／`middle`／`cheap` 與舊梯表語義讀取，明示歷史v1；不由Chat手推兩入口、改標v2或自動送重算。收到明確重算意圖才依契約使用已核對的新產品。未知版本／混用欄位拒絕。
+
+- **本次來源退出**：從已驗證成功JSON的 `caveats` 原樣取 `來源退出：` 前綴行，在兩入口結論後、階梯表前明示；無退出就不造空警告。退役表示當次AA明確 `deprecated=true`，本次未參戰並退出後續強制追蹤，不宣稱服務永久下架。當前task cost缺值表示本次未參戰、未沿用舊價，未退役者仍追蹤；不是free，也不能手估價、拿相似模型／effort代入或塞入數字候選。完整B／係數／版本caveats仍保留；固定來源重算沿用該来源退出，不套今天deprecated或另抓來源。proof、前次追蹤與可信舊產品辨識見同版契約。
 
 已知身份更正（2026-09-27）：Meta官方models文件明載Muse Spark1.3的max僅限Standard，`Muse Spark 1.3 max Meta Contributor`不可用。讀到含該行的歷史CSV／舊表時，帶上`docs/superpowers/notes/2026-09-27-contributor-effort-correction.md`的更正，不把它推薦為可用服務，也不能拿max分數代入xhigh。需要更新選型時先讀同版更正記錄，確認所用產品已含身份修復並完成驗收，再依使用者重算意圖重新計算整條鏈；若記錄仍是修復中／未部署，不把舊產品的成功結果當作修正後的新推薦，也不由Chat手刪一列或手推替補。固定來源仍是原始快照；新計算的excluded狀態及理由供稽核。
 
