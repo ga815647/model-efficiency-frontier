@@ -17,7 +17,7 @@ from bridge.result import validate_envelope
 from bridge.request import RequestError
 from scripts.meta_availability import MODELS_URL, parse_meta_models, unavailable_reason
 from scripts.aa_public import SourceError
-from bridge.runner import RunnerError, _refresh_policy, _previous, _legacy_workflow_context
+from bridge.runner import RunnerError, _refresh_policy, _previous_context, _legacy_workflow_context
 from scripts.refresh_snapshot import _previous_slugs
 from scripts.refresh_inventory import tracked_public_slugs
 import csv
@@ -282,7 +282,10 @@ def _output_files(output, *, source_repository=None, trusted_product_sha=None, a
                 policy = _refresh_policy(source_repository, trusted_product_sha, approved_main_sha=approved_main_sha)
                 if envelope['product_sha'].lower() != trusted_product_sha.lower():
                     raise PublishError('product_context_mismatch')
-                previous = _previous(source_repository, trusted_product_sha, approved_main_sha=approved_main_sha)
+                previous, locator = _previous_context(source_repository, trusted_product_sha,
+                                                       approved_main_sha=approved_main_sha)
+                if policy and source_map.get('previous_inventory') != locator:
+                    raise PublishError('previous_inventory_context_mismatch')
                 expected = tracked_public_slugs(previous, _previous_slugs(previous)[0])
                 proof = {name: files['snapshot/evidence/' + name] for name in
                          ('leaderboard.html', 'leaderboard_records.json', 'sources.json')} if policy else None

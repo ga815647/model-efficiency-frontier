@@ -1,4 +1,6 @@
 import hashlib
+import io
+from contextlib import redirect_stdout
 import json
 import subprocess
 import tempfile
@@ -33,7 +35,8 @@ class PublishTests(unittest.TestCase):
         context = product_context(self.base, previous, new_policy=True)
         output = self.base / 'new-proof'
         output.mkdir()
-        provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=refresh_pages().__getitem__)
+        provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=refresh_pages().__getitem__,
+            previous_inventory=dict(product_sha=context[1], results_commit=None, result_path=None))
         calculation, report = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
         req = dict(request_data(), product_sha=context[1])
         execution = dict(request_commit_sha=context[1], run_id='new-proof', run_attempt=1,
@@ -75,10 +78,121 @@ class PublishTests(unittest.TestCase):
         with self.assertRaises(PublishError):
             _output_files(output, **kwargs)
         path.write_bytes(saved)
+        for change in ('absent', 'different_fixed_context'):
+            mapping = json.loads(saved)
+            if change == 'absent':
+                del mapping['previous_inventory']
+            else:
+                mapping['previous_inventory']['results_commit'] = context[1]
+            path.write_text(json.dumps(mapping))
+            with self.subTest(locator=change), self.assertRaisesRegex(PublishError, 'previous_inventory_context_mismatch'):
+                _output_files(output, **kwargs)
+        path.write_bytes(saved)
         envelope['product_sha'] = 'a' * 40
         (output / 'result.json').write_text(json.dumps(envelope))
         with self.assertRaisesRegex(PublishError, 'product_context_mismatch'):
             _output_files(output, **kwargs)
+
+    def test_frozen_concurrent_contexts_and_new_chain_reject_locator_rollback(self):
+        from refresh_inventory_fixtures import refresh_pages, flight, record, GPT_ENTRIES
+        from scripts.aa_public import LEADERBOARD, parse_leaderboard
+        from scripts.refresh_inventory import build_reconciliation, source_exit_caveats
+        from bridge.runner import materialize_snapshot
+        repo, product = product_context(self.base, {'slugs': ['inkling', 'minimax-m2-7']}, new_policy=True)
+        request = dict(request_data(), product_sha=product)
+        request_path = repo / 'bridge/requests' / (request['request_id'] + '.json')
+        request_path.parent.mkdir(parents=True)
+        request_path.write_text(json.dumps(request))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'verified refresh request')
+        event = git(repo, 'rev-parse', 'HEAD')
+        pages = refresh_pages()
+        records = parse_leaderboard(pages[LEADERBOARD].decode())
+        records.append(record('newly-tracked', name='Newly Tracked', score='40', cost='1'))
+        pages[LEADERBOARD] = flight(records)
+        outputs = []
+        for run in ('concurrent-A', 'concurrent-B'):
+            execution = dict(request_commit_sha=event, product_sha=product,
+                branch='efficiency-run/' + request['request_id'], run_id=run, run_attempt=1,
+                run_url='https://github.com/example/actions/runs/' + run)
+            output = self.base / run
+            envelope = execute_request(request, execution=execution, repository=repo,
+                                       output=output, fetch=pages.__getitem__)
+            self.assertEqual(envelope['status'], 'success', envelope['errors'])
+            mapping = json.loads((output / 'snapshot/evidence/source_map.json').read_text())
+            self.assertEqual(mapping['previous_inventory'],
+                             dict(product_sha=product, results_commit=None, result_path=None))
+            outputs.append(output)
+        first = publish_result(outputs[0], remote=str(self.remote), source_repository=repo, trusted_product_sha=product)
+        second = publish_result(outputs[1], remote=str(self.remote), source_repository=repo, trusted_product_sha=product)
+        self.assertEqual(git(self.remote, 'rev-parse', second + '^'), first)
+        # Both contexts froze no results before acquisition. B's append parent
+        # now contains A; that must not replace B's original predecessor.
+        git(repo, 'fetch', '-q', str(self.remote), 'refs/heads/results:refs/heads/results')
+        target_b = f'results/{request["request_id"]}/concurrent-B-1'
+        materialize_snapshot(dict(commit=second, path=target_b + '/snapshot/candidates.csv'), repo, self.base / 'B-read')
+        git(repo, 'checkout', '-q', '--detach', product)
+        request['created_at'] = '2026-09-30T13:00:00+00:00'
+        request_path.parent.mkdir(parents=True, exist_ok=True)
+        request_path.write_text(json.dumps(request))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'new-chain request')
+        next(r for r in records if r['slug'] == 'newly-tracked')['cost_per_task'] = None
+        pages[LEADERBOARD] = flight(records)
+        execution.update(request_commit_sha=git(repo, 'rev-parse', 'HEAD'), run_id='chain-C',
+                         run_url='https://github.com/example/actions/runs/chain-C')
+        output = self.base / 'chain-C'
+        envelope = execute_request(request, execution=execution, repository=repo, output=output, fetch=pages.__getitem__)
+        self.assertEqual(envelope['status'], 'success', envelope['errors'])
+        mapping = json.loads((output / 'snapshot/evidence/source_map.json').read_text())
+        expected = sorted([entry[0] for entry in GPT_ENTRIES] + [
+            'grok-4-7-high', 'grok-4-7', 'muse-spark-1-3-xhigh', 'muse-spark-1-3', 'inkling', 'newly-tracked'])
+        self.assertEqual(mapping['reconciliation']['previous_tracked_slugs'], expected)
+        self.assertEqual(mapping['previous_inventory']['results_commit'], second)
+        self.assertEqual(mapping['previous_inventory']['result_path'],
+                         f'results/{request["request_id"]}/concurrent-A-1/result.json')
+        third = publish_result(output, remote=str(self.remote), source_repository=repo, trusted_product_sha=product)
+        git(repo, 'fetch', '-q', str(self.remote), '+refs/heads/results:refs/heads/results')
+        self.assertIn('newly-tracked', _previous(repo, product)['reconciliation']['tracked_slugs'])
+        target = f'results/{request["request_id"]}/chain-C-1'
+        materialize_snapshot(dict(commit=third, path=target + '/snapshot/candidates.csv'), repo, self.base / 'C-read')
+        # A coherent rollback to a different *valid* archive locator must not
+        # erase the independently tracked identity introduced by the new chain.
+        git(repo, 'checkout', '-q', 'results')
+        mapping['previous_inventory'] = dict(product_sha=product, results_commit=None, result_path=None)
+        mapping['reconciliation'] = build_reconciliation(records, {'inkling', 'minimax-m2-7'})
+        envelope['caveats'] = [c for c in envelope['caveats'] if not c.startswith('來源退出：')] + source_exit_caveats(records, mapping['reconciliation'])
+        (repo / target / 'snapshot/evidence/source_map.json').write_text(json.dumps(mapping))
+        (repo / target / 'result.json').write_text(json.dumps(envelope))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'coherent locator rollback')
+        forged = git(repo, 'rev-parse', 'HEAD')
+        for reader in ('previous', 'materialize'):
+            with self.subTest(reader=reader), self.assertRaises(ValueError):
+                if reader == 'previous':
+                    _previous(repo, product)
+                else:
+                    materialize_snapshot(dict(commit=forged, path=target + '/snapshot/candidates.csv'),
+                                         repo, self.base / 'rollback-read')
+        # Path-limited Git history must not let a merge hide the original
+        # introduction behind a second, coherently forged introduction.
+        import shutil
+        git(repo, 'checkout', '-q', '-b', 'forged-sibling', second)
+        shutil.copytree(output, repo / target)
+        (repo / target / 'snapshot/evidence/source_map.json').write_text(json.dumps(mapping))
+        (repo / target / 'result.json').write_text(json.dumps(envelope))
+        git(repo, 'add', '.')
+        git(repo, 'commit', '-qm', 'second conflicting introduction')
+        git(repo, 'checkout', '-q', '-B', 'results', third)
+        git(repo, 'merge', '-q', '--no-ff', '--no-edit', '-X', 'theirs', 'forged-sibling')
+        merged = git(repo, 'rev-parse', 'HEAD')
+        for reader in ('previous', 'materialize'):
+            with self.subTest(merge_reader=reader), self.assertRaises(ValueError):
+                if reader == 'previous':
+                    _previous(repo, product)
+                else:
+                    materialize_snapshot(dict(commit=merged, path=target + '/snapshot/candidates.csv'),
+                                         repo, self.base / 'merge-forgery-read')
 
     def test_queued_legacy_publication_validates_newer_original_product(self):
         from refresh_inventory_fixtures import refresh_pages
@@ -137,7 +251,8 @@ class PublishTests(unittest.TestCase):
         fresh = self.base / 'B-output'
         fresh.mkdir()
         prov = refresh_snapshot(fresh / 'snapshot', previous={'slugs': ['inkling', 'minimax-m2-7']},
-                                fetch=refresh_pages().__getitem__)
+                                fetch=refresh_pages().__getitem__,
+                                previous_inventory=dict(product_sha=b, results_commit=None, result_path=None))
         calculation, report = calculate_snapshot(fresh / 'snapshot/candidates.csv', PARAMETERS, prov)
         envelope = make_envelope(fresh_request, fresh_execution, calculation=calculation, errors=[])
         (fresh / 'result.json').write_text(json.dumps(envelope))
@@ -183,7 +298,9 @@ class PublishTests(unittest.TestCase):
             os.chdir(bootstrap)
             env = dict(EVENT_SHA=event, EVENT_REF='efficiency-run/' + request['request_id'])
             with patch.dict('os.environ', env):
-                self.assertEqual(main(['--output', str(output), '--remote', str(self.remote)]), 0)
+                with redirect_stdout(io.StringIO()) as stdout:
+                    self.assertEqual(main(['--output', str(output), '--remote', str(self.remote)]), 0)
+                self.assertEqual(stdout.getvalue(), tip + '\n')
                 legacy_envelope['request_commit_sha'] = a
                 result_path.write_text(json.dumps(legacy_envelope))
                 with self.assertRaisesRegex(PublishError, 'event_result_mismatch'):
@@ -246,7 +363,9 @@ class PublishTests(unittest.TestCase):
         missing = self.base / 'missing.sha'
         argv = ['--output', str(output), '--remote', str(self.remote),
                 '--source-repository', str(self.base / 'missing-product'), '--product-sha-file', str(missing)]
-        self.assertEqual(main(argv), 0)
+        with redirect_stdout(io.StringIO()) as stdout:
+            self.assertEqual(main(argv), 0)
+        self.assertEqual(stdout.getvalue(), git(self.remote, 'rev-parse', 'refs/heads/results') + '\n')
         for raw in (b'not-a-sha', b'\xff', b'a' * 39):
             missing.write_bytes(raw)
             with self.subTest(raw=raw), self.assertRaisesRegex(PublishError, 'invalid_product_handoff'):
@@ -470,7 +589,8 @@ class PublishTests(unittest.TestCase):
                     result = make_envelope(req, execution, calculation=None,
                                            errors=[{'code': caught.exception.code, 'message': str(caught.exception)}])
                 else:
-                    provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=source.__getitem__)
+                    provenance = refresh_snapshot(output / 'snapshot', previous=previous, fetch=source.__getitem__,
+                        previous_inventory=dict(product_sha=context[1], results_commit=None, result_path=None))
                     calculation, report = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
                     from scripts.aa_public import parse_leaderboard
                     from scripts.refresh_inventory import classify_record

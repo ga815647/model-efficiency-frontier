@@ -64,8 +64,15 @@ def _read(repo, sha, path):
 
 
 def _json(repo, sha, path):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError('duplicate source JSON key')
+            result[key] = value
+        return result
     try:
-        return json.loads(_read(repo, sha, path))
+        return json.loads(_read(repo, sha, path), object_pairs_hook=pairs)
     except (ValueError, UnicodeDecodeError) as exc:
         raise RunnerError('invalid_source_json: ' + path) from exc
 
@@ -95,6 +102,29 @@ def _inventory_evidence(repository, publication_sha, prefix):
             for name in ('leaderboard.html', 'leaderboard_records.json', 'sources.json')}
 
 
+def _publication_origin(repo, sha, prefix):
+    path = prefix + 'result.json'
+    history = _git(repo, 'rev-list', '--full-history', '--reverse', '--topo-order', sha,
+                   '--', path).decode().splitlines()
+    origins = []
+    for commit in history:
+        parents = _git(repo, 'rev-list', '--parents', '-n', '1', commit).decode().split()[1:]
+        if _has_file(repo, commit, path) and all(not _has_file(repo, parent, path) for parent in parents):
+            origins.append(commit)
+    # An immutable append-only attempt has one introduction. Full history is
+    # essential: TREESAME merge simplification can hide a conflicting sibling.
+    if len(origins) != 1:
+        raise RunnerError('ambiguous_publication_origin')
+    return origins[0]
+
+
+def _published_refresh_policy(repo, sha, prefix, envelope, *, approved_main_sha=None):
+    original = _json(repo, _publication_origin(repo, sha, prefix), prefix + 'result.json')
+    if original.get('product_sha') != envelope['product_sha']:
+        raise RunnerError('source_product_changed')
+    return _refresh_policy(repo, original['product_sha'], approved_main_sha=approved_main_sha)
+
+
 def _legacy_workflow_context(bootstrap, *, event_sha, ref_name):
     """Repeat the authenticated bootstrap gate, read-only, for the old CLI wire.
 
@@ -104,24 +134,8 @@ def _legacy_workflow_context(bootstrap, *, event_sha, ref_name):
     bootstrap = Path(bootstrap)
     source = bootstrap.parent / 'product'
     handoff = bootstrap.parent / 'handoff'
-    _commit(bootstrap, event_sha)
-    parents = _git(bootstrap, 'rev-list', '--parents', '-n', '1', event_sha).decode().split()
-    if len(parents) != 2:
-        raise RunnerError('invalid_request_parents')
-    product = parents[1]
-    main = _git(bootstrap, 'rev-parse', 'HEAD').decode().strip()
-    _commit(bootstrap, main)
-    if not _ancestor(bootstrap, product, main):
-        raise RunnerError('product_not_on_main')
-    identity = ref_name.removeprefix('efficiency-run/') if ref_name.startswith('efficiency-run/') else ''
-    if not UUID.fullmatch(identity):
-        raise RunnerError('invalid_event_ref')
-    path = 'bridge/requests/' + identity + '.json'
-    if _git(bootstrap, 'diff-tree', '--no-commit-id', '--name-status', '-r', event_sha).decode().splitlines() != ['A\t' + path]:
-        raise RunnerError('invalid_changed_paths')
-    raw = _read(bootstrap, event_sha, path)
-    request = decode_request(raw.decode('utf-8'))
-    validate_request(request, branch=ref_name, parent_sha=product, changed_paths=[('A', path)])
+    facts = _verified_transport(bootstrap, event_sha=event_sha, ref_name=ref_name)
+    product, main, raw = (facts[key] for key in ('product_sha', 'approved_main_sha', 'request_bytes'))
     if (handoff / 'product.sha').read_text(encoding='ascii').strip().lower() != product.lower() or (
             handoff / 'request.json').read_bytes() != raw:
         raise RunnerError('invalid_product_handoff')
@@ -130,6 +144,39 @@ def _legacy_workflow_context(bootstrap, *, event_sha, ref_name):
     if _refresh_policy(source, product, approved_main_sha=main) is not None:
         raise RunnerError('legacy_workflow_requires_legacy_product')
     return source, product, main
+
+
+def _verified_transport(repo, *, event_sha, ref_name):
+    """Read-only authentication gate shared by prepare and old-wire publication."""
+    parent = None
+    try:
+        if type(event_sha) is not str or not SHA.fullmatch(event_sha):
+            raise RunnerError('invalid_event_sha')
+        _commit(repo, event_sha)
+        parents = _git(repo, 'rev-list', '--parents', '-n', '1', event_sha).decode().split()
+        if len(parents) != 2:
+            raise RunnerError('invalid_request_parents')
+        parent = parents[1]
+        main = _git(repo, 'rev-parse', 'HEAD').decode().strip()
+        _commit(repo, main)
+        if not _ancestor(repo, parent, main):
+            raise RunnerError('product_not_on_main')
+        identity = ref_name.removeprefix('efficiency-run/') if ref_name.startswith('efficiency-run/') else ''
+        if not UUID.fullmatch(identity):
+            raise RunnerError('invalid_event_ref')
+        path = 'bridge/requests/' + identity + '.json'
+        changes = _git(repo, 'diff-tree', '--no-commit-id', '--name-status', '-r', event_sha).decode().splitlines()
+        if changes != ['A\t' + path]:
+            raise RunnerError('invalid_changed_paths')
+        raw = _read(repo, event_sha, path)
+        request = decode_request(raw.decode('utf-8'))
+        validate_request(request, branch=ref_name, parent_sha=parent, changed_paths=[('A', path)])
+        return dict(product_sha=parent, approved_main_sha=main, request_bytes=raw, request=request)
+    except Exception as exc:
+        # Prepare retains correlation with a verified single parent even when a
+        # later check fails; the gate itself writes no diagnostics or handoff.
+        exc.product_sha = parent
+        raise
 
 
 def _atomic(path, data):
@@ -243,10 +290,11 @@ def materialize_snapshot(locator: dict, repository: Path, output: Path) -> tuple
         version = _json(repository, sha, prefix + 'snapshot/evidence/version.json')
         if version.get('benchmark_version') != envelope['benchmark_version']:
             raise RunnerError('result_version_mismatch')
-        policy = _refresh_policy(repository, envelope['product_sha'])
+        policy = _published_refresh_policy(repository, sha, prefix, envelope)
         proof = _inventory_evidence(repository, sha, prefix) if policy else None
+        previous = _original_previous(repository, sha, prefix, envelope, inventory) if policy else None
         _fresh_inventory(data, inventory, envelope, error_code='result_inventory_mismatch',
-                         refresh_policy=policy, evidence=proof)
+                         refresh_policy=policy, evidence=proof, expected_previous_slugs=previous)
         provenance = {key: envelope[key] for key in ('benchmark', 'benchmark_version',
                       'version_status', 'cost_basis', 'source_dates', 'caveats')}
     provenance['source_locator'] = dict(locator)
@@ -275,12 +323,62 @@ def _transport(repo, request, execution):
 
 
 def _previous(repo, product_sha, *, approved_main_sha=None):
+    return _previous_context(repo, product_sha, approved_main_sha=approved_main_sha)[0]
+
+
+def _previous_context(repo, product_sha, *, approved_main_sha=None):
     # Resolve results once; subsequent reads use only that exact object ID.
     ref = subprocess.run(['git', '-C', str(repo), 'rev-parse', '--verify', 'refs/heads/results'],
                          capture_output=True)
-    if ref.returncode:
-        return _json(repo, product_sha, ARCHIVE + '/public_candidate_source_map.json')
-    tip = ref.stdout.decode().strip()
+    tip = None if ref.returncode else ref.stdout.decode().strip()
+    inventory, path = _previous_at(repo, product_sha, tip, approved_main_sha=approved_main_sha)
+    return inventory, dict(product_sha=product_sha, results_commit=tip, result_path=path)
+
+
+def _original_previous(repo, publication_sha, prefix, envelope, inventory, *, approved_main_sha=None, seen=None):
+    """Derive P from an immutable predecessor, never from this map's reconciliation."""
+    locator = inventory.get('previous_inventory')
+    if (type(locator) is not dict or set(locator) != {'product_sha', 'results_commit', 'result_path'} or
+            locator['product_sha'] != envelope['product_sha']):
+        raise RunnerError('invalid_previous_inventory')
+    # Anchor the locator to the immutable first introduction of this result.
+    # Otherwise a later coherent rewrite could replace a real results context
+    # with a valid-but-different archive context and erase newly tracked slugs.
+    # Do not infer execution context from the append parent: concurrent writers
+    # may legitimately append after a result they did not observe at startup.
+    original = _json(repo, _publication_origin(repo, publication_sha, prefix),
+                     prefix + 'snapshot/evidence/source_map.json')
+    if original.get('previous_inventory') != locator:
+        raise RunnerError('previous_inventory_origin_mismatch')
+    _commit(repo, locator['product_sha'])
+    seen = set() if seen is None else set(seen)
+    key = (publication_sha, prefix)
+    if key in seen:
+        raise RunnerError('previous_inventory_cycle')
+    seen.add(key)
+    predecessor = locator['results_commit']
+    if predecessor is None:
+        if locator['result_path'] is not None:
+            raise RunnerError('invalid_previous_inventory')
+    else:
+        _commit(repo, predecessor)
+        if (predecessor == publication_sha or not _ancestor(repo, predecessor, publication_sha) or
+                _has_file(repo, predecessor, prefix + 'result.json')):
+            raise RunnerError('invalid_previous_inventory_ancestry')
+    previous, path = _previous_at(repo, locator['product_sha'], predecessor,
+                                  approved_main_sha=approved_main_sha, seen=seen)
+    if locator['result_path'] != path:
+        raise RunnerError('previous_inventory_path_mismatch')
+    return tracked_public_slugs(previous, _previous_slugs(previous)[0])
+
+
+def _previous_at(repo, product_sha, tip, *, approved_main_sha=None, seen=None):
+    """Read one fixed results context, including proven archive fallback states."""
+    if tip is None:
+        previous = _json(repo, product_sha, ARCHIVE + '/public_candidate_source_map.json')
+        _previous_slugs(previous)
+        return previous, None
+    _commit(repo, tip)
     if not _has_file(repo, tip, 'latest-refresh.json'):
         # An orphan results branch or recompute-only publications are allowed.
         # A successful refresh without its pointer is inconsistent; do not
@@ -293,7 +391,9 @@ def _previous(repo, product_sha, *, approved_main_sha=None):
             validate_envelope(published)
             if published['status'] == 'success' and published['operation'] == 'refresh':
                 raise RunnerError('missing_latest_refresh')
-        return _json(repo, product_sha, ARCHIVE + '/public_candidate_source_map.json')
+        previous = _json(repo, product_sha, ARCHIVE + '/public_candidate_source_map.json')
+        _previous_slugs(previous)
+        return previous, None
     pointer = _json(repo, tip, 'latest-refresh.json')
     path = pointer.get('result_path')
     if type(path) is not str or not re.fullmatch(r'results/[0-9a-f-]+/[A-Za-z0-9._-]+/result\.json', path):
@@ -310,11 +410,16 @@ def _previous(repo, product_sha, *, approved_main_sha=None):
                                        'sha256': hashlib.sha256(data).hexdigest()}:
         raise RunnerError('invalid_latest_refresh_source')
     inventory = _json(repo, tip, prefix + 'snapshot/evidence/source_map.json')
-    policy = _refresh_policy(repo, envelope['product_sha'], approved_main_sha=approved_main_sha)
+    version = _json(repo, tip, prefix + 'snapshot/evidence/version.json')
+    if version.get('benchmark_version') != envelope['benchmark_version']:
+        raise RunnerError('result_version_mismatch')
+    policy = _published_refresh_policy(repo, tip, prefix, envelope, approved_main_sha=approved_main_sha)
     proof = _inventory_evidence(repo, tip, prefix) if policy else None
+    previous = _original_previous(repo, tip, prefix, envelope, inventory,
+                                  approved_main_sha=approved_main_sha, seen=seen) if policy else None
     _fresh_inventory(data, inventory, envelope, error_code='invalid_latest_refresh_inventory',
-                     refresh_policy=policy, evidence=proof)
-    return inventory
+                     refresh_policy=policy, evidence=proof, expected_previous_slugs=previous)
+    return inventory, path
 
 
 def _json_safe(value):
@@ -339,10 +444,11 @@ def execute_request(request: dict, *, execution: dict, repository: Path,
         validated = _transport(repository, request, execution)
         if validated['operation'] == 'refresh':
             policy = _refresh_policy(repository, execution['product_sha'])
-            previous = _previous(repository, execution['product_sha'])
+            previous, previous_inventory = _previous_context(repository, execution['product_sha'])
             expected = tracked_public_slugs(previous, _previous_slugs(previous)[0])
             provenance = refresh_snapshot(output / 'snapshot',
-                                          previous=previous, fetch=fetch)
+                                          previous=previous, fetch=fetch,
+                                          previous_inventory=previous_inventory if policy else None)
             source_path = output / 'snapshot/candidates.csv'
         else:
             if validated['source_snapshot']['path'].startswith('runs/') and not _ancestor(
@@ -391,27 +497,8 @@ def verify_transport(repo: Path, *, event_sha: str, ref_name: str, run_id: str,
     product_sha_file.unlink(missing_ok=True)
     parent = None
     try:
-        if type(event_sha) is not str or not SHA.fullmatch(event_sha):
-            raise RunnerError('invalid_event_sha')
-        _commit(repo, event_sha)
-        parents = _git(repo, 'rev-list', '--parents', '-n', '1', event_sha).decode().split()
-        if len(parents) != 2:
-            raise RunnerError('invalid_request_parents')
-        parent = parents[1]
-        main_sha = _git(repo, 'rev-parse', 'HEAD').decode().strip()
-        if not _ancestor(repo, parent, main_sha):
-            raise RunnerError('product_not_on_main')
-        identity = ref_name.removeprefix('efficiency-run/') if ref_name.startswith('efficiency-run/') else ''
-        if not UUID.fullmatch(identity):
-            raise RunnerError('invalid_event_ref')
-        request_path = 'bridge/requests/' + identity + '.json'
-        changes = _git(repo, 'diff-tree', '--no-commit-id', '--name-status', '-r', event_sha).decode().splitlines()
-        if changes != ['A\t' + request_path]:
-            raise RunnerError('invalid_changed_paths')
-        request_bytes = _read(repo, event_sha, request_path)
-        request = decode_request(request_bytes.decode('utf-8'))
-        validate_request(request, branch=ref_name, parent_sha=parent,
-                         changed_paths=[('A', request_path)])
+        facts = _verified_transport(repo, event_sha=event_sha, ref_name=ref_name)
+        parent, request_bytes, request = (facts[key] for key in ('product_sha', 'request_bytes', 'request'))
         # An atomic handoff; no JSON-derived paths are used by the workflow.
         _atomic(product_sha_file.parent / 'request.json', request_bytes)
         _atomic(product_sha_file, (parent + '\n').encode('ascii'))
@@ -421,6 +508,7 @@ def verify_transport(repo: Path, *, event_sha: str, ref_name: str, run_id: str,
                              '\nrequest_id=' + request['request_id'] + '\n')
         return True
     except Exception as exc:
+        parent = getattr(exc, 'product_sha', parent)
         (product_sha_file.parent / 'request.json').unlink(missing_ok=True)
         write_diagnostic_failure(output, event_sha=event_sha, ref_name=ref_name,
                                  product_sha=parent, run_id=run_id, run_attempt=run_attempt,

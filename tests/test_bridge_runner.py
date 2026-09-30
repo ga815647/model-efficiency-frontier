@@ -246,6 +246,107 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result['status'], 'success', result['errors'])
         self.assertEqual(result['caveats'], envelope['caveats'])
 
+    def new_snapshot_output(self):
+        from refresh_inventory_fixtures import refresh_pages
+        self.new_product()
+        req, execution = self.fresh_request()
+        output = Path(self.tmp.name) / 'new-output'
+        envelope = execute_request(req, execution=execution, repository=self.repo, output=output,
+                                   fetch=refresh_pages().__getitem__)
+        self.assertEqual(envelope['status'], 'success', envelope['errors'])
+        return output, envelope
+
+    def install_new_output(self, output, envelope):
+        import shutil
+        git(self.repo, 'checkout', '-q', '-B', 'results')
+        target = f'results/{UUID}/{envelope["run_id"]}-1'
+        shutil.copytree(output, self.repo / target)
+        (self.repo / 'latest-refresh.json').write_text(json.dumps(dict(result_path=target + '/result.json',
+            request_commit_sha=envelope['request_commit_sha'])))
+        git(self.repo, 'add', '.')
+        git(self.repo, 'commit', '-qm', 'fixed new refresh')
+        return dict(commit=git(self.repo, 'rev-parse', 'HEAD'), path=target + '/snapshot/candidates.csv')
+
+    def test_fixed_source_readers_reject_coherent_predecessor_forgery(self):
+        from bridge.runner import _previous
+        output, envelope = self.new_snapshot_output()
+        path = output / 'snapshot/evidence/source_map.json'
+        mapping = json.loads(path.read_text())
+        # Independently literal original context; do not derive the expected P
+        # from the reconciliation being attacked.
+        mapping['previous_inventory'] = dict(product_sha=self.product, results_commit=None, result_path=None)
+        self.assertEqual(mapping['reconciliation']['previous_tracked_slugs'], ['inkling', 'minimax-m2-7'])
+        mapping['reconciliation']['previous_tracked_slugs'] = []
+        mapping['reconciliation']['tracked_slugs'] = sorted(mapping['inventory']['slugs'])
+        envelope['caveats'] = [c for c in envelope['caveats'] if not c.startswith('來源退出：')]
+        path.write_text(json.dumps(mapping))
+        (output / 'result.json').write_text(json.dumps(envelope))
+        locator = self.install_new_output(output, envelope)
+        for reader in ('previous', 'materialize'):
+            with self.subTest(reader=reader), self.assertRaises(ValueError):
+                if reader == 'previous':
+                    _previous(self.repo, self.product)
+                else:
+                    materialize_snapshot(locator, self.repo, Path(self.tmp.name) / 'forged')
+
+    def test_fixed_readers_require_exact_predecessor_locator(self):
+        from bridge.runner import _previous
+        output, envelope = self.new_snapshot_output()
+        path = output / 'snapshot/evidence/source_map.json'
+        original = json.loads(path.read_text())
+        original['previous_inventory'] = dict(product_sha=self.product, results_commit=None, result_path=None)
+        locator = self.install_new_output(output, envelope)
+        current_map = self.repo / locator['path'].removesuffix('candidates.csv') / 'evidence/source_map.json'
+        for change in ('absent', 'product', 'noncommit', 'self', 'unknown_field', 'duplicate'):
+            mapping = json.loads(json.dumps(original))
+            if change == 'absent':
+                del mapping['previous_inventory']
+            elif change == 'product':
+                mapping['previous_inventory']['product_sha'] = self.locator['commit']
+            elif change == 'noncommit':
+                mapping['previous_inventory']['results_commit'] = git(self.repo, 'rev-parse', 'HEAD:' + ARCHIVE + '/candidates.csv')
+            elif change == 'self':
+                mapping['previous_inventory']['results_commit'] = locator['commit']
+                mapping['previous_inventory']['result_path'] = locator['path'].removesuffix('snapshot/candidates.csv') + 'result.json'
+            elif change == 'unknown_field':
+                mapping['previous_inventory']['extra'] = 'not allowed'
+            raw = json.dumps(mapping)
+            if change == 'duplicate':
+                raw = raw.replace('"results_commit": null', '"results_commit": null, "results_commit": null')
+            current_map.write_text(raw)
+            git(self.repo, 'add', '.')
+            git(self.repo, 'commit', '-qm', 'tampered locator ' + change)
+            forged = dict(locator, commit=git(self.repo, 'rev-parse', 'HEAD'))
+            for reader in ('previous', 'materialize'):
+                with self.subTest(change=change, reader=reader), self.assertRaises(ValueError):
+                    if reader == 'previous':
+                        _previous(self.repo, self.product)
+                    else:
+                        materialize_snapshot(forged, self.repo, Path(self.tmp.name) / change)
+
+    def test_new_source_cannot_strip_locator_by_claiming_legacy_product(self):
+        from bridge.runner import _previous
+        output, envelope = self.new_snapshot_output()
+        locator = self.install_new_output(output, envelope)
+        prefix = locator['path'].removesuffix('snapshot/candidates.csv')
+        path = self.repo / prefix / 'snapshot/evidence/source_map.json'
+        mapping = json.loads(path.read_text())
+        del mapping['reconciliation']
+        mapping.pop('previous_inventory', None)
+        envelope['product_sha'] = self.locator['commit']  # authorized but not original product
+        envelope['caveats'] = [c for c in envelope['caveats'] if not c.startswith('來源退出：')]
+        path.write_text(json.dumps(mapping))
+        (self.repo / prefix / 'result.json').write_text(json.dumps(envelope))
+        git(self.repo, 'add', '.')
+        git(self.repo, 'commit', '-qm', 'forged legacy downgrade')
+        forged = dict(locator, commit=git(self.repo, 'rev-parse', 'HEAD'))
+        for reader in ('previous', 'materialize'):
+            with self.subTest(reader=reader), self.assertRaises(ValueError):
+                if reader == 'previous':
+                    _previous(self.repo, self.product)
+                else:
+                    materialize_snapshot(forged, self.repo, Path(self.tmp.name) / 'legacy-forgery')
+
     def test_new_product_recompute_legacy_source_does_not_require_new_proof(self):
         self.publish_refresh_fixture(schema_version=2)
         locator = dict(commit=git(self.repo, 'rev-parse', 'HEAD'), path=f'results/{UUID}/777-1/snapshot/candidates.csv')

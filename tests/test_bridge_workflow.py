@@ -62,6 +62,19 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(self.sha_file.read_text().strip(), self.product)
         self.assertFalse((self.output / 'result.json').exists())
 
+    def test_shared_read_only_gate_returns_fixed_facts_without_handoff_writes(self):
+        from bridge import runner
+        self.submit()
+        head = git(self.repo, 'rev-parse', 'HEAD')
+        facts = runner._verified_transport(self.repo, event_sha=self.event, ref_name=self.branch)
+        self.assertEqual(facts['product_sha'], self.product)
+        self.assertEqual(facts['approved_main_sha'], head)
+        self.assertEqual(facts['request'], self.request)
+        self.assertEqual(json.loads(facts['request_bytes']), self.request)
+        self.assertEqual(git(self.repo, 'rev-parse', 'HEAD'), head)
+        self.assertFalse(self.sha_file.exists())
+        self.assertFalse(self.output.exists())
+
     def test_code_change_rejected_and_failed_output_correlated(self):
         self.submit(code=True)
         self.assertEqual(self.verify(), 1)

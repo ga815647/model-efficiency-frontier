@@ -175,7 +175,8 @@ def _diagnostic(evidence, benchmark):
             'public_version': benchmark, 'mixed_into_public_rows': False}
 
 
-def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_public) -> dict:
+def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_public,
+                     previous_inventory: dict | None = None) -> dict:
     """Create a new destination only. Failed validation leaves diagnostic evidence, not a CSV.
 
     Previous inventory: {'slugs': paid_public_slugs, 'contributor_efforts': ['xhigh', ...]}.
@@ -246,6 +247,8 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
     source_map = {'source_by_slug': included, 'excluded': excluded, 'availability': availability,
                   'contributor': [], 'inventory': {'slugs': sorted(included), 'contributor_efforts': []},
                   'reconciliation': rec}
+    if previous_inventory is not None:
+        source_map['previous_inventory'] = dict(previous_inventory)
 
     def save_missing_diagnostics(slugs, records):
         current = {r['slug']: r for r in records}

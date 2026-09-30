@@ -1,4 +1,6 @@
 import csv
+import io
+from contextlib import redirect_stderr
 import os
 import unittest
 
@@ -164,7 +166,10 @@ class TestVerify(unittest.TestCase):
         import sys
         sys.path.insert(0, "scripts")
         import ladder
-        self.assertEqual(ladder.load_config_refs("/nonexistent/opencode.json"), {})
+        with redirect_stderr(io.StringIO()) as stderr:
+            self.assertEqual(ladder.load_config_refs("/nonexistent/opencode.json"), {})
+        self.assertIn("WARNING: cannot load config refs from /nonexistent/opencode.json", stderr.getvalue())
+        self.assertIn("No such file or directory", stderr.getvalue())
 
     def test_two_groups_split(self):
         import sys
