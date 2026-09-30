@@ -22,6 +22,67 @@ def git(repo, *args):
 
 
 class PublishTests(unittest.TestCase):
+    def test_coherent_identity_and_date_forgery_at_publisher_and_both_readers(self):
+        import shutil
+        from refresh_inventory_fixtures import refresh_pages, recalculate_mutation, IDENTITY_MUTATIONS
+        from scripts.refresh_snapshot import refresh_snapshot
+        from bridge.runner import materialize_snapshot
+        mutations = [*IDENTITY_MUTATIONS, 'future-date', 'missing-date', 'invalid-date', 'conflicting-date']
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                base = self.base / mutation
+                base.mkdir()
+                previous = {'slugs': ['inkling', 'minimax-m2-7']}
+                repo, product = product_context(base, previous, new_policy=True)
+                output = base / 'output'
+                output.mkdir()
+                provenance = refresh_snapshot(output / 'snapshot', previous=previous,
+                    fetch=refresh_pages().__getitem__, previous_inventory=dict(
+                        product_sha=product, results_commit=None, result_path=None))
+                calculation, report = calculate_snapshot(output / 'snapshot/candidates.csv', PARAMETERS, provenance)
+                envelope = make_envelope(dict(request_data(), product_sha=product), dict(
+                    request_commit_sha=product, run_id='forged', run_attempt=1,
+                    run_url='https://github.com/example/actions/runs/forged'), calculation=calculation, errors=[])
+                csv_path = output / 'snapshot/candidates.csv'
+                map_path = output / 'snapshot/evidence/source_map.json'
+                if mutation in IDENTITY_MUTATIONS or mutation == 'future-date':
+                    data, mapping, envelope = recalculate_mutation(csv_path.read_bytes(),
+                        json.loads(map_path.read_text()), envelope, mutation)
+                    csv_path.write_bytes(data)
+                    map_path.write_text(json.dumps(mapping))
+                else:
+                    manifest_path = output / 'snapshot/evidence/sources.json'
+                    manifest = json.loads(manifest_path.read_text())
+                    if mutation == 'missing-date':
+                        del manifest['checked_date']
+                    else:
+                        manifest['checked_date'] = '2026-02-29' if mutation == 'invalid-date' else '1999-01-01'
+                    manifest_path.write_text(json.dumps(manifest))
+                (output / 'result.json').write_text(json.dumps(envelope))
+                (output / 'report.md').write_text(report)
+                (output / 'report.html').write_text('<title>Report</title>')
+                with self.subTest(consumer='publisher'):
+                    with self.assertRaises(PublishError):
+                        publish_result(output, remote=str(self.remote), source_repository=repo,
+                                       trusted_product_sha=product)
+                # Install as the unique original introduction: rejection must
+                # come from proof, not from rewriting immutable publication.
+                git(repo, 'checkout', '-q', '-b', 'results')
+                target = f'results/{envelope["request_id"]}/forged-1'
+                shutil.copytree(output, repo / target)
+                (repo / 'latest-refresh.json').write_text(json.dumps(dict(
+                    result_path=target + '/result.json', request_commit_sha=product)))
+                git(repo, 'add', '.')
+                git(repo, 'commit', '-qm', 'forged original introduction')
+                locator = dict(commit=git(repo, 'rev-parse', 'HEAD'), path=target + '/snapshot/candidates.csv')
+                for reader in ('previous', 'materialize'):
+                    error = 'invalid_latest_refresh_inventory' if reader == 'previous' else 'result_inventory_mismatch'
+                    with self.subTest(reader=reader), self.assertRaisesRegex(ValueError, error):
+                        if reader == 'previous':
+                            _previous(repo, product)
+                        else:
+                            materialize_snapshot(locator, repo, base / 'read')
+
     def test_success_refresh_requires_trusted_context(self):
         output, _ = self.valid_refresh_output()
         with self.assertRaisesRegex(PublishError, 'missing_trusted_product_context'):

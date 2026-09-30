@@ -1,8 +1,21 @@
 # Refresh Reconciliation Acceptance
 
-**最新狀態：Task1–4及Issue #2獨立覆核通過；Task5本地完整測試／75保護物件／9/30保存原頁重播／9/26固定控制驗證通過，待控制端唯一整條分支最終覆核。整條分支尚未正式發布或執行修復後live驗收。** 使用者最新要求完成Chat/main可用性，控制端已獲最終覆核乾淨後非force發布及live／固定重算驗收授權；不需再問一般實作批准，不代表遠端動作已完成。
+**最新狀態：Task1–4及Issue #2獨立覆核通過；整條分支最終覆核發現兩項Important共同proof缺口及一項Minor狀態文件過期，已作單輪本地修正，待控制端限定再覆核，尚非最終乾淨。Task5本地完整測試／75保護物件／9/30保存原頁重播／9/26固定控制原驗證通過，本輪重驗詳見Final review fix wave節。整條分支尚未正式發布或執行修復後live驗收。** 使用者最新要求完成Chat/main可用性，控制端已獲最終覆核乾淨後非force發布及live／固定重算驗收授權；不需再問一般實作批准，不代表遠端動作已完成。
 
 Execution base: bcb70e1bf78079facf3525858f15c593bc855a7d
+
+## Final review fix wave — local evidence, re-review pending
+
+首次整條分支最終覆核（head `3b865a437d28e1ecdab3fcfb818450aa7652a5d8`）發現兩项Important，並非此前276-test成功已覆蓋的行為：unchanged raw量測可一致重標public身份；manifest `checked_date`可與CSV／map／result日期矛盾而固定readers仍接受。Minor為兩處未限定的handoff pending狀態。依單輪brief本地修正，不重新設計、不派agents／reviewers、不改schema／legacy／routing。
+
+- `scripts/public_identity.py`抽出原effort parser一次，`public_identity(record)`給出model／effort／model_version（exact slug）／identity／provider／pricing_plan六欄；producer及共同`bridge/inventory.py` gate共用，保留`refresh_snapshot._model_effort`相容alias。只對usable public rows解析effort，退休／不可用未知qualifier不重新引入失敗。Contributor與frozen math不改。
+- 新policy共同proof要求manifest `checked_date`為字串，`date.fromisoformat(value).isoformat() == value`；因此只准canonical Gregorian `YYYY-MM-DD`，缺值、basic／week／非canonical／無效日期拒絕。所有public CSV和map checked_date及result `source_dates == [checked_date]`綁該manifest，不用today回寫歷史，真legacy不加raw/date要求。unit utility補真實dated manifest，舊saved inputs未改。
+- 真TDD：五種coherent model／effort／provider／plan／identity攻擊及future date重算actual v2 calculation／envelope／CSV digest後驗證；common-unit RED為15 failures／13 tests，integration RED為23 failures／1 table-driven test（publisher既有capability已擋date變異，不將此誤稱原publisher日期漏洞）。GREEN檢驗實際local `publish_result`及兩個Git固定readers，reader assert精確inventory錯誤，原unique immutable introduction及P合法，避免origin gate假陽性。
+- Covering：`PYTHONPATH=tests:. python3 -m unittest test_bridge_inventory test_bridge_publish test_bridge_runner test_refresh_sources test_refresh_inventory`，115 tests／39.682s／OK。最終產品／test edits後full discovery一次：`python3 -m unittest discover -s tests`，279 tests／51.897s／OK，无stderr警告。純狀態文件closeout在suite後，不改產品／test行為。
+- 保存重播：重跑Task5 ignored script，75 mode/type/blob物件0變更、protected diff／whitespace exit0，五保存原頁SHA皆相同；9/30仍105paid／15chain／9final、Sol6.1 xhigh／Luna low，9/26仍155statuses／154usable／19chain／10final、Astra xhigh／Luna low／來源9/26。兩控制candidate statuses／chain／ladder／anchors／trace／grade-B等語義逐欄相同；CSV及MD／HTML SHA皆與Task5相同。result envelope runtime commit metadata可變，非數值／身份變更。穩定calculation hashes：9/30 `1424cedb3c9c60b52ed880f5ff33e07d808be58480972faa89379ebd5ec6f6d8`；9/26 `39bc28bd73152fc07fc40fb8e324189b7d8acd3052c2005956a5752179f4c793`。
+- `chatgpt-instructions.md`及chat-routing README只更正status；對`3b865a4`核對instructions status段以外bytes及契約整檔不變，10/10離線GREEN／獨立review紀錄仍有效，未宣稱新版目標Chat／settings通過。
+
+本輪日志／精確interface／commit／自查及concerns見`.superpowers/sdd/2026-09-30-refresh-reconciliation/final-fix-report.md`。本地修正完成不等於獨立最終clean：控制端持有唯一限定再覆核及其後已授權非force發布／live／fixed驗收；無remote writes、新request／issues／settings或protected bytes修改。
 
 ## Approval and scope
 
@@ -26,7 +39,7 @@ Execution base: bcb70e1bf78079facf3525858f15c593bc855a7d
 - [x] Task 4：退出摘要及契約，實作／TDD本地完成（report 10、HTML 5、full 276 tests OK）；本次控制端交接確認已獨立覆核通過，execution baseline `387fb0f`。
 - [x] Issue #2 bounded task：`473b0b8`，pre-write freshness disclosure／十個對談fixtures；10/10離線consumer GREEN，独立spec／quality review approved。
 - [x] Task 5 local：完整測試、75保護物件、保存原頁重播、固定historical重算及docs自查。
-- [ ] Task 5 whole-branch review：控制端下一步，worker未派reviewer。
+- [ ] Task 5 whole-branch review：首次最終覆核完成，兩項Important及一項Minor本地修正，待控制端限定再覆核；worker未派reviewer。
 - [ ] 正式整合／發布：已授權最終覆核乾淨後由控制端非force執行，尚未執行。
 - [ ] 新live refresh／新fixed recompute／artifact及pointer：已授權，由控制端於發布後驗收，尚未執行。
 - [ ] 目標Chat新版退場摘要／短續接路由：待實測，不重做connector能力問卷。

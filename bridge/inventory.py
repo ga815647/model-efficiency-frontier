@@ -4,9 +4,11 @@ import csv
 import io
 import hashlib
 import json
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from scripts.aa_public import LEADERBOARD, parse_leaderboard
+from scripts.public_identity import public_identity
 from scripts.refresh_inventory import (POLICY, DISCLOSURE_PREFIX, build_reconciliation,
                                       blocking_candidates, tracked_public_slugs, source_exit_caveats)
 
@@ -35,6 +37,9 @@ def _validate_proof(source_map, envelope, public, evidence, expected_previous_sl
         raise ValueError('missing inventory proof')
     parsed = parse_leaderboard(evidence['leaderboard.html'].decode('utf-8'))
     sources = _strict_json(evidence['sources.json'])
+    checked_date = sources['checked_date']
+    if type(checked_date) is not str or date.fromisoformat(checked_date).isoformat() != checked_date:
+        raise ValueError('invalid acquisition date')
     if sources['sha256_by_url'][LEADERBOARD] != hashlib.sha256(evidence['leaderboard.html']).hexdigest():
         raise ValueError('leaderboard hash mismatch')
     saved = _strict_json(evidence['leaderboard_records.json'])
@@ -67,6 +72,10 @@ def _validate_proof(source_map, envelope, public, evidence, expected_previous_sl
     for row in public:
         item = by_slug[row['model_version']]
         fact = source_map['source_by_slug'][row['model_version']]
+        if any(row[key] != value for key, value in public_identity(item).items()):
+            raise ValueError('canonical public identity mismatch')
+        if row['checked_date'] != checked_date or fact['checked_date'] != checked_date:
+            raise ValueError('acquisition date mismatch')
         for key in ('score', 'cost_per_task'):
             if (isinstance(fact[key], bool) or fact[key] is None or
                     Decimal(row[key]) != Decimal(str(item[key])) or
@@ -75,7 +84,7 @@ def _validate_proof(source_map, envelope, public, evidence, expected_previous_sl
         if row['evidence_url'] != LEADERBOARD or fact['source_url'] != LEADERBOARD:
             raise ValueError('public source mismatch')
         dates.add(row['checked_date'])
-    if dates != set(envelope['source_dates']):
+    if dates != {checked_date} or envelope['source_dates'] != [checked_date]:
         raise ValueError('source date mismatch')
     expected = source_exit_caveats(parsed, rec)
     actual = [c for c in envelope['caveats'] if c.startswith(DISCLOSURE_PREFIX)]

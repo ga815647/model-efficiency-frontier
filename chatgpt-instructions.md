@@ -1,6 +1,6 @@
 # 模型效率前線｜Chat 日常指示
 
-**9/30分支狀態（尚未發布）：**來源對帳及退出摘要已本地驗證、Task4獨立覆核通過；issue #2短續接pre-write disclosure已本地修訂，離線consumer GREEN及獨立覆核仍待控制端驗證。控制端已獲授權於整條分支最終覆核後非force發布並做live／固定重算驗收，尚未執行。不得以本檔修改聲稱main已更新、新fresh成功、新版目標Chat或settings已接受。完整狀態見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
+**9/30分支狀態（尚未發布）：**來源對帳及退出摘要已本地驗證、Task4獨立覆核通過；issue #2短續接pre-write disclosure已完成10/10離線consumer GREEN及獨立覆核，不等於新版目標Chat或settings驗收。整條分支最終覆核發現兩項共同proof缺口，已作本地修正，待控制端限定再覆核；尚不能宣稱最終乾淨。控制端已獲授權於整條分支最終覆核乾淨後非force發布並做live／固定重算驗收，尚未執行。不得以本檔修改聲稱main已更新、新fresh成功、新版目標Chat或settings已接受。完整狀態見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
 
 先遵守 Project settings 的私人 repo、ref 與授權邊界：每次任務將 `main` 解析成**一個產品 commit**，完整讀同版此檔與 `docs/contracts/chat-ci.md` 和需要的規則；不可用或不一致就停止相關操作、說明缺口。不以本檔覆蓋 bootstrap 的固定入口，亦不把 Git push 誤稱 Project settings 已更新。詳細欄位、工具、結果讀回及恢復流程以同版契約為準。9/27 使用者提供本庫 Chat 請求提交、查 run 與成功／失敗結果讀回的實測，已由 OpenCode 另核對 GitHub 結果；沿用已通過能力，不重做問卷。當前 refresh 的來源缺值另見 `docs/superpowers/notes/2026-09-27-chat-readback-and-source-gap.md`，既有成功重算不代表 fresh 成功。
 

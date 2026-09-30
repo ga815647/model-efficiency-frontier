@@ -73,7 +73,8 @@ def inventory_bundle(records, previous_slugs):
                       caveats=['Inventory-unit fixture, not live acquisition'] + source_exit_caveats(parsed, rec))
     evidence = {'leaderboard.html': raw,
                 'leaderboard_records.json': json.dumps(parsed, default=str).encode(),
-                'sources.json': json.dumps({'sha256_by_url': {LEADERBOARD: hashlib.sha256(raw).hexdigest()}}).encode()}
+                'sources.json': json.dumps({'checked_date': '2026-09-30',
+                    'sha256_by_url': {LEADERBOARD: hashlib.sha256(raw).hexdigest()}}).encode()}
     with tempfile.TemporaryDirectory() as temp:
         path = Path(temp) / 'candidates.csv'
         path.write_bytes(data)
@@ -91,6 +92,53 @@ def record(slug, *, name=None, score='40', cost='1', estimated=False, deprecated
     return dict(slug=slug, name=name or slug, creator='Fixture',
                 score=scalar(score), cost_per_task=scalar(cost), is_estimated=estimated,
                  deprecated=deprecated, price1m_input=None, price1m_output=None, cache_hit_price=None)
+
+
+IDENTITY_MUTATIONS = {
+    'model': {'model': 'GPT-99 Invented', 'identity': 'GPT-99 Invented max AA-public published-price'},
+    'effort': {'effort': 'off', 'identity': 'GPT-6.1 Sol off AA-public published-price'},
+    'provider': {'provider': 'Invented route'},
+    'plan': {'pricing_plan': 'Invented plan'},
+    'identity': {'identity': 'GPT-99 Invented low AA-public published-price'},
+}
+
+
+def recalculate_mutation(data, mapping, envelope, mutation):
+    """Coherently forge output fields, keeping original raw proof unchanged."""
+    from copy import deepcopy
+    from bridge.result import calculate_snapshot, make_envelope, validate_envelope
+    from test_bridge_request import request_data
+    from test_bridge_result import PARAMETERS
+    mapping = deepcopy(mapping)
+    rows = list(csv.DictReader(io.StringIO(data.decode())))
+    row = next(r for r in rows if r['model_version'] == 'gpt-6-1-sol')
+    if mutation == 'future-date':
+        for r in rows:
+            r['checked_date'] = '2030-01-01'
+        for fact in mapping['source_by_slug'].values():
+            fact['checked_date'] = '2030-01-01'
+    else:
+        row.update(IDENTITY_MUTATIONS[mutation])
+    buf = io.StringIO(newline='')
+    writer = csv.DictWriter(buf, fieldnames=COLUMNS)
+    writer.writeheader()
+    writer.writerows(rows)
+    data = buf.getvalue().encode()
+    provenance = {k: deepcopy(envelope[k]) for k in (
+        'benchmark', 'benchmark_version', 'cost_basis', 'version_status', 'source_dates', 'caveats')}
+    provenance['source_locator'] = deepcopy(envelope['source_snapshot'])
+    provenance['source_locator']['sha256'] = hashlib.sha256(data).hexdigest()
+    if mutation == 'future-date':
+        provenance['source_dates'] = ['2030-01-01']
+    with tempfile.TemporaryDirectory() as temp:
+        path = Path(temp) / 'candidates.csv'
+        path.write_bytes(data)
+        calculation, _ = calculate_snapshot(path, PARAMETERS, provenance)
+    request = dict(request_data(), product_sha=envelope['product_sha'])
+    execution = {k: envelope[k] for k in ('request_commit_sha', 'run_id', 'run_attempt', 'run_url')}
+    forged = make_envelope(request, execution, calculation=calculation, errors=[])
+    validate_envelope(forged)
+    return data, mapping, forged
 
 
 GPT_ENTRIES = [

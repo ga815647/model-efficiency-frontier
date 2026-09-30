@@ -10,6 +10,29 @@ from refresh_inventory_fixtures import record, inventory_bundle, flight
 
 
 class InventoryProofTests(unittest.TestCase):
+    def test_coherent_identity_and_future_date_forgery_rejected(self):
+        from refresh_inventory_fixtures import recalculate_mutation, IDENTITY_MUTATIONS
+        data, mapping, envelope, evidence = inventory_bundle([record('gpt-6-1-sol',
+            name='GPT-6.1 Sol (max)', score='51.8332597011541', cost='0.7241670655535033')], set())
+        for mutation in [*IDENTITY_MUTATIONS, 'future-date']:
+            forged_data, forged_map, forged_envelope = recalculate_mutation(data, mapping, envelope, mutation)
+            with self.subTest(mutation=mutation), self.assertRaises(InventoryError):
+                self.validate(data=forged_data, mapping=forged_map, envelope=forged_envelope,
+                              evidence=evidence, expected_previous_slugs=set())
+
+    def test_manifest_date_required_canonical_and_agrees(self):
+        for date in (None, True, '', '20260930', '2026-9-30', '2026-02-29',
+                     '0000-01-01', '2026-09-30T00:00:00', '1999-01-01'):
+            evidence = dict(self.evidence)
+            manifest = json.loads(evidence['sources.json'])
+            if date is None:
+                del manifest['checked_date']
+            else:
+                manifest['checked_date'] = date
+            evidence['sources.json'] = json.dumps(manifest).encode()
+            with self.subTest(date=date), self.assertRaises(InventoryError):
+                self.validate(evidence=evidence)
+
     def setUp(self):
         self.previous = {'inkling', 'minimax-m2-7'}
         self.records = [record('inkling', cost=None), record('minimax-m2-7', deprecated=True, cost=None),
@@ -149,7 +172,8 @@ class InventoryProofTests(unittest.TestCase):
                 self.validate(mapping=bad)
 
     def test_untracked_unusable_records_need_no_exit_disclosure(self):
-        records = [record('estimated', estimated=True), record('missing', score=None),
+        records = [record('retired', name='Retired (unknown qualifier)', deprecated=True),
+                   record('estimated', name='Estimated (unknown qualifier)', estimated=True), record('missing', score=None),
                    record('zero', cost='0'), record('paid')]
         data, mapping, envelope, evidence = inventory_bundle(records, set())
         self.validate(data=data, mapping=mapping, envelope=envelope, evidence=evidence)

@@ -19,6 +19,7 @@ from scripts.meta_pricing import URL as META, parse_meta_pricing, rescale_contri
 from scripts.meta_availability import MODELS_URL, parse_meta_models, unavailable_reason
 from scripts.refresh_inventory import (classify_record, build_reconciliation, blocking_candidates,
                                        tracked_public_slugs, source_exit_caveats)
+from scripts.public_identity import model_effort as _model_effort, public_identity
 
 SOURCES = (LEADERBOARD, GROK, MUSE, META, MODELS_URL)
 
@@ -46,33 +47,6 @@ def fetch_public(url: str) -> bytes:
 
 def _json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, default=str) + '\n')
-
-
-def _model_effort(name, slug):
-    """Only documented reasoning labels become effort; slug pins checkpoint/variant.
-
-    Dates/versions are *not* reasoning levels; keep their visible qualifier in
-    model as well as the slug in model_version. Unknown qualifiers fail closed.
-    """
-    match = re.fullmatch(r'(.*?)\s*\(([^()]*)\)', name)
-    if not match:
-        return name.strip(), 'unspecified', slug
-    base, qualifier = match.group(1).strip(), match.group(2).strip()
-    label = qualifier.lower()
-    direct = {'off', 'low', 'medium', 'high', 'xhigh', 'max', 'reasoning', 'non-reasoning'}
-    if label in direct:
-        return base, label, slug
-    effort = re.fullmatch(r'(?:adaptive )?reasoning, (max|xhigh|high|medium|low) effort(?:, .+)?', label)
-    if not effort:
-        effort = re.fullmatch(r'(max|xhigh|high|medium|low) effort(?:, .+)?', label)
-    if not effort:
-        effort = re.fullmatch(r'(max|xhigh|high|medium|low), based on .+', label)
-    if effort:
-        return base, effort.group(1), slug
-    if re.fullmatch(r'(?:[A-Za-z]+\s+)?(?:\d{2,4}|\d{4}-\d{2}(?:-\d{2})?|\d{4})', qualifier) or re.fullmatch(
-            r"[A-Za-z]+\s+'\d{2}", qualifier):
-        return name.strip(), 'unspecified', slug
-    raise SourceError('effort_ambiguous', LEADERBOARD, slug)
 
 
 def _previous_slugs(previous):
@@ -230,12 +204,10 @@ def refresh_snapshot(destination: Path, *, previous: dict | None, fetch=fetch_pu
             continue
         if any(not Decimal(str(n)).is_finite() for n in (score, cost)) or Decimal(str(cost)) < 0:
             raise SourceError('invalid_measurement', LEADERBOARD, item['slug'])
-        model, effort, checkpoint = _model_effort(item['name'], item['slug'])
+        identity = public_identity(item)
         included[item['slug']] = {'source_url': LEADERBOARD, 'checked_date': today,
                                   'score': score, 'cost_per_task': cost}
-        rows.append({'identity': f'{model} {effort} AA-public published-price',
-                     'model': model, 'effort': effort, 'provider': 'AA-public (first-party/median)',
-                     'pricing_plan': 'published-price', 'model_version': checkpoint,
+        rows.append({**identity,
                      'benchmark': 'AA-Intelligence-Index', 'benchmark_version': version['benchmark_version'],
                      'score': str(score), 'cost_per_task': str(cost), 'cost_basis': 'api',
                      'privacy': '', 'is_free': 'false', 'evidence_url': LEADERBOARD,
