@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-refresh-reconciliation-design.md`（使用者於書面審閱請求後回覆「繼續」，已確認；執行者必讀全篇）。
 
-**Status:** 計畫待使用者審閱，尚未開始產品實作。沿用既有 Subagent-driven，不重問執行方法。Issue #2 是已提出的 bounded 短設計，另外確認／驗收，不是本計畫的第二套子系統。
+**Status:** 使用者審阅計畫並釐清每次退役／缺值判定後回覆「可以了」，計畫已批准，開始產品實作。沿用既有 Subagent-driven，不重問執行方法。Issue #2 沿前述已確認的 bounded 短設計另外實作／驗收，不混入本計畫來源子系統。尚未授權正式發布或提交雲端驗收請求。
 
 ## Global Constraints
 
@@ -537,4 +537,4 @@ success時GPT-6.1五檔若當次仍完整可用，均在候選並有各自source
 - [x] Interface consistency：v2fixture從 `bridge.result` 生成；report測試沿現有 `self.payload`／`self.views`；新Git／CLI介面均有宣告及接線位置。
 - [x] Review Focus：五項均已分配Task1–4測例，包括Decimal小差、legacy降級、固定前次與source-only escape。
 
-計畫先交使用者審閱，尚未開始上述checkbox的產品步驟。審閱通過才依已選Subagent-driven逐項執行，不從「繼續寫計畫」推定產品實作或發布已獲准。
+使用者已對計畫及判定說明回覆「可以了」，依已選Subagent-driven逐項執行；進度以各task checkbox與驗收帳為準。實作批准不是正式發布授權。

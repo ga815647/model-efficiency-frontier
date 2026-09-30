@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-09-30 issue #1 計畫已批准、開始實作（最新，未發布）**：使用者在五任務計畫審閱及每次retired／missing_task_cost判定說明後回覆「可以了」，沿用Subagent-driven＋TDD，在既有`.worktrees/window-knee`／`docs/refresh-reconciliation`實作；固定execution base為`bcb70e1bf78079facf3525858f15c593bc855a7d`。issue #2按前述bounded短設計另做pre-write freshness guard與對談fixtures／路由驗收，不用#1取數成功替代。進度見`docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`；正式產品仍舊v2，尚未發布修復或建立新的雲端驗收request。實作批准不等於merge／push／發布／issue結案授權。
+
 > **2026-09-30 issue #1 書面規格已確認、實作計畫待審（最新，尚未實作／發布）**：使用者在 `2026-09-30-refresh-reconciliation-design.md` 的書面審閱請求後回覆「繼續」，本規格已確認。五任務計畫位於 `docs/superpowers/plans/2026-09-30-refresh-reconciliation.md`，待審閱後沿用既有 Subagent-driven；涵蓋純來源分類、proof／可信policy、新producer与Git／發布接線、退出摘要及整體／雲端驗收。對談及文件批准不等於已修產品或授權force發布；產品仍為既有v2，fresh尚有舊hard guard。issue #2 的bounded短設計另行確認／驗收，不用#1結果替代。
 
 > **2026-09-30 issue #1 政策方向已確認、書面規格待審（最新，尚未實作／發布）**：使用者要求已淘汰的舊模型可退出，不能綁架整批 pipeline，並對「MiniMax-M2.7 當次 deprecated=true 排行退役；Inkling deprecated=false 但本次 task cost 缺值，明示排除、不擋其他有效模型」回覆「好」。新對帳分開 observed／usable／tracked／retired，不沿用舊價、不代入相似身份、保留當次證據；退役退出後續強制追蹤，缺價未退役者仍追蹤。規格位於 `docs/superpowers/specs/2026-09-30-refresh-reconciliation-design.md`，待書面審閱；產品仍是 `0a6ea5d` 的已發布v2，live fresh仍有舊硬阻擋，不能宣稱修復或更新成功。9/30固定失敗原頁五個hash已獨立驗證並重播；未修改產品229測試基線通過。`CONTEXT.md` 只記術語，不取代本檔政策。issue #2 的短續接freshness guard另行處理／驗收，不把#1方向確認當作兩項均已完成。
