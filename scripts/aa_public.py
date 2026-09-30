@@ -128,6 +128,9 @@ def parse_leaderboard(html: str) -> list[dict]:
         if not isinstance(obj['name'], str) or not isinstance(obj.get('intelligenceIndexIsEstimated'), bool):
             raise SourceError('invalid_measurement', LEADERBOARD, str(obj.get('slug')))
         slug = obj['slug']
+        deprecated = obj.get('deprecated')
+        if deprecated is not None and type(deprecated) is not bool:
+            raise SourceError('invalid_measurement', LEADERBOARD, slug + ': deprecated')
         score = _scalar(obj['intelligenceIndex'], LEADERBOARD, slug, 'intelligenceIndex',
                         undefined_is_missing=True)
         cost = _scalar(obj.get('intelligenceIndexCostPerTask'), LEADERBOARD, slug,
@@ -137,7 +140,7 @@ def parse_leaderboard(html: str) -> list[dict]:
                         'score': score,
                         'cost_per_task': cost,
                         'is_estimated': obj.get('intelligenceIndexIsEstimated'),
-                        'deprecated': obj.get('deprecated'),
+                        'deprecated': deprecated,
                         'price1m_input': _optional_price(obj.get('price1mInputTokens'), slug, 'price1mInputTokens'),
                         'price1m_output': _optional_price(obj.get('price1mOutputTokens'), slug, 'price1mOutputTokens'),
                         'cache_hit_price': _optional_price(obj.get('cacheHitPrice'), slug, 'cacheHitPrice')})

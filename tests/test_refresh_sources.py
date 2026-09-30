@@ -26,6 +26,23 @@ def flight_record(raw):
 
 
 class RefreshSourcesTest(unittest.TestCase):
+    def test_deprecated_accepts_only_optional_boolean(self):
+        base = {'slug': 'inkling', 'name': 'Inkling (xhigh)', 'shortName': 'Inkling',
+                'modelCreatorName': 'Thinking Machines', 'intelligenceIndex': 24.9847810999384,
+                'intelligenceIndexIsEstimated': False, 'intelligenceIndexCostPerTask': 0.6070445010820831}
+        for value in (True, False, None):
+            with self.subTest(value=value):
+                row = parse_leaderboard(flight_record(json.dumps({**base, 'deprecated': value})))[0]
+                self.assertIs(row['deprecated'], value)
+        self.assertIsNone(parse_leaderboard(flight_record(json.dumps(base)))[0]['deprecated'])
+        for value in (0, 1, 'false', {}, []):
+            with self.subTest(value=value):
+                with self.assertRaises(SourceError) as caught:
+                    parse_leaderboard(flight_record(json.dumps({**base, 'deprecated': value})))
+                self.assertEqual(caught.exception.code, 'invalid_measurement')
+                self.assertEqual(caught.exception.url, URLS['leader'])
+                self.assertIn('inkling: deprecated', str(caught.exception))
+
     def test_models_page_proves_exact_muse_version_and_max_plan_restriction(self):
         html = (FIX / 'models.html').read_text()
         fact = parse_meta_models(html)
