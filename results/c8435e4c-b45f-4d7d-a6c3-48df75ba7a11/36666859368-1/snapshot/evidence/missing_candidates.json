@@ -1,0 +1,38 @@
+[
+  {
+    "slug": "inkling",
+    "local_snapshot_search": "present in approved previous inventory",
+    "leaderboard_source_check": {
+      "slug": "inkling",
+      "name": "Inkling (xhigh)",
+      "creator": "Thinking Machines",
+      "score": "24.9847810999384",
+      "cost_per_task": null,
+      "is_estimated": false,
+      "deprecated": false,
+      "price1m_input": 1,
+      "price1m_output": "4.05",
+      "cache_hit_price": "0.17"
+    },
+    "model_and_index_check": "release/model page disambiguation required; not verified absent",
+    "effort_id_disambiguation": "manual review required; do not substitute similar effort/ID"
+  },
+  {
+    "slug": "minimax-m2-7",
+    "local_snapshot_search": "present in approved previous inventory",
+    "leaderboard_source_check": {
+      "slug": "minimax-m2-7",
+      "name": "MiniMax-M2.7",
+      "creator": "MiniMax",
+      "score": "22.7578150287271",
+      "cost_per_task": null,
+      "is_estimated": false,
+      "deprecated": true,
+      "price1m_input": "0.3",
+      "price1m_output": "1.2",
+      "cache_hit_price": "0.06"
+    },
+    "model_and_index_check": "release/model page disambiguation required; not verified absent",
+    "effort_id_disambiguation": "manual review required; do not substitute similar effort/ID"
+  }
+]
