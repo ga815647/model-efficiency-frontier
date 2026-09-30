@@ -1,0 +1,8 @@
+{
+  "source_url": "https://dev.meta.ai/docs/models",
+  "model_id": "muse-spark-1.3",
+  "max_plan": "Standard",
+  "contributor_max_available": false,
+  "claim": "Supports all reasoning effort levels, including the \"max\" level for extended reasoning (available on Standard tier only).",
+  "checked_date": "2026-09-30"
+}
