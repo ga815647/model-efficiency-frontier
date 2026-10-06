@@ -6,7 +6,7 @@
 
 - 起始 main：`69a7aff6663034db9f20d6bf5413cab7487f6542`。完整 fetch 的 main、results、16 個 request branches 與 tags（當時無 tag），共 103 個可達 commit／1040 個可達 Git object；包含原始 sources、API 快照、失敗診斷及歷史報告。以 gitleaks v8.30.1、官方 archive checksum 核對後，`git --log-opts=--all --redact=100` 掃描，0 命中。沒有 `.env`、SSH private-key 或 credentials 命名的追蹤檔案。
 - Actions 當時全部 16 runs，32 份可下載 logs、全部 11 個 report artifacts 已下載掃描；2 個 issues、0 個 issue／PR inline／commit comments、0 release，Discussions 未啟用。遠端內容 gitleaks 遮罩掃描 0 命中。CLI artifact redirect 不可用，改用已授權 GitHub connector 下載並掃描，沒有用缺失資料冒充通過。
-- 未讀取平台保存的 secret 值、未列印 secret 或匯出未遮罩 finding。腳本中的環境變數名稱、dummy test tokens 与公開第三方 script 不是 token 值。掃描未命中不代表保證沒有一切敏感內容。
+- 未讀取平台保存的 secret 值、未列印 secret 或匯出未遮罩 finding。腳本中的環境變數名稱、dummy test tokens 與公開第三方 script 不是 token 值。掃描未命中不代表保證沒有一切敏感內容。
 - 公開頁／Meta 文件／AA API 回應與個人情境註記均在既有歷史；完整公開會連同这些 bytes 一起開放，不能只檢查目前 main 或只排除網站輸出。
 
 ## 明確再散布阻擋

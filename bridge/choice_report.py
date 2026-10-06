@@ -97,8 +97,12 @@ def _candidate(row):
 
 
 def _observation(row):
-    return (f'<li data-search="{_html(row["name"])}"><h3>{_html(row["name"])}</h3>'
+    search = ' '.join(v for v in (row['name'], row.get('model'), row.get('effort')) if v)
+    effort = ('來源未標示（unspecified）' if row.get('effort') == 'unspecified' else
+              row.get('effort') or '來源原文未能辨識，沒有代入其他 effort')
+    return (f'<li data-search="{_html(search)}"><h3>{_html(row.get("model") or row["name"])}</h3>'
             '<span class="badge">來源缺值／退出 · 本次未參戰</span>'
+            f'<p>effort：{_html(effort)}</p><small>來源原名：{_html(row["name"])}</small>'
             f'<p>{_html(row["state"])}：{_html(row["reason"])}</p>'
             '<p>不沿用舊價、不推定成本，也不借用其他 effort 的數字。</p>'
             f'<small>來源證據：{_html(row["slug"])}</small></li>')
@@ -151,7 +155,7 @@ def render_html(calculation, *, observations=(), links=()):
 <header><p class="eyebrow">MODEL EFFICIENCY FRONTIER</p><h1>模型怎麼選？<br>先看這兩個入口。</h1>
 <p class="intro">能力優先，或成本優先。從已選好的推薦階梯開始，依照你的任務比較每一檔的差異。</p>
 <div class="stamp"><span>來源日期：{_html(', '.join(calculation['source_dates']))}</span><span>{_html(operation)} · {operation_note}</span></div>
-<p class="note">使用者成本情境：GPT ×{_html(params['gpt_factor'])}／Grok ×{_html(params['grok_factor'])}／Contributor ×1。這是使用者情境，不是所有人的公開 API 售價；金額為美元／任務。</p>
+<p class="note">使用者成本情境：GPT ×{_html(params['gpt_factor'])}／Grok ×{_html(params['grok_factor'])}／Contributor ×1。GPT 預設 ×18 由個人約18.9倍保守取整；Grok 預設 ×16 為指定情境、非實測。這是使用者情境，不是所有人的公開 API 售價；金額為美元／任務。</p>
 </header>
 <section id="recommendations" class="cards" aria-label="保留檔入口">{''.join(cards)}</section>{same}
 {exit_section}

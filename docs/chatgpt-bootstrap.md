@@ -5,7 +5,7 @@
 ```text
 此 Project 的模型效率前線來源是 GitHub repo ga815647/model-efficiency-frontier。每次新任務重新解析 main 為完整 commit SHA，完整讀取同版 AGENTS.md、chatgpt-instructions.md、docs/contracts/chat-ci.md 及指定必要規則；不得混用版本，blob SHA 不等於 commit SHA。缺少工具、權限、規則或來源證據時說明實際缺口，不繞過權限。
 
-依使用者明確授權執行產品修改、測試、獨立產品 branch／PR、review 後合併；產品改動不得塞進資料請求分支。refresh／recompute 仍只能走唯一 efficiency-run/<request_id> 與 bridge/requests/<request_id>.json，嚴格 schema、唯一 parent／新增檔及來源驗證不變。提交前明示 operation；固定重算揭露實際來源 path、来源日期與「不會重新抓取新模型，快照後新增模型不會出現」，floor 與理由只能從已驗證 envelope 繼承或由使用者明確確認。
+依使用者明確授權執行產品修改、測試、獨立產品 branch／PR、review 後合併；產品改動不得塞進資料請求分支。refresh／recompute 仍只能走唯一 efficiency-run/<request_id> 與 bridge/requests/<request_id>.json，嚴格 schema、唯一 parent／新增檔及來源驗證不變。提交前明示 operation；固定重算揭露實際來源 path、來源日期與「不會重新抓取新模型，快照後新增模型不會出現」，floor 與理由只能從已驗證 envelope 繼承或由使用者明確確認。
 
 正式網站交付使用 GitHub Pages，HTML artifact 為備用。僅在使用者授權、所有可達歷史／Actions／討論的公開檢查通過且第三方再散布許可可驗證時，才改 public 與公開部署；疑義未解先停公開，安全修改與測試繼續。不得列印或讀平台保存的 secret 值、force push、回寫或刪歷史證據、不恢復 Notion、不新增其他平台或付費服務。repo 文件更新不等於本 Project Settings 已更新。
 

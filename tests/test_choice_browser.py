@@ -21,8 +21,17 @@ class ChoiceBrowserTests(unittest.TestCase):
         cls.temp=tempfile.TemporaryDirectory()
         cls.root=Path(cls.temp.name)
         payload=calculate_v2(SNAPSHOT,PARAMETERS,PROVENANCE)
+        # A source exit is absent from the current calculation; the older fixture
+        # still contains this identity, so remove it to model that condition.
+        payload['candidate_statuses']=[row for row in payload['candidate_statuses'] if row['model']!='MiniMax-M2.7']
+        payload['candidate_count']=len(payload['candidate_statuses'])
         payload['caveats'].append('來源退出：Inkling 缺 task cost，不沿用舊价。')
-        (cls.root/'index.html').write_text(render_html(payload,observations=[dict(name='SourceMissing xhigh',slug='source-missing',state='missing_task_cost',reason='task cost missing')]))
+        from bridge.view_evidence import source_observations
+        observations=source_observations([dict(name='SourceMissing (xhigh)',slug='source-missing'),dict(name='MiniMax-M2.7',slug='minimax-m2-7')],
+            {'reconciliation':{'status_by_slug':{
+                'source-missing':dict(state='observed_unusable',reason='missing_task_cost'),
+                'minimax-m2-7':dict(state='retired',reason='deprecated')}}})
+        (cls.root/'index.html').write_text(render_html(payload,observations=observations))
         edge=deepcopy(payload)
         edge['anchors']=dict.fromkeys(edge['anchors'])
         for row in edge['ladder']:
@@ -49,6 +58,7 @@ class ChoiceBrowserTests(unittest.TestCase):
                 self.assertGreater(page.locator('[data-search]:visible').count(),0)
                 search.fill('Sol max'); self.assertGreater(page.locator('[data-search]:visible').count(),0)
                 search.fill('SourceMissing xhigh');self.assertIn('來源缺值／退出',page.locator('[data-search]:visible').inner_text())
+                search.fill('MiniMax-M2.7 unspecified');self.assertIn('retired',page.locator('[data-search]:visible').inner_text(timeout=1000))
                 search.fill('not-observed-123');self.assertTrue(page.locator('#search-empty').is_visible())
                 search.press('Escape');self.assertEqual(search.input_value(),'')
                 summary=page.locator('#calculation > summary');summary.focus();summary.press('Enter')

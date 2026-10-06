@@ -1,6 +1,6 @@
 # GitHub Pages 展示與交付契約
 
-本網站沿用 Python bridge／靜態單檔 HTML。選型、來源取得及精確 schema 不變，瀏覽器只做文字搜尋與展開；JavaScript 關閉仍可讀两入口、階梯與全部候選。
+本網站沿用 Python bridge／靜態單檔 HTML。選型、來源取得及精確 schema 不變，瀏覽器只做文字搜尋與展開；JavaScript 關閉仍可讀兩入口、階梯與全部候選。
 
 ## 狀態與公開門檻
 
