@@ -4,7 +4,7 @@
 
 ## 狀態與公開門檻
 
-2026-10-06：實作中；repo 保持 private，AA 再散布授權待解，尚未有成功 Pages deployment。公開檢查見 [publication-review.md](publication-review.md)。現有 token 讀 Pages／branch protection 設定 API 回傳 403，metadata 的 admin=true 不代表每個 endpoint 具權限。
+2026-10-06：產品 PR #3 已合併、固定快照 recompute 與自動 Pages build 成功；deploy job skipped。repo 保持 private，AA 再散布授權待解，尚未有成功 Pages deployment。公開檢查見 [publication-review.md](publication-review.md)。現有 token 讀 Pages／branch protection 設定 API 回傳 403，metadata 的 admin=true 不代表每個 endpoint 具權限。
 
 公開檢查必須涵蓋所有遠端 branches／tags 可達歷史、logs／artifacts、issue／PR／discussion 內容及原始第三方來源。未確認敏感或再散布問題時停止 public 與公開部署；不得以刪歷史、force push 或自行改授權排除問題。
 
@@ -15,7 +15,7 @@
 3. `pages.yml` 使用 `workflow_run: Chat execution completed`。成功才啟動，與 GITHUB_TOKEN 推送 results 的 push event 無關。可用 `workflow_dispatch` 重試部署，僅 main。
 4. Pages build 只 checkout main，不 checkout／執行 upstream branch、artifact 或任何不受信任程式。以 GitHub API 讀精確 upstream run／attempt，核對同庫、push、成功、精確 workflow path、branch 和 head；再由 Git transport gate 核對 request。取得實際 results tip 後所有讀取均固定 commit。
 5. `bridge.site` 逐一驗證成功 v2 envelope、immutable introduction、request 關聯與原始來源 proof／CSV hash，再以既有計算核對保存結果。呈現與 JSON 使用同一 envelope，renderer 不重選檔。歷史 v1 不改標 v2，也不自動重新解釋。
-6. 每次完整輸出全部已驗證成功 v2 的固定 `results/<request_id>/<run_id>-<attempt>/` 頁；重新部署仍指向相同結果。首頁只選正式參數完全相符的成功結果。正式情境在 `site-policy.json`，可追至固定 refresh envelope；實驗不無声覆蓋首頁。
+6. 每次完整輸出全部已驗證成功 v2 的固定 `results/<request_id>/<run_id>-<attempt>/` 頁；重新部署仍指向相同結果。首頁只選正式參數完全相符的成功結果。正式情境在 `site-policy.json`，可追至固定 refresh envelope；實驗不無聲覆蓋首頁。
 7. `concurrency: model-efficiency-pages, cancel-in-progress:false` 序列化整條 build→deploy，每次排隊後重新固定最新 results；首頁按來源日期、created_at、request commit、run／attempt 排序。因此較早 request 較晚完成時仍保留最新正式結果，失敗／無正式成功／驗證錯誤不產生新的可部署輸出。
 8. 只有 `repository.private=false` 且 repo variable `PUBLICATION_REVIEW_PASSED=true` 才 configure／deploy。build 只需 contents:read、actions:read；deploy 只需 pages:write、id-token:write，使用 github-pages environment。外部 PR 僅 Product CI read token、無 secrets／發布／部署，無 pull_request_target。
 

@@ -1,5 +1,7 @@
 # Model Efficiency Frontier
 
+**10/6 實作與重跑已完成：** [PR #3](https://github.com/ga815647/model-efficiency-frontier/pull/3) 已合併，產品 `1f487a2bddf121acfe3d24993edc2fe2cc8b7b43`；295 項測試、獨立 review 與產品 CI 通過。新固定快照 recompute [37501847653-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501847653) 成功，publication `c3cd3307b956b776334a4668c62b6580a80f864e`。自動 Pages build [37501895642-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501895642) 成功，**deploy job skipped、repo 仍 private、沒有已上線網址**；來源為 2026-09-30，不是新抓來源。詳見本次驗收紀錄。
+
 **模型怎麼選：先看「推薦中能力最高」與「推薦中情境成本最低」，再看推薦階梯。** 新介面採繁體中文、手機卡片／桌面精簡表格，可依名稱與 effort 搜尋，完整稽核與證據放在展開區；HTML 仍可離線開啟。正式交付政策改為 GitHub Pages，HTML artifact 為備用。**目前 repo 仍 private，公開與 Pages 部署受 AA 再散布條款阻擋；沒有已驗證上線網址。** 不能把本地預覽或 Pages artifact 說成網站已上線。
 
 - [網站部署與驗證契約](docs/deployment.md)

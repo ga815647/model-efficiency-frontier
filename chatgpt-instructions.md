@@ -1,5 +1,7 @@
 # 模型效率前線｜Chat 日常指示
 
+**10/6 實作與重跑已完成：** [PR #3](https://github.com/ga815647/model-efficiency-frontier/pull/3) 已合併，產品 `1f487a2bddf121acfe3d24993edc2fe2cc8b7b43`；295 項測試、獨立 review 與產品 CI 通過。新固定快照 recompute [37501847653-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501847653) 成功，publication `c3cd3307b956b776334a4668c62b6580a80f864e`。自動 Pages build [37501895642-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501895642) 成功，**deploy job skipped、repo 仍 private、沒有已上線網址**；來源為 2026-09-30，不是新抓來源。詳見本次驗收紀錄。
+
 **2026-10-06 現行交付政策：**網站首頁以 GitHub Pages 為正式入口，HTML artifact 為備用；公開前檢查通過才可 public／公開部署。目前第三方再散布條款待解決，repo 仍 private，網站尚未部署，詳見 `docs/publication-review.md`。下方日期驗收段均維持歷史身份。產品實作已可在明確授權範圍使用獨立產品 branch／PR 修改程式、測試、workflow 與文件；資料請求仍只能走唯一 request bridge，不把產品程式放進 request branch。不恢復 Notion，不新增外部平台。新版 Project Instructions 見 `docs/chatgpt-bootstrap.md`，Git 文件更新不表示 ChatGPT Settings 已更新。
 
 **9/30修復已發布：**來源對帳及退出摘要產品 `c68f3de` 經最終修正再覆核通過，已非force發布main並讀回。OpenCode已驗真實refresh及該9/30來源的固定recompute成功：105付費候選／15chain／9final，兩入口Sol6.1 xhigh／Luna low，HTML artifact與固定Git報告bytes相同。issue #2短續接pre-write disclosure已發布，另有10/10離線consumer GREEN及獨立覆核；新版目標Chat實測與settings安裝仍獨立未確認，不用OpenCode驗收替代。bootstrap不改，不需因本次Git指示更新重貼。完整證據見 `docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`。
