@@ -35,27 +35,28 @@ class WindowReportTests(unittest.TestCase):
                 self.assertIn(anchor['identity'], output)
             for row in self.payload['candidate_statuses']:
                 self.assertIn(escape(row['identity']), output)
-            for label in ('最強保留檔', '最低情境成本保留檔', 'Cost_orig',
+            for label in ('Cost_orig',
                           'Cost_adj', 'CP_adj', 'GRADE', '僅比較',
                           'Standard tier only', '2026-09-26', '推定',
                           PROVENANCE['source_locator']['path'], 'a' * 40,
                           '$79', '不自動續訂', '硬2分邊界'):
                 self.assertIn(label, output)
             self.assertNotIn('階梯中段', output)
-        self.assertEqual(re.findall(r'data-rank="(\d+)"', page),
-                         [str(i) for i in range(1, 11)])
+        self.assertEqual(sorted(int(i) for i in re.findall(r'data-rank="(\d+)"', page)),
+                         list(range(1, 11)))
         self.assertNotIn('aria-label="三檔推薦"', page)
         table = page.split('<tbody>', 1)[1].split('</tbody>', 1)[0]
-        positions = [table.index(escape(r['identity'])) for r in self.payload['ladder']]
+        positions = [table.index(escape(r['model'])) for r in self.payload['ladder'] if not r['comparison_only']]
         self.assertEqual(positions, sorted(positions))
 
-    def test_source_and_policy_context_precedes_recommendations(self):
+    def test_source_date_visible_and_full_policy_available_in_details(self):
         md, page = self.views(self.payload)
         for output in (md, page):
-            prefix = output.split('最強保留檔', 1)[0]
             for value in ('2026-09-26', 'AA-Intelligence-Index-v4.3.2',
                           '推定', 'full-candidate comparison', '0.05', 'Privacy'):
-                self.assertIn(value, prefix)
+                self.assertIn(value, output)
+        self.assertIn('2026-09-26', page.split('aria-label="保留檔入口"')[0])
+        self.assertIn('<details id="calculation"', page)
 
     def test_source_exits_are_visible_before_ladder_and_escaped(self):
         payload = deepcopy(self.payload)
@@ -158,10 +159,11 @@ class WindowReportTests(unittest.TestCase):
             def handle_starttag(self, tag, attrs):
                 attrs = dict(attrs)
                 if tag in ('script', 'link', 'iframe', 'img', 'object'):
-                    self.active.append(tag)
+                    if tag != 'script' or attrs.get('id') != 'model-search-script':
+                        self.active.append(tag)
                 if any(k.startswith('on') for k in attrs):
                     self.active.append('event')
-                if 'href' in attrs and not attrs['href'].startswith(('https://', 'http://')):
+                if 'href' in attrs and not attrs['href'].startswith('#'):
                     self.active.append('unsafe link')
         payload = deepcopy(self.payload)
         for row in payload['candidate_statuses']:

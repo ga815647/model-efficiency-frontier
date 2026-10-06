@@ -13,7 +13,7 @@ class HTMLTests(unittest.TestCase):
         from bridge.result_v2 import calculate_v2
         payload = calculate_v2(SNAPSHOT, PARAMETERS, PROVENANCE)
         page = render_html(payload)
-        self.assertIn('最強保留檔', page)
+        self.assertIn('推薦中能力最高', page)
         self.assertEqual(page.count('data-rank="'), 10)
         self.assertNotIn('三檔推薦', page)
 

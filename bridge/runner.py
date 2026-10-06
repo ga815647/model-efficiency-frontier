@@ -464,7 +464,21 @@ def execute_request(request: dict, *, execution: dict, repository: Path,
             _fresh_inventory(source_path.read_bytes(), json.loads((evidence / 'source_map.json').read_bytes()),
                              envelope, error_code='invalid_refresh_inventory', refresh_policy=policy,
                              evidence=proof, expected_previous_slugs=expected if policy else None)
-        html = render_html(calculation)
+        from bridge.view_evidence import source_observations
+        # The source has already passed materialization/proof validation above.
+        observations = []
+        if validated['operation'] == 'refresh':
+            source_map = json.loads((output / 'snapshot/evidence/source_map.json').read_bytes())
+            records = json.loads((output / 'snapshot/evidence/leaderboard_records.json').read_bytes())
+            observations = source_observations(records, source_map)
+        elif validated['source_snapshot']['path'].startswith('results/'):
+            source = validated['source_snapshot']
+            base = source['path'].removesuffix('candidates.csv') + 'evidence/'
+            if _has_file(repository, source['commit'], base + 'leaderboard_records.json'):
+                observations = source_observations(
+                    _json(repository, source['commit'], base + 'leaderboard_records.json'),
+                    _json(repository, source['commit'], base + 'source_map.json'))
+        html = render_html(envelope, observations=observations)
         _atomic(output / 'report.md', report.encode('utf-8'))
         _atomic(output / 'report.html', html.encode('utf-8'))
     except Exception as exc:

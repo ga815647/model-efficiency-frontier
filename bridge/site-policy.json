@@ -1,0 +1,13 @@
+{
+  "formal_parameters": {
+    "gpt_factor": 18,
+    "grok_factor": 16,
+    "min_score": 0,
+    "min_score_reason": "同版本全候選情境比較",
+    "max_cost": null
+  },
+  "source_refresh": {
+    "commit": "9bcabcee80ba3c2850dffc8df1c865afe6cf3cbb",
+    "path": "results/834cf811-f1ca-467e-a72f-291fd0195f61/36703900975-1/result.json"
+  }
+}

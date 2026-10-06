@@ -144,65 +144,7 @@ def render_markdown(calculation: dict) -> str:
     return '\n'.join(lines) + '\n'
 
 
-_CSS = '''
-:root { color-scheme:light; --ink:#172b37; --muted:#516573; --line:#d9e2e5; --accent:#146a65; }
-* { box-sizing:border-box; } body { margin:0; font:16px/1.55 system-ui,-apple-system,sans-serif; background:#f3f6f5; color:var(--ink); }
-main { max-width:1120px; margin:auto; padding:clamp(16px,4vw,48px); }
-h1 { font-size:clamp(1.9rem,4vw,3rem); line-height:1.18; } h2 { font-size:1.25rem; }
-.cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:28px 0; }
-.card,.panel { background:white; border:1px solid var(--line); border-radius:14px; padding:clamp(16px,3vw,28px); min-width:0; margin:18px 0; overflow-wrap:anywhere; }
-.card strong { display:block; } .card span,.intro,small { color:var(--muted); } .intro { overflow-wrap:anywhere; }
-.table-wrap { overflow-x:auto; max-width:100%; } table { border-collapse:collapse; width:100%; min-width:960px; }
-th,td { text-align:left; padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:top; min-width:90px; }
-th { color:var(--muted); font-size:.8rem; } td { font-variant-numeric:tabular-nums; }
-td.model { min-width:220px; } td.notes { min-width:220px; } summary { cursor:pointer; color:var(--accent); }
-.rank { color:var(--accent); font-weight:bold; } .comparison { color:var(--accent); font-weight:bold; }
-@media(max-width:720px) { .cards { grid-template-columns:1fr; } main { padding:16px; } }
-'''
 
-
-def render_html(calculation: dict) -> str:
-    """Return a single offline document. All source strings are escaped text."""
-    cards = []
-    for key, title in _ANCHORS:
-        row = calculation['anchors'][key]
-        body = (_html(row['identity']) if row else '從缺')
-        detail = (f'Score {_number(row["score"])} · Cost_adj ${_number(row["cost_adj"])}'
-                  if row else '無非Claude保留行')
-        cards.append(f'<article class="card"><h2>{title}</h2><strong>{body}</strong><span>{_html(detail)}</span></article>')
-    sections = []
-    for key, title, columns, rows in _tables(calculation):
-        body = []
-        for rank, row in enumerate(rows, 1):
-            cells = []
-            for column, value in zip(columns, row):
-                content = _html(value)
-                css = ''
-                if column == '原始註記':
-                    content = f'<details><summary>原始註記</summary><small>{content}</small></details>'
-                    css = 'notes'
-                elif column == '身份':
-                    css = 'model'
-                elif column == '用途' and value == '僅比較':
-                    css = 'comparison'
-                cells.append(f'<td class="{css}">{content}</td>')
-            attr = f' data-rank="{rank}"' if key == 'ladder' else ''
-            body.append(f'<tr{attr}>{"".join(cells)}</tr>')
-        table = ('<div class="table-wrap"><table><thead><tr>' +
-                 ''.join(f'<th scope="col">{_html(c)}</th>' for c in columns) +
-                 '</tr></thead><tbody>' + ''.join(body) + '</tbody></table></div>') if rows else '<p>無</p>'
-        sections.append(f'<section class="panel" data-family="{key}"><h2>{title} ({len(rows)})</h2>{table}</section>')
-    context = ''.join(f'<li>{_html(line)}</li>' for line in _context(calculation))
-    metadata = ''.join(f'<p class="intro">{_html(line)}</p>' for line in _metadata(calculation))
-    exits = _source_exits(calculation)
-    exit_section = ('<section class="panel" data-family="source-exits"><h2>本次來源退出</h2><ul>' +
-                    ''.join('<li>' + _html(line) + '</li>' for line in exits) + '</ul></section>') if exits else ''
-    return f'''<!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>模型效率前線｜固定視窗階梯</title><style>{_CSS}</style></head><body><main>
-<header><h1>模型效率前線</h1><p class="intro">CP-new-high → 固定2分視窗 · Score降序 · Claude僅比較</p>{metadata}</header>
-<section class="cards" aria-label="保留檔入口">{''.join(cards)}</section>
-{exit_section}
-{''.join(sections)}
-<section class="panel"><h2>來源與限制</h2><ul>{context}</ul></section>
-</main></body></html>'''
+def render_html(calculation: dict, *, observations=(), links=()) -> str:
+    from .choice_report import render_html as render_choice
+    return render_choice(calculation, observations=observations, links=links)
