@@ -6,7 +6,7 @@ on:
     paths: ["bridge/requests/*.json"]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: chat-execution-${{ github.run_id }}-${{ github.run_attempt }}
@@ -14,6 +14,9 @@ concurrency:
 
 jobs:
   execute:
+    if: github.repository == 'ga815647/model-efficiency-frontier'
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -133,7 +136,8 @@ jobs:
           if [ "$RECOMPUTE_OUTCOME" != success ] && [ "$REFRESH_OUTCOME" != success ]; then
             exit 1
           fi
-      # actions/upload-artifact v4.6.2 (official commit); HTML is an attachment, not a website.
+      # HTML remains an offline backup. Publish Pages chains via workflow_run,
+      # never a push workflow triggered by this job's GITHUB_TOKEN result push.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: steps.publish.outcome == 'success' && steps.prepare.outcome == 'success' && (steps.recompute.outcome == 'success' || steps.refresh.outcome == 'success')
         with:

@@ -19,12 +19,12 @@ def _row(row, rank):
             f'<td>×{_text(row["factor"])}</td><td>{_num(row["cp_adj"])}</td></tr>')
 
 
-def render_html(calculation: dict) -> str:
+def render_html(calculation: dict, *, observations=()) -> str:
     """Render only payload data: no network, JavaScript, or recalculation."""
     from .result_v2 import POLICY
     if calculation.get('selection_policy') == POLICY:
         from .window_report import render_html as render_window_html
-        return render_window_html(calculation)
+        return render_window_html(calculation, observations=observations)
     ladder = calculation['ladder']
     picks = calculation['picks']
     statuses = calculation['candidate_statuses']

@@ -1,5 +1,16 @@
 # model-efficiency-frontier — workspace 規約
 
+> **2026-10-06 網站交付政策（本節優先於下方歷史紀錄）**：使用者已授權重整介面、產品 branch／PR、測試及 review 通過後合併 main；公開前檢查通過後改 public、以官方 Actions 部署 GitHub Pages，再以最近已驗證成功 refresh 固定快照 recompute 驗收。正式交付入口改為 GitHub Pages，單檔 HTML artifact 為備用；不恢復 Notion、不新增外部平台。**目前公開檢查受第三方再散布條款阻擋，repo 保持 private，尚未部署。** 詳見 `docs/publication-review.md`、`docs/deployment.md`。下方「私人 repo／不部署／bootstrap 不改」與過去驗收狀態均保留歷史身份，不是本次交付限制。
+
+### 產品實作與資料請求
+
+- 產品實作使用獨立 `feat/*` branch／PR，範圍可含 renderer、前端、測試、workflow 及本庫規約。不得把產品修改塞入 `efficiency-run/*`。外部 PR CI 僅 contents:read，不使用 secrets、不寫 results、不部署，不使用 pull_request_target。
+- 資料 refresh／recompute 沿用唯一 `efficiency-run/<request_id>` 與 `bridge/requests/<request_id>.json`；固定本次 main、讀同版規則、核對單 parent 與唯一新增檔，並逐項核對 Actions、固定 publication、結果及來源。request v1／result v2 精確 schema、選型算法、EPS、成本與身份驗證不變。
+- 首頁只消費 `bridge/site-policy.json` 正式情境的已驗證 v2 成功結果；正式參數來自固定成功 refresh envelope，變更正式情境需明確授權及產品 PR。實驗另有固定結果頁，不默默覆蓋首頁。兩入口只讀 anchors，升級只讀 upgrade；Claude 僅供比較。`來源退出：` 保留在兩入口後、階梯前。
+- 公開前檢查涵蓋所有 branches／tags 可達歷史、Actions logs／artifacts、討論及第三方來源。掃描遮罩，不讀平台保存的 secret 值；不擅自刪歷史、force push 或重新授權內容。敏感／再散布疑義未解決時暫停 public 及公開部署，繼續安全的修改與測試。
+- Pages 僅預設網域、GitHub-hosted ubuntu-24.04、官方 action 固定可信 commit；部署須 repo public 且 `PUBLICATION_REVIEW_PASSED=true`。網站發布 manifest 獨立於嚴格 result schema；原 results／runs／原始來源與歷史報告不得回寫。參見同版部署契約。
+- repo 文件更新不代表 ChatGPT Project Settings 已安裝；另交付 `docs/chatgpt-bootstrap.md` 可貼文字，未獲使用者確認不得宣稱已修改 Settings。
+
 > **2026-09-30 修復已發布／真實fresh與固定重算驗收（最新）**：整條分支最終覆核兩項Important及一項Minor在`c68f3de9423b165b0ed46ca22f9d676cc424c4ee`單輪修正後，唯一限定再覆核全數ADDRESSED、無新Critical／Important；控制端新跑279tests／54.614s／OK、75保護Git物件不變，非force發布main並讀回。真實refresh `36698853013-1` success，request `7b8bad731d447dbb248fc9c0e06f9181b127f370`，publication `0d4a7b8962515930f1ddcf9340c409b83cf5b335`；固定該來源recompute `36699959889-1` success，request `3ac2139cf8f671e58d63c1aaa6e58963588d8362`，publication `4bc6fe50e0d49304312ed281b59f5e0048622c9e`。兩次來源皆9/30、v4.3.2 inferred、105paid／15chain／9final（2Claude僅比較、7非Claude）、Sol6.1 xhigh／Luna low兩入口；五份當次raw SHA獨立核對，JSON／MD／HTML一致，各artifact與固定Git bytes相同。GPT6.1五檔各有paid source row；MiniMax-M2.7 deprecated退出排行及追蹤，Inkling缺cost本次排除但仍追蹤。重算保留latest-refresh原bytes並只推進latest-success，舊refresh物件未改。Issue #2 pre-write guard已發布，有獨立10/10bounded離線GREEN及review；新版目標Chat實測／settings安裝仍獨立待確認，不重做既有connector問卷，不改bootstrap或settings、不自動close issues。下方同日「未發布／待覆核」均為發布前歷史，以本段及`docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md`為準。
 
 > **2026-09-30 最終覆核單輪修正（最新，未發布）**：整條分支首次最終覆核在`3b865a4`發現兩項Important：真實public量測可被一致重標身份、共同proof未綁sources manifest日期；另有一項Minor過期handoff狀態。已抽出純canonical mapping與producer共享、於共同gate綁六身份欄及canonical Gregorian checked_date；本輪RED後115 covering／279 full tests GREEN（51.897s），75保護Git物件0變更、五原頁SHA核對、9/30重播105paid／15chain／9final與9/26歷史155statuses／19chain／10final控制及CSV／MD／HTML bytes不變。Issue #2仍10/10 bounded離線GREEN及獨立覆核通過，routing行為bytes不改；新版目標Chat／settings未驗收。待控制端限定再覆核，尚非最終乾淨；未發布、未新建雲端request，既有有條件發布／live授權仍由控制端持有。詳見acceptance的Final review fix wave節及`.superpowers/sdd/2026-09-30-refresh-reconciliation/final-fix-report.md`。

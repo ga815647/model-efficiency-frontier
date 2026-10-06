@@ -1,0 +1,110 @@
+name: Publish Pages
+
+on:
+  # workflow_run is emitted even when the result push used GITHUB_TOKEN.
+  # Always run trusted main code; never execute an upstream artifact/checkout.
+  workflow_run:
+    workflows: ["Chat execution"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize build AND deploy. Every queued build rereads results and selects
+# the newest verified formal success, independent of upstream completion order.
+concurrency:
+  group: model-efficiency-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.repository.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      pages: read
+    steps:
+      # Official releases resolved through their Git tag refs on 2026-10-06.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Read authenticated upstream run
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          UPSTREAM_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: gh api "repos/$REPOSITORY/actions/runs/$UPSTREAM_ID/attempts/$UPSTREAM_ATTEMPT" > "$RUNNER_TEMP/upstream.json"
+      - name: Validate upstream identity
+        id: upstream
+        if: github.event_name == 'workflow_run'
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: python3 -m bridge.site verify-upstream --run-json "$RUNNER_TEMP/upstream.json" --repository "$REPOSITORY" --github-output "$GITHUB_OUTPUT"
+      - name: Pin approved main and results
+        id: pin
+        run: |
+          git update-ref refs/bridge/approved-main "$(git rev-parse HEAD)"
+          git update-ref refs/heads/results refs/remotes/origin/results
+          echo "results=$(git rev-parse refs/heads/results)" >> "$GITHUB_OUTPUT"
+      - name: Configure Pages
+        id: pages
+        if: github.event.repository.private == false && vars.PUBLICATION_REVIEW_PASSED == 'true'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        # Enabling Pages is an explicit admin setup operation, never implicit.
+        with:
+          enablement: false
+      - name: Validate sources and build allowlisted site
+        env:
+          RESULTS_COMMIT: ${{ steps.pin.outputs.results }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path || format('/{0}', github.event.repository.name) }}
+          UPSTREAM_RUN: ${{ steps.upstream.outputs.run }}
+          UPSTREAM_ATTEMPT: ${{ steps.upstream.outputs.attempt }}
+          UPSTREAM_HEAD: ${{ steps.upstream.outputs.head }}
+        run: |
+          args=()
+          if [ -n "$UPSTREAM_RUN" ]; then
+            args=(--upstream-run "$UPSTREAM_RUN" --upstream-attempt "$UPSTREAM_ATTEMPT" --upstream-head "$UPSTREAM_HEAD")
+          fi
+          python3 -m bridge.site --results-commit "$RESULTS_COMMIT" \
+            --output _site --base-path "${BASE_PATH%/}/" "${args[@]}" > "$RUNNER_TEMP/site-manifest.json"
+          cat "$RUNNER_TEMP/site-manifest.json" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+          retention-days: 7
+          include-hidden-files: true
+
+  deploy:
+    needs: build
+    if: github.event.repository.private == false && vars.PUBLICATION_REVIEW_PASSED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: Record actual deployment URL
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: echo "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"

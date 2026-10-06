@@ -1,5 +1,16 @@
 # Model Efficiency Frontier
 
+**模型怎麼選：先看「推薦中能力最高」與「推薦中情境成本最低」，再看推薦階梯。** 新介面採繁體中文、手機卡片／桌面精簡表格，可依名稱與 effort 搜尋，完整稽核與證據放在展開區；HTML 仍可離線開啟。正式交付政策改為 GitHub Pages，HTML artifact 為備用。**目前 repo 仍 private，公開與 Pages 部署受 AA 再散布條款阻擋；沒有已驗證上線網址。** 不能把本地預覽或 Pages artifact 說成網站已上線。
+
+- [網站部署與驗證契約](docs/deployment.md)
+- [公開前檢查與阻擋](docs/publication-review.md)
+- [新版 ChatGPT Project Instructions（須由使用者貼入 Settings）](docs/chatgpt-bootstrap.md)
+- [本次實作與重跑驗收](docs/acceptance/2026-10-06-pages.md)
+
+正式首頁情境固定在 `bridge/site-policy.json`，從 9/30 最新成功 refresh 的固定 envelope 繼承 GPT ×18、Grok ×16、min_score=0、理由「同版本全候選情境比較」、max_cost=null。首頁與固定結果頁共用已驗證 JSON，不在瀏覽器抓價或計算推薦。選型算法與既有 request/result schema 不變；歷史 v1、CSV、原始來源及報告不回寫。
+
+以下保留各日期歷史交付與驗收紀錄；其中「不部署網站／私人 repo／bootstrap 不改」不是 10/6 新任務的限制，過去 HTML 驗收不改標成當時已部署。
+
 **9/30 來源對帳修復已發布，真實fresh與固定重算均成功。** 產品 `c68f3de` 經最終修正再覆核通過，已非force發布main並讀回；279tests及75保護物件通過。OpenCode [live refresh](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36698853013) 取得9/30來源：[固定報表](https://github.com/ga815647/model-efficiency-frontier/blob/0d4a7b8962515930f1ddcf9340c409b83cf5b335/results/c6d618b9-98d5-46b7-a933-58334aed4944/36698853013-1/report.md) 為105付費候選／15chain／9final（2 Claude僅比較、7非Claude），两入口Sol6.1 xhigh／Luna low。[固定新來源重算](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36699959889) 同樣通過，HTML artifacts各與固定Git bytes一致，latest-refresh保持原刷新。完整三SHA／來源／hash見 [9/30驗收帳](docs/superpowers/notes/2026-09-30-refresh-reconciliation-acceptance.md)。MiniMax-M2.7當次 `deprecated=true` 退出排行及強制追蹤；Inkling缺task cost明示排除、仍追蹤，不沿用舊價、不擋其他有效候選。issue #2 pre-write路由已發布，另有10/10離線consumer GREEN及獨立覆核；新版目標Chat實測及settings安裝仍獨立，bootstrap不改、無需因本次Git更新重貼。
 
 **歷史9/27 v2驗收：雲端重算成功，當時fresh因来源缺價失敗。** 產品 `575f78fbdb8acc0c2ec5c2490cd08a503f8aace2` 已發布main並讀回，229項本地測試通過。[v2重算run](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36341140428) 的10階結果、兩入口及HTML artifact已關聯核對；[refresh run](https://github.com/ga815647/model-efficiency-frontier/actions/runs/36341142058) 保存Inkling／MiniMax-M2.7缺task-cost診斷並維持failed，未推進成功pointer，非產品回歸。此失敗不改寫成9/30成功；完整定位見 [v2驗收帳](docs/superpowers/notes/2026-09-27-window-knee-acceptance.md)。下方16階連結是歷史 v1 證據。
