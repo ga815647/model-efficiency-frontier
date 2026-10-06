@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+**10/6 實作與重跑已完成：** [PR #3](https://github.com/ga815647/model-efficiency-frontier/pull/3) 已合併，產品 `1f487a2bddf121acfe3d24993edc2fe2cc8b7b43`；295 項測試、獨立 review 與產品 CI 通過。新固定快照 recompute [37501847653-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501847653) 成功，publication `c3cd3307b956b776334a4668c62b6580a80f864e`。自動 Pages build [37501895642-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501895642) 成功，**deploy job skipped、repo 仍 private、沒有已上線網址**；來源為 2026-09-30，不是新抓來源。詳見本次驗收紀錄。
+
 > **2026-10-06 網站交付政策（本節優先於下方歷史紀錄）**：使用者已授權重整介面、產品 branch／PR、測試及 review 通過後合併 main；公開前檢查通過後改 public、以官方 Actions 部署 GitHub Pages，再以最近已驗證成功 refresh 固定快照 recompute 驗收。正式交付入口改為 GitHub Pages，單檔 HTML artifact 為備用；不恢復 Notion、不新增外部平台。**目前公開檢查受第三方再散布條款阻擋，repo 保持 private，尚未部署。** 詳見 `docs/publication-review.md`、`docs/deployment.md`。下方「私人 repo／不部署／bootstrap 不改」與過去驗收狀態均保留歷史身份，不是本次交付限制。
 
 ### 產品實作與資料請求

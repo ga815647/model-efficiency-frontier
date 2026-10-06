@@ -1,0 +1,127 @@
+{
+  "date": "2026-10-06",
+  "baseline": "69a7aff6663034db9f20d6bf5413cab7487f6542",
+  "recompute": {
+    "product": "1f487a2bddf121acfe3d24993edc2fe2cc8b7b43",
+    "branch": "efficiency-run/d55a6257-3f59-4ea4-90dd-c763e29de528",
+    "path": "bridge/requests/d55a6257-3f59-4ea4-90dd-c763e29de528.json",
+    "source_publication": "9bcabcee80ba3c2850dffc8df1c865afe6cf3cbb",
+    "prior_results": "9bcabcee80ba3c2850dffc8df1c865afe6cf3cbb",
+    "request_commit": "5c98933dbdea33d16d9ee49e725a5039801395cf",
+    "publication": "c3cd3307b956b776334a4668c62b6580a80f864e",
+    "result_path": "results/d55a6257-3f59-4ea4-90dd-c763e29de528/37501847653-1/result.json",
+    "run_id": "37501847653",
+    "run_attempt": 1,
+    "csv_sha256": "478e852ce50cb640992236ff152739d9c0acec5355439024fa97e49453d2f1b1",
+    "result_sha256": "c88a2e9f05cff102dbb4266d4565cc2e96aac757fb0166e23ffa28b984b41047",
+    "report_sha256": "522fc403837d45d1e19d9dd12a2b904a2a93784fe7c05aa96de475d347690f4a",
+    "pages_build_run": "37501895642",
+    "raw_hashes": {
+      "leaderboard.html": "67674fc8b680ec94100788d70f4974922d9c590d68b707589596569f83e0c3a3",
+      "grok_release.html": "81f5806d263a1931cb31f25e3f62c733bab79afd7369938119608b2cbabcce1f",
+      "muse_release.html": "ceedaa2ac691f353394cbfeb288e1461b2cdc37515d5bb161f63f6c83eb149e3",
+      "meta_pricing.html": "4f1d173e55d258cdb87008afe2941b7198c062c7bc9afa3fd30345fa6803a9a6",
+      "models.html": "89c51af5bd10527d986b9ade261c78480d6bfa18f738859eb645898c49208976"
+    },
+    "report_artifact_matches": true,
+    "pages_artifact_matches": true,
+    "published": false,
+    "deployed": false
+  },
+  "pages_build": {
+    "run_id": "37501895642",
+    "run_attempt": 1,
+    "event": "workflow_run",
+    "head_sha": "1f487a2bddf121acfe3d24993edc2fe2cc8b7b43",
+    "build": "success",
+    "deploy": "skipped",
+    "artifact_id": 11429812720,
+    "file_count": 35,
+    "fixed_v2_pages": 8
+  },
+  "report_artifact": {
+    "id": 11430032325,
+    "bytes_match": true
+  },
+  "browser": {
+    "url": "http://127.0.0.1:8766/model-efficiency-frontier/",
+    "fixed_url": "http://127.0.0.1:8766/model-efficiency-frontier/results/d55a6257-3f59-4ea4-90dd-c763e29de528/37501847653-1/",
+    "manifest": {
+      "website_version": "1.0.0",
+      "site_product_commit": "1f487a2bddf121acfe3d24993edc2fe2cc8b7b43",
+      "product_commit": "1f487a2bddf121acfe3d24993edc2fe2cc8b7b43",
+      "publication_commit": "c3cd3307b956b776334a4668c62b6580a80f864e",
+      "request_commit": "5c98933dbdea33d16d9ee49e725a5039801395cf",
+      "request_id": "d55a6257-3f59-4ea4-90dd-c763e29de528",
+      "run_id": "37501847653",
+      "run_attempt": 1,
+      "source_dates": [
+        "2026-09-30"
+      ],
+      "operation": "recompute",
+      "parameters": {
+        "max_cost": null,
+        "min_score_reason": "同版本全候選情境比較",
+        "gpt_factor": 18,
+        "min_score": 0,
+        "grok_factor": 16
+      },
+      "result_url": "/model-efficiency-frontier/results/d55a6257-3f59-4ea4-90dd-c763e29de528/37501847653-1/",
+      "result_sha256": "c88a2e9f05cff102dbb4266d4565cc2e96aac757fb0166e23ffa28b984b41047",
+      "report_sha256": "522fc403837d45d1e19d9dd12a2b904a2a93784fe7c05aa96de475d347690f4a",
+      "source_csv_sha256": "478e852ce50cb640992236ff152739d9c0acec5355439024fa97e49453d2f1b1"
+    },
+    "viewports": [
+      {
+        "width": 360,
+        "http_status": 200,
+        "search": true,
+        "empty": true,
+        "keyboard": true,
+        "overflow": false,
+        "script_errors": []
+      },
+      {
+        "width": 390,
+        "http_status": 200,
+        "search": true,
+        "empty": true,
+        "keyboard": true,
+        "overflow": false,
+        "script_errors": []
+      },
+      {
+        "width": 1280,
+        "http_status": 200,
+        "search": true,
+        "empty": true,
+        "keyboard": true,
+        "overflow": false,
+        "script_errors": []
+      }
+    ],
+    "no_javascript": true
+  },
+  "extended_checks": {
+    "actual_source_date_and_cost_context": true,
+    "source_exits_exact_and_ordered": true,
+    "retired_unspecified_search": true,
+    "missing_cost_search": true,
+    "claude_comparison_count": 2,
+    "download_links_http_200": true,
+    "standalone_html_file_open": true,
+    "scope": "local HTTP serving downloaded cloud artifact; not deployed Pages"
+  },
+  "public_status": {
+    "visibility": "private",
+    "deployed": false,
+    "live_home_url": null,
+    "live_fixed_result_url": null,
+    "reason": "AA redistribution authorization unresolved; Pages setting API integration 403"
+  },
+  "screenshots": {
+    "home-390.png": "888db4dffbec00c5037a1f0c9ffa8fdf32d7625916b9c4105ceca2f28f9f8c4a",
+    "home-1280.png": "895d6fffd8d47b4a6e1c5dd48d1a689ca144aec9f62309d348bcd06e85e64fb1",
+    "home-360.png": "50d8425f00fb28601180f677d583572cd57db8978c74db23db3561702481fb93"
+  }
+}
