@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "request_id": "d55a6257-3f59-4ea4-90dd-c763e29de528",
+  "created_at": "2026-10-06T17:12:47+00:00",
+  "product_sha": "1f487a2bddf121acfe3d24993edc2fe2cc8b7b43",
+  "operation": "recompute",
+  "parameters": {
+    "min_score": 0,
+    "min_score_reason": "同版本全候選情境比較",
+    "max_cost": null,
+    "gpt_factor": 18,
+    "grok_factor": 16
+  },
+  "source_snapshot": {
+    "commit": "9bcabcee80ba3c2850dffc8df1c865afe6cf3cbb",
+    "path": "results/834cf811-f1ca-467e-a72f-291fd0195f61/36703900975-1/snapshot/candidates.csv"
+  }
+}
