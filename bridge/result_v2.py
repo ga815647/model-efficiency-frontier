@@ -69,13 +69,15 @@ def _calculate(csv_path, parameters, provenance, *, schema_version):
     if len({r['identity'] for r in paid}) != len(paid):
         raise ResultError('duplicate_identity')
     payload = dict(calculate_ladder(paid, min_score=parameters['min_score'],
-                                    max_cost=parameters['max_cost']),
+                                    max_cost=parameters['max_cost'],include_claude=schema_version==4),
                    selection_policy=POLICY,
                    selection_parameters={'window_score': 2.0, 'replacement_score': 2.0},
                    parameters=dict(parameters), eps={'score': 2.0, 'cp': 0.05},
                    source_snapshot=dict(locator), source_dates=list(provenance['source_dates']),
                    benchmark=expected[0], benchmark_version=expected[1], cost_basis=expected[2],
                    version_status=provenance['version_status'], caveats=list(provenance['caveats']))
+    if schema_version == 4:
+        payload['eligibility_policy'] = 'all-providers-v1'
     json.dumps(payload, allow_nan=False)
     return payload
 
@@ -119,7 +121,7 @@ def _rows(envelope):
         if row['source_date'] not in envelope['source_dates']:
             raise ResultError('source_date_mismatch')
         if (row['is_grok'] != extra._grok(row) or row['is_contributor'] != extra._contributor(row)
-                or row['comparison_only'] != extra._is_claude(row['identity'])):
+                or row['comparison_only'] != (extra._is_claude(row['identity']) if envelope['schema_version'] < 4 else False)):
             raise ResultError('invalid_family_flags')
         factor = factor_for(row, params)
         if (row['factor'] != factor
@@ -259,8 +261,11 @@ def _validate(envelope, schema_version=2):
                    or not v1._nonempty(e.get('message')) for e in envelope['errors'])):
         raise ResultError('invalid_correlation_or_errors')
     if envelope['status'] == 'success':
-        if set(envelope) != _COMMON | _SUCCESS or envelope['errors']:
+        success_fields = _SUCCESS | ({'eligibility_policy'} if schema_version == 4 else set())
+        if set(envelope) != _COMMON | success_fields or envelope['errors']:
             raise ResultError('invalid_success')
+        if schema_version == 4 and envelope['eligibility_policy'] != 'all-providers-v1':
+            raise ResultError('invalid_eligibility_policy')
         if (envelope['operation'] not in ('refresh', 'recompute')
                 or type(envelope['request_id']) is not str or not v1._UUID.fullmatch(envelope['request_id'])
                 or type(envelope['product_sha']) is not str or not v1._SHA.fullmatch(envelope['product_sha'])
@@ -324,11 +329,12 @@ def _make_envelope(request, execution, *, calculation, errors, schema_version):
         'source_dates': calculation['source_dates'] if status == 'success' else [], 'errors': errors,
     }
     if status == 'success':
+        success_fields = _SUCCESS | ({'eligibility_policy'} if schema_version == 4 else set())
         if calculation['parameters'] != request['parameters']:
             raise ResultError('parameters_mismatch')
-        if set(calculation) != _SUCCESS | {'parameters', 'source_snapshot', 'source_dates'}:
+        if set(calculation) != success_fields | {'parameters', 'source_snapshot', 'source_dates'}:
             raise ResultError('invalid_calculation_fields')
-        envelope.update({k: calculation[k] for k in _SUCCESS})
+        envelope.update({k: calculation[k] for k in success_fields})
     try:
         return _validate(envelope, schema_version)
     except (OverflowError, ZeroDivisionError) as exc:

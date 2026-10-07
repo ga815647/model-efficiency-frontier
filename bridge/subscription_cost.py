@@ -38,9 +38,9 @@ def adjust_rows(rows, parameters):
     return paid
 
 
-def scenario_label(parameters):
+def scenario_label(parameters, *, include_claude=False):
     parts = [f'GPT ×{parameters["gpt_factor"]}']
     if set(parameters) == SUBSCRIPTION_PARAMETERS:
-        parts.extend((f'Gemini ×{parameters["gemini_factor"]}', f'Claude ×{parameters["claude_factor"]}（僅比較）'))
+        parts.extend((f'Gemini ×{parameters["gemini_factor"]}', f'Claude ×{parameters["claude_factor"]}'+('' if include_claude else '（僅比較）')))
     parts.extend((f'Grok ×{parameters["grok_factor"]}', 'Contributor ×1'))
     return '／'.join(parts)

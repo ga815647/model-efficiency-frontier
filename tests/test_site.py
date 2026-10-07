@@ -51,6 +51,8 @@ class SiteTests(unittest.TestCase):
                             site_product_commit='d'*40, base_path='/model-efficiency-frontier/')
             fixed = f'results/{self.envelope["request_id"]}/123-1/'
             expected = {'.nojekyll','index.html','manifest.json'} | {fixed+n for n in ('index.html','result.json','report.html','manifest.json')}
+            expected |= {prefix+f'providers/{provider}/{name}' for prefix in ('',fixed)
+                         for provider in ('gpt','gemini','claude','grok') for name in ('index.html','view.json','manifest.json')}
             self.assertEqual({p.relative_to(output).as_posix() for p in output.rglob('*') if p.is_file()}, expected)
             manifest = json.loads((output/'manifest.json').read_text())
             self.assertEqual(manifest['publication_commit'], 'c'*40)
@@ -60,6 +62,14 @@ class SiteTests(unittest.TestCase):
             self.assertEqual(manifest['site_product_commit'], 'd'*40)
             self.assertIn('/model-efficiency-frontier/'+fixed+'result.json', (output/'index.html').read_text())
             self.assertEqual((output/fixed/'report.html').read_bytes(), record['report_bytes'])
+            for provider in ('gpt','gemini','claude','grok'):
+                view=json.loads((output/f'providers/{provider}/view.json').read_text())
+                self.assertEqual(view['provider'],provider)
+                self.assertEqual(view['parent_result_sha256'],manifest['result_sha256'])
+                link=manifest['provider_views'][provider]
+                self.assertEqual(link['view_sha256'],hashlib.sha256((output/f'providers/{provider}/view.json').read_bytes()).hexdigest())
+                self.assertTrue((output/fixed/f'providers/{provider}/index.html').exists())
+            self.assertNotIn('effort-filter',(output/'index.html').read_text())
 
     def test_invalid_and_duplicate_results_fail_before_output_changes(self):
         with tempfile.TemporaryDirectory() as d:

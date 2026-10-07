@@ -1,5 +1,7 @@
 # GitHub Pages 展示與交付契約
 
+2026-10-07最新增量：新正式request v3／result v4允許Claude推薦，網站新增四種訂閱專屬階梯及view/hash；以同版 [供應商契約](provider-ladders.md) 為準，下方v2/v3僅是相容歷史。allowlist另增加每個固定結果與首頁alias的四家`providers/<key>/index.html`、`view.json`、`manifest.json`。首頁要求新v4，不讓舊資格結果代替。
+
 本網站沿用 Python bridge／靜態單檔 HTML。選型、來源取得及歷史精確 schema 保留；新版倍率使用request v2／result v3，見[倍率契約](subscription-factors.md)，瀏覽器只做文字搜尋與展開；JavaScript 關閉仍可讀兩入口、階梯與全部候選。
 
 ## 狀態與公開門檻

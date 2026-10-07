@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+**2026-10-07 最新供應商政策（優先於下方較早版本）**：使用者明確移除Claude僅比較限制；新request v3產生result v4，七欄parameters不變，成功結果新增精確`eligibility_policy=all-providers-v1`，四家皆可進混排推薦與upgrade。固定CP／視窗／EPS數學不變，歷史result v1/v2/v3保留原Claude資格，不改寫或改標。網站提供ChatGPT、Gemini、Claude、Grok各自重新選出的模型與effort階梯，從完整已驗證候選做同算法計算，另存獨立provider-ladder view與manifest/hash；首頁正式情境要求v4。沒有effort篩選選單，不在瀏覽器計算。詳見`docs/provider-ladders.md`。公開／部署阻擋仍未解除。
+
 **2026-10-07 倍率與兩種 Chat 操作增量（優先於下方舊倍率／schema敘述）**：Chat 可研究並回填 repo 的倍率表，也可依保存倍率產生 LADDER。單一表 `bridge/site-policy.json`：約US$100/月的ChatGPT Pro ×17、Gemini訂閱 ×3.6、Claude訂閱 ×40（仍僅比較）、Grok ×5.2，Contributor×1。本次四個倍率由使用者提供統一方法論並指定，方案／推導／區間／信心見 `docs/subscription-factors.md` 與研究筆記；尚未獨立證實的引用照實標示，不冒稱研究驗證；證據、日期與限制同步保存。更新表走產品 branch／PR；產生新LADDER走唯一 request bridge。新 request v2／result v3 承載七欄參數，歷史 request v1／result v1/v2 的精確欄位與原義保留，算法與原始來源不改。完整流程及schema見 [倍率操作契約](docs/subscription-factors.md)，本檔及該契約須同commit讀取。公開／Pages門檻仍未解除，不能將建置成功稱為上線。
 
 **10/6 實作與重跑已完成：** [PR #3](https://github.com/ga815647/model-efficiency-frontier/pull/3) 已合併，產品 `1f487a2bddf121acfe3d24993edc2fe2cc8b7b43`；295 項測試、獨立 review 與產品 CI 通過。新固定快照 recompute [37501847653-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501847653) 成功，publication `c3cd3307b956b776334a4668c62b6580a80f864e`。自動 Pages build [37501895642-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501895642) 成功，**deploy job skipped、repo 仍 private、沒有已上線網址**；來源為 2026-09-30，不是新抓來源。詳見本次驗收紀錄。

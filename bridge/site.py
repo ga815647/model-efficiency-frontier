@@ -13,6 +13,7 @@ from bridge.view_evidence import source_observations
 from bridge.runner import (_git, _read, _publication_origin, _verified_transport,
                            materialize_snapshot)
 from bridge.cost_policy import validate_policy, validate_source_parameters
+from bridge.provider_view import PROVIDERS, calculate_provider_view, provider_for
 
 
 class SiteError(ValueError):
@@ -64,7 +65,7 @@ def load_record(repo, results_commit, path):
         raise SiteError('invalid_result_path')
     raw = _read(repo, results_commit, path)
     envelope = validate_envelope(_json(raw))
-    if envelope['status'] != 'success' or envelope['schema_version'] not in (2, 3):
+    if envelope['status'] != 'success' or envelope['schema_version'] not in (2, 3, 4):
         raise SiteError('not_successful_window_result')
     base = path.removesuffix('result.json')
     if base != f'results/{envelope["request_id"]}/{envelope["run_id"]}-{envelope["run_attempt"]}/':
@@ -75,7 +76,7 @@ def load_record(repo, results_commit, path):
     facts = _verified_transport(repo, event_sha=envelope['request_commit_sha'],
                                 ref_name='efficiency-run/' + envelope['request_id'])
     request = facts['request']
-    if envelope['schema_version'] != (3 if request['schema_version'] == 2 else 2):
+    if envelope['schema_version'] != {1:2,2:3,3:4}[request['schema_version']]:
         raise SiteError('request_result_schema_mismatch')
     for key in ('request_id', 'product_sha', 'operation', 'parameters', 'created_at'):
         if envelope[key] != request[key]:
@@ -88,7 +89,8 @@ def load_record(repo, results_commit, path):
         csv_path, provenance = materialize_snapshot(locator, Path(repo), Path(temporary))
         if envelope['operation'] == 'refresh':
             provenance['source_locator'] = envelope['source_snapshot']
-        calculation, _ = calculate_snapshot(csv_path, envelope['parameters'], provenance)
+        calculation, _ = calculate_snapshot(csv_path, envelope['parameters'], provenance,
+                                             result_schema_version=envelope['schema_version'])
         if any(envelope.get(key) != value for key, value in calculation.items()):
             raise SiteError('source_result_mismatch')
         csv_hash = hashlib.sha256(csv_path.read_bytes()).hexdigest()
@@ -105,9 +107,10 @@ def _home_order(record):
     return _order(envelope) + (envelope['run_id'], envelope['run_attempt'])
 
 
-def select_home(records, formal_parameters):
+def select_home(records, formal_parameters, formal_result_schema_version=None):
     formal = [r for r in records if r['envelope']['status'] == 'success'
-              and r['envelope']['schema_version'] in (2, 3)
+              and r['envelope']['schema_version'] in (2, 3, 4)
+              and (formal_result_schema_version is None or r['envelope']['schema_version']==formal_result_schema_version)
               and r['envelope']['parameters'] == formal_parameters]
     if not formal:
         raise SiteError('no_verified_formal_success')
@@ -128,15 +131,16 @@ def _manifest(record, product, base_path):
                 source_csv_sha256=record['csv_sha256'])
 
 
-def write_site(records, output, *, formal_parameters, site_product_commit, base_path):
+def write_site(records, output, *, formal_parameters, site_product_commit, base_path,
+               formal_result_schema_version=None):
     validate_base_path(base_path)
-    home = select_home(records, formal_parameters)
+    home = select_home(records, formal_parameters, formal_result_schema_version)
     if not re.fullmatch('[0-9a-f]{40}', site_product_commit):
         raise SiteError('invalid_site_product_commit')
     files = {'.nojekyll': b''}
     for record in records:
         envelope = record['envelope']
-        if envelope['status'] != 'success' or envelope['schema_version'] not in (2, 3):
+        if envelope['status'] != 'success' or envelope['schema_version'] not in (2, 3, 4):
             raise SiteError('not_successful_window_result')
         manifest = _manifest(record, site_product_commit, base_path)
         path = f'results/{envelope["request_id"]}/{envelope["run_id"]}-{envelope["run_attempt"]}/'
@@ -144,7 +148,27 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
             raise SiteError('duplicate_or_invalid_result_path')
         links = [('固定結果頁', manifest['result_url']), ('下載已驗證 JSON', manifest['result_url']+'result.json'),
                  ('下載備用 HTML', manifest['result_url']+'report.html'), ('網站發布 manifest', manifest['result_url']+'manifest.json')]
-        page = render_html(envelope, observations=record['observations'], links=links).encode()
+        views={}
+        manifest['provider_views']={}
+        provider_links=[('all','全部供應商',manifest['result_url'])]+[(key,label,manifest['result_url']+f'providers/{key}/') for key,label in PROVIDERS.items()]
+        for key in PROVIDERS:
+            view=calculate_provider_view(envelope,key)
+            view.update(parent_result_sha256=manifest['result_sha256'],parent_publication_commit=record['publication_commit'])
+            raw=(json.dumps(view,ensure_ascii=False,indent=2)+'\n').encode()
+            url=manifest['result_url']+f'providers/{key}/'
+            manifest['provider_views'][key]=dict(url=url,view_url=url+'view.json',view_sha256=hashlib.sha256(raw).hexdigest())
+            views[key]=(view,raw)
+        for key,(view,raw) in views.items():
+            scoped_manifest=dict(manifest,selection_scope=key,provider_view_sha256=hashlib.sha256(raw).hexdigest())
+            scoped_page=render_html(view['calculation'],observations=[r for r in record['observations'] if provider_for(r)==key],
+                links=links+[('下載供應商專屬結果',manifest['provider_views'][key]['view_url'])],
+                provider_links=provider_links,provider=key).encode()
+            scoped_files={'index.html':scoped_page,'view.json':raw,'manifest.json':(json.dumps(scoped_manifest,ensure_ascii=False,indent=2)+'\n').encode()}
+            files.update({path+f'providers/{key}/'+name:data for name,data in scoped_files.items()})
+            if record is home:
+                files.update({f'providers/{key}/'+name:data for name,data in scoped_files.items()})
+        page = render_html(envelope, observations=record['observations'], links=links,
+                           provider_links=provider_links,provider_views={k:v[0] for k,v in views.items()}).encode()
         manifest_bytes = (json.dumps(manifest, ensure_ascii=False, indent=2)+'\n').encode()
         files.update({path+'index.html':page, path+'result.json':record['result_bytes'],
                       path+'report.html':record['report_bytes'], path+'manifest.json':manifest_bytes})
@@ -158,7 +182,7 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
     output.mkdir(parents=True)
     for name, data in files.items():
         target=output/name; target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(data)
-    return _manifest(home, site_product_commit, base_path)
+    return _json(files['manifest.json'])
 
 
 def build_site(repository, results_commit, output, *, base_path, expected_run=None):
@@ -175,14 +199,21 @@ def build_site(repository, results_commit, output, *, base_path, expected_run=No
     for path in paths:
         if RESULT_PATH.fullmatch(path):
             envelope=validate_envelope(_json(_read(repo,results_commit,path)))
-            if envelope['status']=='success' and envelope['schema_version'] in (2, 3):
+            if envelope['status']=='success' and envelope['schema_version'] in (2, 3, 4):
                 records.append(load_record(repo,results_commit,path))
     if expected_run:
         matches=[r for r in records if (r['envelope']['run_id'],r['envelope']['run_attempt'],r['envelope']['request_commit_sha'])==expected_run]
         if len(matches)!=1:
             raise SiteError('upstream_run_result_missing')
+    from bridge.runner import _has_file
+    version=None
+    if _has_file(repo,product,'bridge/recommendation-policy.json'):
+        marker=_json(_read(repo,product,'bridge/recommendation-policy.json'))
+        if marker != {'policy':'all-providers-v1','result_schema_version':4}:
+            raise SiteError('invalid_recommendation_policy')
+        version=4
     return write_site(records,output,formal_parameters=policy['formal_parameters'],
-                      site_product_commit=product,base_path=base_path)
+                      site_product_commit=product,base_path=base_path,formal_result_schema_version=version)
 
 
 def main(argv=None):

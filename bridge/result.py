@@ -1,19 +1,24 @@
 """Generate versioned window results while preserving exact historical schemas."""
-from . import result_v1, result_v2, result_v3, window_report
+from . import result_v1, result_v2, result_v3, result_v4, window_report
 from .subscription_cost import SUBSCRIPTION_PARAMETERS
 
 ResultError = result_v1.ResultError
 
 
-def calculate_snapshot(csv_path, parameters, provenance):
+def calculate_snapshot(csv_path, parameters, provenance, *, result_schema_version=None):
     calculator = (result_v3.calculate_v3 if type(parameters) is dict and
                   set(parameters) == SUBSCRIPTION_PARAMETERS else result_v2.calculate_v2)
+    if result_schema_version is not None:
+        calculators={2:result_v2.calculate_v2,3:result_v3.calculate_v3,4:result_v4.calculate_v4}
+        if result_schema_version not in calculators:
+            raise ResultError('invalid_result_schema')
+        calculator=calculators[result_schema_version]
     calculation = calculator(csv_path, parameters, provenance)
     return calculation, window_report.render_markdown(calculation)
 
 
 def make_envelope(request, execution, *, calculation, errors):
-    factory = result_v3.make_v3_envelope if request.get('schema_version') == 2 else result_v2.make_v2_envelope
+    factory = ({1:result_v2.make_v2_envelope,2:result_v3.make_v3_envelope,3:result_v4.make_v4_envelope}.get(request.get('schema_version'),result_v2.make_v2_envelope))
     return factory(request, execution, calculation=calculation, errors=errors)
 
 
@@ -30,4 +35,6 @@ def validate_envelope(envelope):
         return result_v2.validate_v2_envelope(envelope)
     if version == 3:
         return result_v3.validate_v3_envelope(envelope)
+    if version == 4:
+        return result_v4.validate_v4_envelope(envelope)
     raise ResultError('invalid_result_schema')

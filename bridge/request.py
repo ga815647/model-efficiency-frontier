@@ -100,14 +100,14 @@ def _snapshot(value):
 
 def validate_request(request: dict, *, branch: str, parent_sha: str,
                      changed_paths: list[tuple[str, str]]) -> dict:
-    """Validate exact v1/v2 schemas and a single-file, added-only request commit."""
+    """Validate exact v1/v2/v3 schemas and a single-file, added-only request commit."""
     if type(request) is not dict:
         raise RequestError("invalid_request")
     operation = request.get("operation")
     if operation not in ("refresh", "recompute"):
         raise RequestError("invalid_operation")
     _exact_keys(request, _ROOT | ({"source_snapshot"} if operation == "recompute" else set()))
-    if type(request["schema_version"]) is not int or request["schema_version"] not in (1, 2):
+    if type(request["schema_version"]) is not int or request["schema_version"] not in (1, 2, 3):
         raise RequestError("invalid_schema_version")
     request_id = request["request_id"]
     _uuid(request_id)

@@ -455,7 +455,8 @@ def execute_request(request: dict, *, execution: dict, repository: Path,
                     repository, validated['source_snapshot']['commit'], execution['product_sha']):
                 raise RunnerError('source_commit_not_authorized')
             source_path, provenance = materialize_snapshot(validated['source_snapshot'], repository, output)
-        calculation, report = calculate_snapshot(source_path, validated['parameters'], provenance)
+        calculation, report = calculate_snapshot(source_path, validated['parameters'], provenance,
+            result_schema_version={1:2,2:3,3:4}[validated['schema_version']])
         envelope = make_envelope(validated, execution, calculation=calculation, errors=[])
         if validated['operation'] == 'refresh':
             evidence = output / 'snapshot/evidence'
@@ -488,7 +489,7 @@ def execute_request(request: dict, *, execution: dict, repository: Path,
         # Event-ref UUID and commit are trusted for correlation, not arbitrary JSON identity.
         branch = execution.get('branch', '')
         identity = branch.removeprefix('efficiency-run/') if branch.startswith('efficiency-run/') else None
-        safe_request = {'schema_version': 2 if type(request) is dict and type(request.get('schema_version')) is int and request['schema_version'] == 2 else 1,
+        safe_request = {'schema_version': request['schema_version'] if type(request) is dict and type(request.get('schema_version')) is int and request['schema_version'] in (2,3) else 1,
                         'operation': request.get('operation') if type(request) is dict else None,
                         'request_id': identity if identity and UUID.fullmatch(identity) else None,
                         'product_sha': execution.get('product_sha'),
