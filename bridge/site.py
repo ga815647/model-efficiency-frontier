@@ -14,6 +14,7 @@ from bridge.runner import (_git, _read, _publication_origin, _verified_transport
                            materialize_snapshot)
 from bridge.cost_policy import validate_policy, validate_source_parameters
 from bridge.provider_view import PROVIDERS, calculate_provider_view, provider_for
+from bridge.personal_cp import calculate_personal_cp, validate_choices
 
 
 class SiteError(ValueError):
@@ -132,8 +133,10 @@ def _manifest(record, product, base_path):
 
 
 def write_site(records, output, *, formal_parameters, site_product_commit, base_path,
-               formal_result_schema_version=None):
+               formal_result_schema_version=None, personal_choices=None):
     validate_base_path(base_path)
+    choices = validate_choices({'schema_version':1, 'choices':{}} if personal_choices is None else personal_choices)
+    used_choices = set()
     home = select_home(records, formal_parameters, formal_result_schema_version)
     if not re.fullmatch('[0-9a-f]{40}', site_product_commit):
         raise SiteError('invalid_site_product_commit')
@@ -146,8 +149,26 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
         path = f'results/{envelope["request_id"]}/{envelope["run_id"]}-{envelope["run_attempt"]}/'
         if not RESULT_PATH.fullmatch(path + 'result.json') or path + 'index.html' in files:
             raise SiteError('duplicate_or_invalid_result_path')
+        personal = None
+        choice_path = path + 'result.json'
+        if choice_path in choices:
+            choice = choices[choice_path]
+            if choice['result_sha256'] != manifest['result_sha256']:
+                raise SiteError('personal_cp_result_hash_mismatch')
+            personal = calculate_personal_cp(envelope, choice)
+            personal.update(parent_result_sha256=manifest['result_sha256'],
+                            parent_publication_commit=record['publication_commit'],
+                            request_id=envelope['request_id'], run_id=envelope['run_id'],
+                            run_attempt=envelope['run_attempt'])
+            raw_personal = (json.dumps(personal,ensure_ascii=False,indent=2)+'\n').encode()
+            manifest['personal_cp'] = dict(view_url=manifest['result_url']+'personal-cp.json',
+                                          view_sha256=hashlib.sha256(raw_personal).hexdigest())
+            files[path+'personal-cp.json'] = raw_personal
+            used_choices.add(choice_path)
         links = [('固定結果頁', manifest['result_url']), ('下載已驗證 JSON', manifest['result_url']+'result.json'),
                  ('下載備用 HTML', manifest['result_url']+'report.html'), ('網站發布 manifest', manifest['result_url']+'manifest.json')]
+        if personal:
+            links.append(('下載本次個人主力 CP 結果',manifest['personal_cp']['view_url']))
         views={}
         manifest['provider_views']={}
         provider_links=[('all','全部供應商',manifest['result_url'])]+[(key,label,manifest['result_url']+f'providers/{key}/') for key,label in PROVIDERS.items()]
@@ -162,18 +183,21 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
             scoped_manifest=dict(manifest,selection_scope=key,provider_view_sha256=hashlib.sha256(raw).hexdigest())
             scoped_page=render_html(view['calculation'],observations=[r for r in record['observations'] if provider_for(r)==key],
                 links=links+[('下載供應商專屬結果',manifest['provider_views'][key]['view_url'])],
-                provider_links=provider_links,provider=key).encode()
+                provider_links=provider_links,provider=key,personal_cp=personal).encode()
             scoped_files={'index.html':scoped_page,'view.json':raw,'manifest.json':(json.dumps(scoped_manifest,ensure_ascii=False,indent=2)+'\n').encode()}
             files.update({path+f'providers/{key}/'+name:data for name,data in scoped_files.items()})
             if record is home:
                 files.update({f'providers/{key}/'+name:data for name,data in scoped_files.items()})
         page = render_html(envelope, observations=record['observations'], links=links,
-                           provider_links=provider_links,provider_views={k:v[0] for k,v in views.items()}).encode()
+                           provider_links=provider_links,provider_views={k:v[0] for k,v in views.items()},
+                           personal_cp=personal).encode()
         manifest_bytes = (json.dumps(manifest, ensure_ascii=False, indent=2)+'\n').encode()
         files.update({path+'index.html':page, path+'result.json':record['result_bytes'],
                       path+'report.html':record['report_bytes'], path+'manifest.json':manifest_bytes})
         if record is home:
             files.update({'index.html':page, 'manifest.json':manifest_bytes})
+    if used_choices != set(choices):
+        raise SiteError('personal_cp_result_missing')
     # Validate every record before touching the destination. Deployment receives
     # only this fresh tree, never a repository or raw evidence directory.
     output = Path(output)
@@ -213,7 +237,9 @@ def build_site(repository, results_commit, output, *, base_path, expected_run=No
             raise SiteError('invalid_recommendation_policy')
         version=4
     return write_site(records,output,formal_parameters=policy['formal_parameters'],
-                      site_product_commit=product,base_path=base_path,formal_result_schema_version=version)
+                      site_product_commit=product,base_path=base_path,formal_result_schema_version=version,
+                      personal_choices=(_json(_read(repo,product,'bridge/personal-cp-policy.json'))
+                                        if _has_file(repo,product,'bridge/personal-cp-policy.json') else None))
 
 
 def main(argv=None):

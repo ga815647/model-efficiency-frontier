@@ -9,12 +9,19 @@ from pathlib import Path
 from urllib.parse import urljoin
 from urllib.request import urlopen
 
+# The documented direct CLI must resolve bridge modules as well as -m usage.
+if __package__ in (None, ''):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-def verify_site(url, expected, output):
+
+def verify_site(url, expected, output, *, expected_site_product=None, personal_policy=None):
     from playwright.sync_api import sync_playwright
     output=Path(output); output.mkdir(parents=True,exist_ok=True)
     root=url.rstrip('/')+'/'
     manifest=json.loads(urlopen(urljoin(root,'manifest.json')).read())
+    if expected_site_product:
+        assert manifest['site_product_commit']==expected_site_product, 'site_product_commit'
     for field in ('request_id','run_id','run_attempt','operation','parameters','source_dates'):
         assert manifest[field]==expected[field], field
     assert manifest['product_commit']==expected['product_sha']
@@ -24,6 +31,29 @@ def verify_site(url, expected, output):
     assert json.loads(raw)==expected
     assert hashlib.sha256(raw).hexdigest()==manifest['result_sha256']
     assert json.loads(urlopen(urljoin(fixed,'manifest.json')).read())==manifest
+    personal=None
+    if personal_policy is not None:
+        from bridge.personal_cp import validate_choices
+        path=f'results/{expected["request_id"]}/{expected["run_id"]}-{expected["run_attempt"]}/result.json'
+        choice=validate_choices(personal_policy).get(path)
+        assert bool(manifest.get('personal_cp'))==bool(choice), 'personal_choice_missing_or_inherited'
+        if choice:
+            assert choice['result_sha256']==manifest['result_sha256']
+    if 'personal_cp' in manifest:
+        from bridge.personal_cp import calculate_personal_cp
+        raw_personal=urlopen(urljoin(root,manifest['personal_cp']['view_url'])).read()
+        assert hashlib.sha256(raw_personal).hexdigest()==manifest['personal_cp']['view_sha256']
+        personal=json.loads(raw_personal)
+        assert personal['parent_result_sha256']==manifest['result_sha256']
+        assert personal['parent_publication_commit']==manifest['publication_commit']
+        for field in ('request_id','run_id','run_attempt'):
+            assert personal[field]==expected[field]
+        choice=dict(benchmark_identity=personal['benchmark']['identity'],
+                    tolerance_multiplier=personal['tolerance_multiplier'],result_sha256=manifest['result_sha256'])
+        if personal_policy is not None:
+            assert choice==validate_choices(personal_policy)[path]
+        recalculated=calculate_personal_cp(expected,choice)
+        for key,value in recalculated.items(): assert personal[key]==value,key
     report=urlopen(urljoin(fixed,'report.html')).read()
     assert hashlib.sha256(report).hexdigest()==manifest['report_sha256']
     source_exits=[note for note in expected['caveats'] if note.startswith('來源退出：')]
@@ -41,6 +71,19 @@ def verify_site(url, expected, output):
         content=page.locator('body').text_content()
         assert all(note not in content for note in source_exits)
 
+    def check_personal_cp(page,scope='all'):
+        card=page.locator('#personal-cp')
+        assert card.count()==int(personal is not None)
+        if personal:
+            row=personal['scopes'][scope]['selected']
+            assert card.locator('.model-name').inner_text()==(row['model'] if row else '從缺')
+            assert f'≥ {personal["minimum_score"]:.2f}' in card.locator('[data-personal-threshold]').inner_text()
+            assert personal['benchmark']['model'] in card.locator('[data-personal-benchmark]').inner_text()
+            assert '並非 AA 的統計誤差' in card.inner_text()
+            if row:
+                assert row['effort'] in card.locator('.effort').inner_text()
+                assert card.locator('.metrics b').all_inner_texts()==[f'{row["score"]:.2f}',f'${row["cost_adj"]:.4f}']
+
     evidence=[]
     with sync_playwright() as p:
         browser=p.chromium.launch()
@@ -50,6 +93,7 @@ def verify_site(url, expected, output):
             page.on('pageerror',lambda e:errors.append(str(e)))
             response=page.goto(root,wait_until='networkidle'); assert response.status==200
             check_global_source_exits(page)
+            check_personal_cp(page)
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
             for key,row in expected['anchors'].items():
                 card=page.locator(f'[data-anchor="{key}"]')
@@ -80,6 +124,7 @@ def verify_site(url, expected, output):
             assert not errors,errors
             assert page.goto(fixed,wait_until='networkidle').status==200
             check_global_source_exits(page)
+            check_personal_cp(page)
             highest=expected['anchors']['highest_retained_score']
             assert page.locator('[data-anchor="highest_retained_score"] .model-name').inner_text()==(highest['model'] if highest else '從缺')
             providers=[]
@@ -102,6 +147,7 @@ def verify_site(url, expected, output):
                 assert page.locator('#effort-filter').count()==0
                 assert page.locator('[data-selection-scope]').get_attribute('data-selection-scope')==key
                 check_provider_source_exits(page)
+                check_personal_cp(page,key)
                 assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
                 for anchor,row in view['calculation']['anchors'].items():
                     assert page.locator(f'[data-anchor="{anchor}"] .model-name').inner_text()==(row['model'] if row else '從缺')
@@ -109,18 +155,24 @@ def verify_site(url, expected, output):
                 provider_url=page.url
                 assert page.goto(urljoin(root,f'providers/{key}/'),wait_until='networkidle').status==200
                 check_provider_source_exits(page)
+                check_personal_cp(page,key)
                 providers.append(dict(provider=key,url=provider_url,view_sha256=entry['view_sha256'],anchors=True,overflow=False,source_exit_summary=False))
             assert not errors,errors
             evidence.append(dict(width=width,http_status=response.status,search=True,empty=True,keyboard=True,overflow=False,script_errors=errors,providers=providers,source_exits_at_end=True))
             page.close()
         page=browser.new_page(java_script_enabled=False,viewport={'width':360,'height':900})
         assert page.goto(root).status==200
+        check_personal_cp(page)
         assert page.locator('[data-anchor]').count()==2
         assert page.locator('#ladder > .table-wrap tbody tr').count()==len(formal)
         page.locator('#search-results > summary').click()
         assert page.locator('[data-search]:visible').count()>=expected['candidate_count']
+        for key in manifest.get('provider_views',{}):
+            assert page.goto(urljoin(root,f'providers/{key}/')).status==200
+            check_personal_cp(page,key)
+            assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
         browser.close()
-    result=dict(url=root,fixed_url=fixed,manifest=manifest,viewports=evidence,no_javascript=True)
+    result=dict(url=root,fixed_url=fixed,manifest=manifest,viewports=evidence,no_javascript=True,personal_cp=personal)
     (output/'browser-evidence.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     return result
 
@@ -130,5 +182,9 @@ if __name__=='__main__':
     parser.add_argument('--url',required=True)
     parser.add_argument('--expected-json',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--expected-site-product')
+    parser.add_argument('--personal-policy',type=Path)
     args=parser.parse_args()
-    print(json.dumps(verify_site(args.url,json.loads(args.expected_json.read_bytes()),args.output),ensure_ascii=False))
+    print(json.dumps(verify_site(args.url,json.loads(args.expected_json.read_bytes()),args.output,
+        expected_site_product=args.expected_site_product,
+        personal_policy=json.loads(args.personal_policy.read_bytes()) if args.personal_policy else None),ensure_ascii=False))

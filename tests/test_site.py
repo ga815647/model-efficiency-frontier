@@ -86,6 +86,53 @@ class SiteTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(site.SiteError):
                 site.validate_base_path(path)
 
+    def test_personal_choice_is_bound_to_exact_result_and_shared_by_all_pages(self):
+        from bridge.personal_cp import calculate_personal_cp
+        record = self.record()
+        env = record['envelope']
+        path = f'results/{env["request_id"]}/123-1/'
+        benchmark = env['candidate_statuses'][0]
+        choice = dict(benchmark_identity=benchmark['identity'], tolerance_multiplier=1,
+                      result_sha256=hashlib.sha256(record['result_bytes']).hexdigest())
+        policy = dict(schema_version=1,choices={path+'result.json':choice})
+        original = deepcopy(record)
+        with tempfile.TemporaryDirectory() as d:
+            output=Path(d)/'valid'
+            manifest=site.write_site([record],output,formal_parameters=PARAMETERS,
+                site_product_commit='d'*40,base_path='/demo/',personal_choices=policy)
+            raw=(output/path/'personal-cp.json').read_bytes()
+            view=json.loads(raw)
+            self.assertEqual(manifest['personal_cp']['view_sha256'],hashlib.sha256(raw).hexdigest())
+            self.assertEqual(view['parent_result_sha256'],choice['result_sha256'])
+            expected=calculate_personal_cp(env,choice)
+            for key in ('benchmark','minimum_score','scopes'):
+                self.assertEqual(view[key],expected[key])
+            for scope in ('all','gpt','gemini','claude','grok'):
+                prefix='' if scope=='all' else f'providers/{scope}/'
+                page=(output/prefix/'index.html').read_text(encoding='utf-8')
+                self.assertIn('id="personal-cp"',page)
+                self.assertIn(f'能力門檻 ≥ {view["minimum_score"]:.2f}',page)
+                row=view['scopes'][scope]['selected']
+                personal=page.split('id="personal-cp"')[1].split('</section>')[0]
+                self.assertIn(row['model'] if row else '從缺',personal)
+            self.assertEqual((output/path/'result.json').read_bytes(),record['result_bytes'])
+            self.assertEqual((output/path/'report.html').read_bytes(),record['report_bytes'])
+            bad=deepcopy(policy);bad['choices'][path+'result.json']['result_sha256']='e'*64
+            with self.assertRaisesRegex(site.SiteError,'personal_cp_result_hash_mismatch'):
+                site.write_site([record],Path(d)/'bad',formal_parameters=PARAMETERS,
+                    site_product_commit='d'*40,base_path='/demo/',personal_choices=bad)
+            self.assertFalse((Path(d)/'bad').exists())
+            newer=self.record();newer['envelope']['run_id']='456'
+            newer['envelope']['created_at']='2026-10-06T00:00:00Z'
+            site.write_site([record,newer],Path(d)/'new',formal_parameters=PARAMETERS,
+                site_product_commit='d'*40,base_path='/demo/',personal_choices=policy)
+            self.assertNotIn('id="personal-cp"',(Path(d)/'new/index.html').read_text(encoding='utf-8'))
+            self.assertNotIn('personal_cp',json.loads((Path(d)/'new/manifest.json').read_bytes()))
+            with self.assertRaisesRegex(site.SiteError,'personal_cp_result_missing'):
+                site.write_site([newer],Path(d)/'missing',formal_parameters=PARAMETERS,
+                    site_product_commit='d'*40,base_path='/demo/',personal_choices=policy)
+        self.assertEqual(record,original)
+
 
 class SiteGitValidationTests(unittest.TestCase):
     def setUp(self):

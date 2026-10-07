@@ -48,8 +48,18 @@ class ChoiceBrowserTests(unittest.TestCase):
                           calculation=calculate_v4(SNAPSHOT,PARAMS,provider_provenance),errors=[])
         record=dict(envelope=env,publication_commit='c'*40,result_bytes=json.dumps(env).encode(),
                     report_bytes=b'original report',csv_sha256=hashlib.sha256(SNAPSHOT.read_bytes()).hexdigest(),observations=[])
+        benchmark=next(r for r in env['candidate_statuses'] if r['model']=='GPT-6 Sol' and r['effort']=='max')
+        choice=dict(benchmark_identity=benchmark['identity'],tolerance_multiplier=1,
+                    result_sha256=hashlib.sha256(record['result_bytes']).hexdigest())
+        choice_path=f'results/{env["request_id"]}/{env["run_id"]}-{env["run_attempt"]}/result.json'
+        from bridge.personal_cp import calculate_personal_cp
+        cls.personal=calculate_personal_cp(env,choice)
         site.write_site([record],cls.root/'provider-demo',formal_parameters=PARAMS,
-                        site_product_commit='d'*40,base_path='/provider-demo/',formal_result_schema_version=4)
+                        site_product_commit='d'*40,base_path='/provider-demo/',formal_result_schema_version=4,
+                        personal_choices=dict(schema_version=1,choices={choice_path:choice}))
+        (cls.root/'expected.json').write_bytes(record['result_bytes'])
+        (cls.root/'personal-policy.json').write_bytes(json.dumps(
+            dict(schema_version=1,choices={choice_path:choice})).encode())
         edge=deepcopy(payload)
         edge['anchors']=dict.fromkeys(edge['anchors'])
         for row in edge['ladder']:
@@ -95,6 +105,37 @@ class ChoiceBrowserTests(unittest.TestCase):
         page.locator('#search-results > summary').click()
         self.assertGreater(page.locator('[data-search]:visible').count(),150)
         page.close()
+
+    def test_personal_cp_all_scopes_mobile_desktop_and_no_javascript(self):
+        for width in (360,390,1280):
+            for js in (True,False):
+                with self.subTest(width=width,javascript=js):
+                    page=self.browser.new_page(viewport={'width':width,'height':900},java_script_enabled=js)
+                    for scope in ('all','gpt','gemini','claude','grok'):
+                        suffix='' if scope=='all' else f'providers/{scope}/'
+                        page.goto(self.url+'provider-demo/'+suffix)
+                        card=page.locator('#personal-cp')
+                        row=self.personal['scopes'][scope]['selected']
+                        self.assertEqual(card.locator('.model-name').inner_text(),row['model'] if row else '從缺')
+                        if row: self.assertIn(row['effort'],card.locator('.effort').inner_text())
+                        self.assertIn(f'≥ {self.personal["minimum_score"]:.2f}',card.locator('[data-personal-threshold]').inner_text())
+                        self.assertIn('並非 AA 的統計誤差',card.inner_text())
+                        self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
+                    page.close()
+
+    def test_verifier_direct_cli_checks_personal_choice_and_exact_product(self):
+        import subprocess,sys
+        root=Path(__file__).resolve().parents[1]
+        command=[sys.executable,str(root/'scripts/verify_site.py'),
+                 '--url',self.url+'provider-demo/', '--expected-json',str(self.root/'expected.json'),
+                 '--personal-policy',str(self.root/'personal-policy.json'),
+                 '--expected-site-product','d'*40,'--output',str(self.root/'cli-evidence')]
+        result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stderr)
+        import json
+        evidence=json.loads((self.root/'cli-evidence/browser-evidence.json').read_bytes())
+        self.assertEqual(evidence['personal_cp']['minimum_score'],self.personal['minimum_score'])
+        self.assertTrue(evidence['no_javascript'])
 
     def test_subscription_factors_are_readable_without_overflow_or_javascript(self):
         for width in (360,390,1280):

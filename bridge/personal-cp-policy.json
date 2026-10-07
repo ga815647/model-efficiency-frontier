@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "choices": {
+    "results/680ad45c-3818-4fbd-809e-59b3a68117ff/37564382191-1/result.json": {
+      "result_sha256": "153d781415b9bd990a193c9e46ab2c6a56b2a8f6dfb4251283644e1d51dc545c",
+      "benchmark_identity": "GPT-6.1 Sol xhigh AA-public published-price",
+      "tolerance_multiplier": 1
+    }
+  }
+}
