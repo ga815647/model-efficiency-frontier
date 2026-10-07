@@ -35,6 +35,8 @@ jobs:
     timeout-minutes: 15
     outputs:
       artifact_name: ${{ steps.artifact-name.outputs.name }}
+      product_commit: ${{ steps.pin.outputs.product }}
+      results_commit: ${{ steps.pin.outputs.results }}
     permissions:
       contents: read
       actions: read
@@ -71,6 +73,7 @@ jobs:
         run: |
           git update-ref refs/bridge/approved-main "$(git rev-parse HEAD)"
           git update-ref refs/heads/results refs/remotes/origin/results
+          echo "product=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "results=$(git rev-parse refs/heads/results)" >> "$GITHUB_OUTPUT"
       - name: Configure Pages
         id: pages
@@ -110,12 +113,25 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Reject superseded site build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PRODUCT_COMMIT: ${{ needs.build.outputs.product_commit }}
+          RESULTS_COMMIT: ${{ needs.build.outputs.results_commit }}
+        run: |
+          test -n "$PRODUCT_COMMIT" && test -n "$RESULTS_COMMIT"
+          current_product=$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          current_results=$(gh api "repos/$REPOSITORY/git/ref/heads/results" --jq .object.sha)
+          test "$current_product" = "$PRODUCT_COMMIT"
+          test "$current_results" = "$RESULTS_COMMIT"
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
