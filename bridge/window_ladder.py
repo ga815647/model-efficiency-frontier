@@ -117,7 +117,8 @@ def select_anchors(ladder: list[dict]) -> dict:
     }
 
 
-def calculate_ladder(rows: list[dict], *, min_score: float, max_cost: float | None) -> dict:
+def calculate_ladder(rows: list[dict], *, min_score: float, max_cost: float | None,
+                     include_claude: bool = False) -> dict:
     """Compose one main selection and an independent all-B-removed membership audit."""
     selection = select_chain(rows, min_score=min_score, max_cost=max_cost)
     final_ids = {r['identity'] for r in selection['final']}
@@ -134,6 +135,8 @@ def calculate_ladder(rows: list[dict], *, min_score: float, max_cost: float | No
         else:
             row, reason = excluded[identity]
             projected = _project(row, 'excluded', reason)
+        if include_claude:
+            projected['comparison_only'] = False
         statuses.append(projected)
     by_identity = {r['identity']: r for r in statuses}
     ladder = [by_identity[r['identity']] for r in selection['final']]

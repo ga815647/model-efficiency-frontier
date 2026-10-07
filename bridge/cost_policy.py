@@ -67,8 +67,15 @@ def main(argv=None):
     args = parser.parse_args(argv)
     from .request import decode_request
     policy = validate_policy(decode_request(args.policy.read_text()))
+    marker_path=args.policy.with_name('recommendation-policy.json')
+    include_claude=False
+    if marker_path.exists():
+        marker=decode_request(marker_path.read_text())
+        if marker != {'policy':'all-providers-v1','result_schema_version':4}:
+            raise ValueError('invalid_recommendation_policy')
+        include_claude=True
     if args.operation == 'show':
-        print(scenario_label(policy['formal_parameters']))
+        print(scenario_label(policy['formal_parameters'],include_claude=include_claude))
         for key, item in policy.get('factor_evidence', {}).items():
             print(f'{key}: {item["basis"]}; {item["as_of"]}; ' + ' / '.join(item['references']))
     else:

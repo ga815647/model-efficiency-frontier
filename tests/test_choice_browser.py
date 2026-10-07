@@ -36,6 +36,18 @@ class ChoiceBrowserTests(unittest.TestCase):
         from test_subscription_scenario import PARAMS
         subscription, _ = calculate_snapshot(SNAPSHOT, PARAMS, PROVENANCE)
         (cls.root/'subscription.html').write_text(render_html(subscription))
+        from bridge import site
+        from bridge.result_v4 import calculate_v4
+        from bridge.result import make_envelope
+        from test_bridge_result import recompute_data
+        from test_bridge_result_v2 import EXECUTION
+        import hashlib,json
+        env=make_envelope(dict(recompute_data(),schema_version=3,parameters=PARAMS),EXECUTION,
+                          calculation=calculate_v4(SNAPSHOT,PARAMS,PROVENANCE),errors=[])
+        record=dict(envelope=env,publication_commit='c'*40,result_bytes=json.dumps(env).encode(),
+                    report_bytes=b'original report',csv_sha256=hashlib.sha256(SNAPSHOT.read_bytes()).hexdigest(),observations=[])
+        site.write_site([record],cls.root/'provider-demo',formal_parameters=PARAMS,
+                        site_product_commit='d'*40,base_path='/provider-demo/',formal_result_schema_version=4)
         edge=deepcopy(payload)
         edge['anchors']=dict.fromkeys(edge['anchors'])
         for row in edge['ladder']:
@@ -91,6 +103,41 @@ class ChoiceBrowserTests(unittest.TestCase):
             self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
             self.assertEqual(page.locator('[data-anchor]').count(),2)
             page.close()
+
+    def test_four_subscription_ladders_and_native_provider_navigation(self):
+        from bridge.provider_view import provider_for
+        import json
+        for width in (360,390,1280):
+            page=self.browser.new_page(viewport={'width':width,'height':900})
+            page.goto(self.url+'provider-demo/')
+            self.assertEqual(page.locator('[data-provider-summary]').count(),4)
+            self.assertEqual(page.locator('#effort-filter').count(),0)
+            self.assertNotIn('僅供比較',page.locator('body').inner_text())
+            for key in ('gpt','gemini','claude','grok'):
+                link=page.locator(f'#provider-chooser [data-provider="{key}"]')
+                link.focus();link.press('Enter')
+                self.assertEqual(page.locator('[data-selection-scope]').get_attribute('data-selection-scope'),key)
+                self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
+                for model in page.locator('#ladder > .table-wrap tbody tr td strong').all_inner_texts():
+                    self.assertEqual(provider_for({'identity':model}),key)
+                raw=page.request.get(page.url+'view.json')
+                self.assertEqual(raw.status,200)
+                calculation=raw.json()['calculation']
+                for anchor,row in calculation['anchors'].items():
+                    displayed=page.locator(f'[data-anchor="{anchor}"] .model-name').inner_text()
+                    self.assertEqual(displayed,row['model'] if row else '從缺')
+                page.locator('#model-search').fill('not-observed-123')
+                self.assertTrue(page.locator('#search-empty').is_visible())
+                page.locator('#model-search').press('Escape')
+                page.locator('#calculation > summary').click()
+                self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
+            page.close()
+        page=self.browser.new_page(java_script_enabled=False,viewport={'width':360,'height':900})
+        page.goto(self.url+'provider-demo/')
+        page.locator('#provider-chooser [data-provider="claude"]').click()
+        self.assertTrue(page.locator('[data-anchor="highest_retained_score"] .model-name').is_visible())
+        self.assertGreater(page.locator('#ladder > .table-wrap tbody tr').count(),0)
+        page.close()
 
 
 if __name__=='__main__': unittest.main()

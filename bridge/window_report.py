@@ -9,6 +9,7 @@ import re
 
 from scripts.refresh_inventory import DISCLOSURE_PREFIX
 from .subscription_cost import SUBSCRIPTION_PARAMETERS, scenario_label
+from .result_v1 import extra
 
 
 _ANCHORS = (('highest_retained_score', '最強保留檔'),
@@ -48,7 +49,8 @@ def _upgrade(row):
 def _cells(row):
     return (row['identity'], _number(row['score']), '$' + _number(row['cost_orig']),
             '$' + _number(row['cost_adj']), _number(row['cp_adj']), '×' + str(row['factor']),
-            'GRADE-' + row['grade'], '僅比較' if row['comparison_only'] else '非Claude', _upgrade(row))
+            'GRADE-' + row['grade'], '僅比較' if row['comparison_only'] else
+            '可推薦' if extra._is_claude(row['identity']) else '非Claude', _upgrade(row))
 
 
 def _tables(calculation):
@@ -99,13 +101,14 @@ def _metadata(calculation):
            f'第一階段 eps_score={calculation["eps"]["score"]}、eps_cp={calculation["eps"]["cp"]}；'
            f'固定視窗半寬={calculation["selection_parameters"]["window_score"]}、'
            f'替代半徑={calculation["selection_parameters"]["replacement_score"]}')
-    yield 'Privacy／配額／速度僅註記，不參與選檔；Claude僅比較、不推薦。'
+    yield ('Privacy／配額／速度僅註記，不參與選檔；四家皆可推薦。' if calculation.get('eligibility_policy')=='all-providers-v1' else
+           'Privacy／配額／速度僅註記，不參與選檔；Claude僅比較、不推薦。')
 
 
 def _context(calculation):
     params = calculation['parameters']
     if set(params) == SUBSCRIPTION_PARAMETERS:
-        yield ('cost_adj = Cost_orig ÷ factor；CP_adj = Score ÷ cost_adj。' + scenario_label(params) +
+        yield ('cost_adj = Cost_orig ÷ factor；CP_adj = Score ÷ cost_adj。' + scenario_label(params,include_claude=calculation.get('eligibility_policy')=='all-providers-v1') +
                '。倍率為使用者訂閱情境，非AA實測或公開API售價；同工作量API等值費用÷訂閱費用，'
                '不是各家保證額度。原價、分數與成本GRADE不變。')
     else:
