@@ -22,7 +22,7 @@ def model_effort(name, slug):
     if not effort:
         effort = re.fullmatch(r'(max|xhigh|high|medium|low) effort(?:, .+)?', label)
     if not effort:
-        effort = re.fullmatch(r'(max|xhigh|high|medium|low), based on .+', label)
+        effort = re.fullmatch(r'(max|xhigh|high|medium|low), (?:based on .+|.+ fallback)', label)
     if effort:
         return base, effort.group(1), slug
     if re.fullmatch(r'(?:[A-Za-z]+\s+)?(?:\d{2,4}|\d{4}-\d{2}(?:-\d{2})?|\d{4})', qualifier) or re.fullmatch(
