@@ -1,5 +1,7 @@
 # Model Efficiency Frontier
 
+**2026-10-07 產品發布與重跑修正**：正式 Pages 除成功計算外，也在同庫 main 的 Product CI（push）通過後自動建置部署；PR、fork、失敗或已落後 main 的 CI 不可觸發產品發布，產品 checkout 固定為通過 CI 的完整 SHA。Chat execution 仍核對獨立 request/run/attempt，產品 CI 不冒充新計算。官方 upload/deploy action 使用一致的 `github-pages-<run_id>-<run_attempt>` 名稱，避免重跑產生同名 artifact 歧義；不刪舊 artifacts 或歷史證據。所有來源／結果驗證、最小權限及正式情境門檻維持。
+
 **2026-10-07 最新來源退出呈現政策（優先於下方較早位置規則）**：依使用者要求，網站與新產生的 HTML 將完整「本次來源退出」清單原樣放在全部供應商頁的最後、計算與來源之後；四家供應商分頁不重複整批清單，也不在計算展開區重複。單一模型的缺值／退出狀態及來源理由仍保留，成功 JSON caveats、原始證據與已保存的歷史報告不改寫；無退出不造空區。此為展示更新，不變更算法、倍率或資料來源。
 
 **2026-10-07 公開與部署現況（本節優先於下方較早狀態）**：使用者最新明確確認「repo 和 page 都改 public，Artificial Analysis token 不會被公開就好」，並已完成管理設定。本庫 visibility 已讀回 public；Pages Source 為 GitHub Actions，`github-pages` environment 只允許 main，正式部署開關已由成功 configure/deploy 實證生效。[正式首頁](https://ga815647.github.io/model-efficiency-frontier/) 匿名 HTTP 200；[Pages run 37565960035-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37565960035) build/deploy 均成功，deployment `6900788565` success。正式結果為 request `680ad45c-3818-4fbd-809e-59b3a68117ff`／run `37564382191-1`，結果 publication `f4d85b7ab0c939b2770b6d79a26a85f52bc8a960`，來源日期 2026-10-07、固定快照 recompute，不是新抓來源。四家倍率 ChatGPT17／Gemini3.6／Claude40／Grok5.2、新 v4 Claude 可推薦；下方舊倍率、僅比較及 private／未部署描述保留歷史身份。AA_API_KEY 仍只由 server-side Actions Secrets 注入，不放 repository variables、來源檔、網站或瀏覽器；不得讀保存的 secret 值。第三方條款的歷史發現保留，使用者確認不冒稱第三方授權。完整固定網址、雜湊、公開驗收見 `docs/acceptance/2026-10-07-public-pages.md`。Git 文件更新不代表 ChatGPT Project Settings 已更新。

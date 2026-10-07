@@ -2,9 +2,9 @@ name: Publish Pages
 
 on:
   # workflow_run is emitted even when the result push used GITHUB_TOKEN.
-  # Always run trusted main code; never execute an upstream artifact/checkout.
+  # Only execute trusted main code; upstream request/fork artifacts are data.
   workflow_run:
-    workflows: ["Chat execution"]
+    workflows: ["Chat execution", "Product CI"]
     types: [completed]
   workflow_dispatch:
 
@@ -24,7 +24,13 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'push' &&
-        github.event.workflow_run.repository.full_name == github.repository))
+        github.event.workflow_run.repository.full_name == github.repository &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.name == 'Chat execution' ||
+         (github.event.workflow_run.name == 'Product CI' &&
+          github.event.workflow_run.path == '.github/workflows/product-ci.yml' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_sha == github.sha))))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -35,14 +41,17 @@ jobs:
       # Official releases resolved through their Git tag refs on 2026-10-06.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Product CI' && github.event.workflow_run.head_sha || 'main' }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Reject superseded product CI
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Product CI'
+        run: test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
       - name: Read authenticated upstream run
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Chat execution'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -51,7 +60,7 @@ jobs:
         run: gh api "repos/$REPOSITORY/actions/runs/$UPSTREAM_ID/attempts/$UPSTREAM_ATTEMPT" > "$RUNNER_TEMP/upstream.json"
       - name: Validate upstream identity
         id: upstream
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Chat execution'
         env:
           REPOSITORY: ${{ github.repository }}
         run: python3 -m bridge.site verify-upstream --run-json "$RUNNER_TEMP/upstream.json" --repository "$REPOSITORY" --github-output "$GITHUB_OUTPUT"
@@ -85,6 +94,7 @@ jobs:
           cat "$RUNNER_TEMP/site-manifest.json" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: _site
           retention-days: 7
           include-hidden-files: true
@@ -104,6 +114,8 @@ jobs:
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Record actual deployment URL
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
