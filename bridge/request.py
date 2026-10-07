@@ -11,6 +11,8 @@ import math
 import re
 import uuid
 
+from .subscription_cost import LEGACY_PARAMETERS, SUBSCRIPTION_PARAMETERS
+
 
 class RequestError(ValueError):
     """An invalid request or request-only commit."""
@@ -21,7 +23,7 @@ _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\Z")
 _SEGMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 _ROOT = {"schema_version", "request_id", "created_at", "product_sha", "operation", "parameters"}
-_PARAMETERS = {"gpt_factor", "grok_factor", "min_score", "min_score_reason", "max_cost"}
+_PARAMETERS = LEGACY_PARAMETERS
 
 
 def _unique_pairs(pairs):
@@ -98,14 +100,14 @@ def _snapshot(value):
 
 def validate_request(request: dict, *, branch: str, parent_sha: str,
                      changed_paths: list[tuple[str, str]]) -> dict:
-    """Validate schema v1 and a single-file, added-only request commit."""
+    """Validate exact v1/v2 schemas and a single-file, added-only request commit."""
     if type(request) is not dict:
         raise RequestError("invalid_request")
     operation = request.get("operation")
     if operation not in ("refresh", "recompute"):
         raise RequestError("invalid_operation")
     _exact_keys(request, _ROOT | ({"source_snapshot"} if operation == "recompute" else set()))
-    if type(request["schema_version"]) is not int or request["schema_version"] != 1:
+    if type(request["schema_version"]) is not int or request["schema_version"] not in (1, 2):
         raise RequestError("invalid_schema_version")
     request_id = request["request_id"]
     _uuid(request_id)
@@ -121,8 +123,9 @@ def validate_request(request: dict, *, branch: str, parent_sha: str,
         raise RequestError("invalid_created_at")
 
     params = request["parameters"]
-    _exact_keys(params, _PARAMETERS)
-    for name in ("gpt_factor", "grok_factor"):
+    parameter_keys = _PARAMETERS if request['schema_version'] == 1 else SUBSCRIPTION_PARAMETERS
+    _exact_keys(params, parameter_keys)
+    for name in parameter_keys - {'min_score', 'min_score_reason', 'max_cost'}:
         finite_number(params[name], positive=True)
     finite_number(params["min_score"])
     if params["max_cost"] is not None:
@@ -142,7 +145,7 @@ def validate_request(request: dict, *, branch: str, parent_sha: str,
         raise RequestError("invalid_changed_paths")
 
     result = {key: request[key] for key in _ROOT}
-    result["parameters"] = {key: params[key] for key in _PARAMETERS}
+    result["parameters"] = {key: params[key] for key in parameter_keys}
     if operation == "recompute":
         result["source_snapshot"] = _snapshot(request["source_snapshot"])
     return result

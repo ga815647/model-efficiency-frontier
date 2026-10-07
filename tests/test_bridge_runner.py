@@ -41,8 +41,8 @@ class RunnerTests(unittest.TestCase):
         git(self.repo, 'update-ref', 'refs/bridge/approved-main', self.product)
         self.locator = {'commit': self.product, 'path': ARCHIVE + '/candidates.csv'}
 
-    def submit(self, *, params=None, locator=None):
-        req = dict(request_data(), product_sha=self.product, operation='recompute',
+    def submit(self, *, params=None, locator=None, schema_version=1):
+        req = dict(request_data(), schema_version=schema_version, product_sha=self.product, operation='recompute',
                    source_snapshot=locator or self.locator)
         if params is not None:
             req['parameters'] = params

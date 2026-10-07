@@ -8,6 +8,7 @@ from html import escape
 import re
 
 from scripts.refresh_inventory import DISCLOSURE_PREFIX
+from .subscription_cost import SUBSCRIPTION_PARAMETERS, scenario_label
 
 
 _ANCHORS = (('highest_retained_score', '最強保留檔'),
@@ -103,15 +104,24 @@ def _metadata(calculation):
 
 def _context(calculation):
     params = calculation['parameters']
-    yield (f'cost_adj = Cost_orig ÷ factor；CP_adj = Score ÷ cost_adj。GPT ×{params["gpt_factor"]} '
+    if set(params) == SUBSCRIPTION_PARAMETERS:
+        yield ('cost_adj = Cost_orig ÷ factor；CP_adj = Score ÷ cost_adj。' + scenario_label(params) +
+               '。倍率為使用者訂閱情境，非AA實測或公開API售價；同工作量API等值費用÷訂閱費用，'
+               '不是各家保證額度。原價、分數與成本GRADE不變。')
+    else:
+        yield (f'cost_adj = Cost_orig ÷ factor；CP_adj = Score ÷ cost_adj。GPT ×{params["gpt_factor"]} '
            f'為個人情境；Grok ×{params["grok_factor"]} 為用戶指定情境、非實測。Contributor ×1。'
            '預設GPT ×18來自個人約18.9倍保守取整，非AA實測；原價及成本GRADE與情境係數分開。')
     yield ('GRADE-B 成本公式與假設見原始註記。B組移除診斷只標示A行保留狀態改變，'
            '非單一B的唯一因果證明；A代表也可能受B間接影響。空診斷表示未列出A行保留變化。')
     yield ('固定政策限制：硬2分邊界、缺窗中性規則及逐次選擇仍可能跳變；'
            '不到2分不宣稱能力相同，轉折不是任務成功率或購買效用。')
-    yield ('$20+$59=$79只屬GPT特定訂閱組合假設；N未提供，不產生新月費決策，'
-           '不從非GPT入口推論續訂，不自動續訂。')
+    if set(params) == SUBSCRIPTION_PARAMETERS:
+        yield ('未提供各訂閱方案、實際用量及月任務數，不產生月費、保證額度或回本結論；'
+               '不把歷史GPT $20+$59組合套到本次ChatGPT Pro／Gemini／Claude。')
+    else:
+        yield ('$20+$59=$79只屬GPT特定訂閱組合假設；N未提供，不產生新月費決策，'
+               '不從非GPT入口推論續訂，不自動續訂。')
     yield from calculation['caveats']
 
 

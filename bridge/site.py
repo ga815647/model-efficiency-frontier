@@ -12,6 +12,7 @@ from bridge.result import calculate_snapshot, validate_envelope
 from bridge.view_evidence import source_observations
 from bridge.runner import (_git, _read, _publication_origin, _verified_transport,
                            materialize_snapshot)
+from bridge.cost_policy import validate_policy, validate_source_parameters
 
 
 class SiteError(ValueError):
@@ -63,8 +64,8 @@ def load_record(repo, results_commit, path):
         raise SiteError('invalid_result_path')
     raw = _read(repo, results_commit, path)
     envelope = validate_envelope(_json(raw))
-    if envelope['status'] != 'success' or envelope['schema_version'] != 2:
-        raise SiteError('not_successful_v2')
+    if envelope['status'] != 'success' or envelope['schema_version'] not in (2, 3):
+        raise SiteError('not_successful_window_result')
     base = path.removesuffix('result.json')
     if base != f'results/{envelope["request_id"]}/{envelope["run_id"]}-{envelope["run_attempt"]}/':
         raise SiteError('result_path_identity_mismatch')
@@ -74,6 +75,8 @@ def load_record(repo, results_commit, path):
     facts = _verified_transport(repo, event_sha=envelope['request_commit_sha'],
                                 ref_name='efficiency-run/' + envelope['request_id'])
     request = facts['request']
+    if envelope['schema_version'] != (3 if request['schema_version'] == 2 else 2):
+        raise SiteError('request_result_schema_mismatch')
     for key in ('request_id', 'product_sha', 'operation', 'parameters', 'created_at'):
         if envelope[key] != request[key]:
             raise SiteError('request_result_mismatch: ' + key)
@@ -104,7 +107,7 @@ def _home_order(record):
 
 def select_home(records, formal_parameters):
     formal = [r for r in records if r['envelope']['status'] == 'success'
-              and r['envelope']['schema_version'] == 2
+              and r['envelope']['schema_version'] in (2, 3)
               and r['envelope']['parameters'] == formal_parameters]
     if not formal:
         raise SiteError('no_verified_formal_success')
@@ -118,7 +121,7 @@ def _manifest(record, product, base_path):
                 request_commit=envelope['request_commit_sha'], request_id=envelope['request_id'],
                 run_id=envelope['run_id'], run_attempt=envelope['run_attempt'],
                 source_dates=envelope['source_dates'], operation=envelope['operation'],
-                parameters=envelope['parameters'],
+                parameters=envelope['parameters'], result_schema_version=envelope['schema_version'],
                 result_url=base_path + f'results/{envelope["request_id"]}/{envelope["run_id"]}-{envelope["run_attempt"]}/',
                 result_sha256=hashlib.sha256(record['result_bytes']).hexdigest(),
                 report_sha256=hashlib.sha256(record['report_bytes']).hexdigest(),
@@ -133,8 +136,8 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
     files = {'.nojekyll': b''}
     for record in records:
         envelope = record['envelope']
-        if envelope['status'] != 'success' or envelope['schema_version'] != 2:
-            raise SiteError('not_successful_v2')
+        if envelope['status'] != 'success' or envelope['schema_version'] not in (2, 3):
+            raise SiteError('not_successful_window_result')
         manifest = _manifest(record, site_product_commit, base_path)
         path = f'results/{envelope["request_id"]}/{envelope["run_id"]}-{envelope["run_attempt"]}/'
         if not RESULT_PATH.fullmatch(path + 'result.json') or path + 'index.html' in files:
@@ -161,20 +164,18 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
 def build_site(repository, results_commit, output, *, base_path, expected_run=None):
     repo = Path(repository)
     product = _git(repo,'rev-parse','HEAD').decode().strip()
-    policy = _json(_read(repo, product, 'bridge/site-policy.json'))
-    if set(policy) != {'formal_parameters', 'source_refresh'}:
-        raise SiteError('invalid_site_policy')
+    policy = validate_policy(_json(_read(repo, product, 'bridge/site-policy.json')))
     pinned = policy['source_refresh']
     formal_source = load_record(repo, pinned['commit'], pinned['path'])
-    if (formal_source['envelope']['operation'] != 'refresh' or
-            formal_source['envelope']['parameters'] != policy['formal_parameters']):
+    if formal_source['envelope']['operation'] != 'refresh':
         raise SiteError('formal_policy_source_mismatch')
+    validate_source_parameters(policy, formal_source['envelope']['parameters'])
     paths = _git(repo, 'ls-tree','-r','--name-only',results_commit,'--','results').decode().splitlines()
     records=[]
     for path in paths:
         if RESULT_PATH.fullmatch(path):
             envelope=validate_envelope(_json(_read(repo,results_commit,path)))
-            if envelope['status']=='success' and envelope['schema_version']==2:
+            if envelope['status']=='success' and envelope['schema_version'] in (2, 3):
                 records.append(load_record(repo,results_commit,path))
     if expected_run:
         matches=[r for r in records if (r['envelope']['run_id'],r['envelope']['run_attempt'],r['envelope']['request_commit_sha'])==expected_run]

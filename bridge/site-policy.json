@@ -1,13 +1,54 @@
 {
   "formal_parameters": {
-    "gpt_factor": 18,
+    "gpt_factor": 18.9,
     "grok_factor": 16,
     "min_score": 0,
     "min_score_reason": "同版本全候選情境比較",
-    "max_cost": null
+    "max_cost": null,
+    "gemini_factor": 6,
+    "claude_factor": 37
   },
   "source_refresh": {
-    "commit": "9bcabcee80ba3c2850dffc8df1c865afe6cf3cbb",
-    "path": "results/834cf811-f1ca-467e-a72f-291fd0195f61/36703900975-1/result.json"
+    "commit": "77a72784521da1825718e23b0c9e1266720e6cd6",
+    "path": "results/4ab43e6d-54ab-4ae0-985f-5dc0ba9b4487/37555947564-1/result.json"
+  },
+  "schema_version": 2,
+  "factor_evidence": {
+    "gpt_factor": {
+      "basis": "user_specified",
+      "as_of": "2026-10-07",
+      "references": [
+        "本次使用者指定固定倍率表：Gemini 訂閱6×、Claude 訂閱37×、ChatGPT Pro18.9×"
+      ],
+      "calculation": null,
+      "limitations": "指定情境值，尚未取得完整用量、方案限制與API等值費用推導；不是供應商保證額度、公開API售價或AA實測。"
+    },
+    "gemini_factor": {
+      "basis": "user_specified",
+      "as_of": "2026-10-07",
+      "references": [
+        "本次使用者指定固定倍率表：Gemini 訂閱6×、Claude 訂閱37×、ChatGPT Pro18.9×"
+      ],
+      "calculation": null,
+      "limitations": "指定情境值，尚未取得完整用量、方案限制與API等值費用推導；不是供應商保證額度、公開API售價或AA實測。"
+    },
+    "claude_factor": {
+      "basis": "user_specified",
+      "as_of": "2026-10-07",
+      "references": [
+        "本次使用者指定固定倍率表：Gemini 訂閱6×、Claude 訂閱37×、ChatGPT Pro18.9×"
+      ],
+      "calculation": null,
+      "limitations": "指定情境值，尚未取得完整用量、方案限制與API等值費用推導；不是供應商保證額度、公開API售價或AA實測。"
+    },
+    "grok_factor": {
+      "basis": "inherited",
+      "as_of": "2026-10-07",
+      "references": [
+        "https://github.com/ga815647/model-efficiency-frontier/blob/77a72784521da1825718e23b0c9e1266720e6cd6/results/4ab43e6d-54ab-4ae0-985f-5dc0ba9b4487/37555947564-1/result.json"
+      ],
+      "calculation": null,
+      "limitations": "沿用已驗證來源成功envelope的Grok16使用者情境；非實測，本次未要求改動。"
+    }
   }
 }
