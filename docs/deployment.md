@@ -1,5 +1,7 @@
 # GitHub Pages 展示與交付契約
 
+**2026-10-07 公開與部署現況（本節優先於下方較早狀態）**：使用者最新明確確認「repo 和 page 都改 public，Artificial Analysis token 不會被公開就好」，並已完成管理設定。本庫 visibility 已讀回 public；Pages Source 為 GitHub Actions，`github-pages` environment 只允許 main，正式部署開關已由成功 configure/deploy 實證生效。[正式首頁](https://ga815647.github.io/model-efficiency-frontier/) 匿名 HTTP 200；[Pages run 37565960035-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37565960035) build/deploy 均成功，deployment `6900788565` success。正式結果為 request `680ad45c-3818-4fbd-809e-59b3a68117ff`／run `37564382191-1`，結果 publication `f4d85b7ab0c939b2770b6d79a26a85f52bc8a960`，來源日期 2026-10-07、固定快照 recompute，不是新抓來源。四家倍率 ChatGPT17／Gemini3.6／Claude40／Grok5.2、新 v4 Claude 可推薦；下方舊倍率、僅比較及 private／未部署描述保留歷史身份。AA_API_KEY 仍只由 server-side Actions Secrets 注入，不放 repository variables、來源檔、網站或瀏覽器；不得讀保存的 secret 值。第三方條款的歷史發現保留，使用者確認不冒稱第三方授權。完整固定網址、雜湊、公開驗收見 `docs/acceptance/2026-10-07-public-pages.md`。Git 文件更新不代表 ChatGPT Project Settings 已更新。
+
 2026-10-07最新增量：新正式request v3／result v4允許Claude推薦，網站新增四種訂閱專屬階梯及view/hash；以同版 [供應商契約](provider-ladders.md) 為準，下方v2/v3僅是相容歷史。allowlist另增加每個固定結果與首頁alias的四家`providers/<key>/index.html`、`view.json`、`manifest.json`。首頁要求新v4，不讓舊資格結果代替。
 
 本網站沿用 Python bridge／靜態單檔 HTML。選型、來源取得及歷史精確 schema 保留；新版倍率使用request v2／result v3，見[倍率契約](subscription-factors.md)，瀏覽器只做文字搜尋與展開；JavaScript 關閉仍可讀兩入口、階梯與全部候選。
