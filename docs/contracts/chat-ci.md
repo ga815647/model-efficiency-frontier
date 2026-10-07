@@ -1,5 +1,7 @@
 # Chat → CI 契約（request v1/v2/v3；result v1/v2/v3/v4；2026-10-07）
 
+**2026-10-07 最新來源退出呈現政策（優先於下方較早位置規則）**：依使用者要求，網站與新產生的 HTML 將完整「本次來源退出」清單原樣放在全部供應商頁的最後、計算與來源之後；四家供應商分頁不重複整批清單，也不在計算展開區重複。單一模型的缺值／退出狀態及來源理由仍保留，成功 JSON caveats、原始證據與已保存的歷史報告不改寫；無退出不造空區。此為展示更新，不變更算法、倍率或資料來源。
+
 **2026-10-07 公開與部署現況（本節優先於下方較早狀態）**：使用者最新明確確認「repo 和 page 都改 public，Artificial Analysis token 不會被公開就好」，並已完成管理設定。本庫 visibility 已讀回 public；Pages Source 為 GitHub Actions，`github-pages` environment 只允許 main，正式部署開關已由成功 configure/deploy 實證生效。[正式首頁](https://ga815647.github.io/model-efficiency-frontier/) 匿名 HTTP 200；[Pages run 37565960035-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37565960035) build/deploy 均成功，deployment `6900788565` success。正式結果為 request `680ad45c-3818-4fbd-809e-59b3a68117ff`／run `37564382191-1`，結果 publication `f4d85b7ab0c939b2770b6d79a26a85f52bc8a960`，來源日期 2026-10-07、固定快照 recompute，不是新抓來源。四家倍率 ChatGPT17／Gemini3.6／Claude40／Grok5.2、新 v4 Claude 可推薦；下方舊倍率、僅比較及 private／未部署描述保留歷史身份。AA_API_KEY 仍只由 server-side Actions Secrets 注入，不放 repository variables、來源檔、網站或瀏覽器；不得讀保存的 secret 值。第三方條款的歷史發現保留，使用者確認不冒稱第三方授權。完整固定網址、雜湊、公開驗收見 `docs/acceptance/2026-10-07-public-pages.md`。Git 文件更新不代表 ChatGPT Project Settings 已更新。
 
 **2026-10-07 最新供應商政策（優先於下方較早版本）**：使用者明確移除Claude僅比較限制；新request v3產生result v4，七欄parameters不變，成功結果新增精確`eligibility_policy=all-providers-v1`，四家皆可進混排推薦與upgrade。固定CP／視窗／EPS數學不變，歷史result v1/v2/v3保留原Claude資格，不改寫或改標。網站提供ChatGPT、Gemini、Claude、Grok各自重新選出的模型與effort階梯，從完整已驗證候選做同算法計算，另存獨立provider-ladder view與manifest/hash；首頁正式情境要求v4。沒有effort篩選選單，不在瀏覽器計算。詳見`docs/provider-ladders.md`。公開／部署阻擋仍未解除。
@@ -103,7 +105,7 @@ production新policy source map另有 **恰好三欄** 的 `previous_inventory`�
 
 固定source reader與前次reader均獨立解析locator並以導出的P驗proof；完整新policy predecessor遞迴驗證，真正legacy predecessor沿用paid-map檢查，不追補新locator。results predecessor必須是publication嚴格ancestor且不含本次result path；驗精確pointer path、ordinary commit／blob並拒絕duplicate JSON keys、cycle、非commit、自指或偽造context。原產品policy與locator固定在result唯一的immutable Git introduction，完整history要求唯一introduction，拒絕ambiguous／reintroduced，不能改寫較晚副本或換另一合法archive來抹掉P；append parent不是P權威。
 
-成功JSON的 `來源退出：` caveats由共享producer產生；Markdown在兩anchors後、階梯前列「本次來源退出」，HTML在cards後以escaped text列同區，完整footer不刪。Chat結論附近同樣原樣揭露：retired是當次排行退役並退出強制追蹤，不等於服務永久關閉；缺task cost不是free或退役，不手估cost。無退出不造空區。新成功refresh的固定重算保留該來源退出；9/26歷史重算不套今天deprecated或重新抓來源。issue #2實際pre-request freshness路由不由本節或fixture成功代替。
+成功JSON的 `來源退出：` caveats由共享producer產生，原始JSON與已保存報告不改寫。網站與新HTML只在全部供應商頁最後、計算與來源之後列「本次來源退出」，以escaped text原樣呈現；供應商分頁與計算展開區不重複整批清單，候選查詢仍保留各模型缺值／退出狀態及來源理由。備用Markdown維持兩anchors後、階梯前的原排版。Chat結報在最後原樣揭露（單一供應商查詢僅相關狀態與理由）：retired是當次排行退役並退出強制追蹤，不等於服務永久關閉；缺task cost不是free或退役，不手估cost。無退出不造空區。新成功refresh的固定重算保留該來源退出；9/26歷史重算不套今天deprecated或重新抓來源。issue #2實際pre-request freshness路由不由本節或fixture成功代替。
 
 `bridge/result.py` 新計算／envelope預設v2，`validate_envelope` 分派合法v1/v2，未知版本與混合欄位拒絕。request仍v1，五個parameters、唯一push分支與三個固定commit不變。新bootstrap可發布排隊中舊product生成的v1；runner、publisher、inventory、固定成功refresh來源及 `assert-success` 皆接受合法v1/v2。`latest-success`／`latest-refresh` 延續append-only與原排序規則；讀到v1不自動觸發重算、不把三picks或表格手推為v2。原Project bootstrap定位不變，無需因本次改制重貼；Git指示發布不證明settings安裝。
 

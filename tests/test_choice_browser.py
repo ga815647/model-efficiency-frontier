@@ -42,8 +42,10 @@ class ChoiceBrowserTests(unittest.TestCase):
         from test_bridge_result import recompute_data
         from test_bridge_result_v2 import EXECUTION
         import hashlib,json
+        provider_provenance = dict(PROVENANCE, caveats=PROVENANCE['caveats'] +
+                                   ['來源退出：SourceMissing 缺 task cost，不沿用舊價。'])
         env=make_envelope(dict(recompute_data(),schema_version=3,parameters=PARAMS),EXECUTION,
-                          calculation=calculate_v4(SNAPSHOT,PARAMS,PROVENANCE),errors=[])
+                          calculation=calculate_v4(SNAPSHOT,PARAMS,provider_provenance),errors=[])
         record=dict(envelope=env,publication_commit='c'*40,result_bytes=json.dumps(env).encode(),
                     report_bytes=b'original report',csv_sha256=hashlib.sha256(SNAPSHOT.read_bytes()).hexdigest(),observations=[])
         site.write_site([record],cls.root/'provider-demo',formal_parameters=PARAMS,
@@ -111,6 +113,9 @@ class ChoiceBrowserTests(unittest.TestCase):
             page=self.browser.new_page(viewport={'width':width,'height':900})
             page.goto(self.url+'provider-demo/')
             self.assertEqual(page.locator('[data-provider-summary]').count(),4)
+            self.assertEqual(page.locator('[data-family="source-exits"]').count(),1)
+            self.assertTrue(page.locator('[data-family="source-exits"]').evaluate(
+                '(node) => node.previousElementSibling.id === "calculation"'))
             self.assertEqual(page.locator('#effort-filter').count(),0)
             self.assertNotIn('僅供比較',page.locator('body').inner_text())
             for key in ('gpt','gemini','claude','grok'):
@@ -130,6 +135,8 @@ class ChoiceBrowserTests(unittest.TestCase):
                 self.assertTrue(page.locator('#search-empty').is_visible())
                 page.locator('#model-search').press('Escape')
                 page.locator('#calculation > summary').click()
+                self.assertEqual(page.locator('[data-family="source-exits"]').count(),0)
+                self.assertNotIn('來源退出：SourceMissing',page.locator('body').inner_text())
                 self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
             page.close()
         page=self.browser.new_page(java_script_enabled=False,viewport={'width':360,'height':900})

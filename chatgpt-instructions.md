@@ -1,5 +1,7 @@
 # 模型效率前線｜Chat 日常指示
 
+**2026-10-07 最新來源退出呈現政策（優先於下方較早位置規則）**：依使用者要求，網站與新產生的 HTML 將完整「本次來源退出」清單原樣放在全部供應商頁的最後、計算與來源之後；四家供應商分頁不重複整批清單，也不在計算展開區重複。單一模型的缺值／退出狀態及來源理由仍保留，成功 JSON caveats、原始證據與已保存的歷史報告不改寫；無退出不造空區。此為展示更新，不變更算法、倍率或資料來源。
+
 **2026-10-07 公開與部署現況（本節優先於下方較早狀態）**：使用者最新明確確認「repo 和 page 都改 public，Artificial Analysis token 不會被公開就好」，並已完成管理設定。本庫 visibility 已讀回 public；Pages Source 為 GitHub Actions，`github-pages` environment 只允許 main，正式部署開關已由成功 configure/deploy 實證生效。[正式首頁](https://ga815647.github.io/model-efficiency-frontier/) 匿名 HTTP 200；[Pages run 37565960035-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37565960035) build/deploy 均成功，deployment `6900788565` success。正式結果為 request `680ad45c-3818-4fbd-809e-59b3a68117ff`／run `37564382191-1`，結果 publication `f4d85b7ab0c939b2770b6d79a26a85f52bc8a960`，來源日期 2026-10-07、固定快照 recompute，不是新抓來源。四家倍率 ChatGPT17／Gemini3.6／Claude40／Grok5.2、新 v4 Claude 可推薦；下方舊倍率、僅比較及 private／未部署描述保留歷史身份。AA_API_KEY 仍只由 server-side Actions Secrets 注入，不放 repository variables、來源檔、網站或瀏覽器；不得讀保存的 secret 值。第三方條款的歷史發現保留，使用者確認不冒稱第三方授權。完整固定網址、雜湊、公開驗收見 `docs/acceptance/2026-10-07-public-pages.md`。Git 文件更新不代表 ChatGPT Project Settings 已更新。
 
 **2026-10-07 最新供應商政策（優先於下方較早版本）**：使用者明確移除Claude僅比較限制；新request v3產生result v4，七欄parameters不變，成功結果新增精確`eligibility_policy=all-providers-v1`，四家皆可進混排推薦與upgrade。固定CP／視窗／EPS數學不變，歷史result v1/v2/v3保留原Claude資格，不改寫或改標。網站提供ChatGPT、Gemini、Claude、Grok各自重新選出的模型與effort階梯，從完整已驗證候選做同算法計算，另存獨立provider-ladder view與manifest/hash；首頁正式情境要求v4。沒有effort篩選選單，不在瀏覽器計算。詳見`docs/provider-ladders.md`。公開／部署阻擋仍未解除。
@@ -35,7 +37,7 @@
 - **v1**：只按歷史 `picks.strong`／`middle`／`cheap` 與舊梯表語義讀取，明示歷史v1；不由Chat手推兩入口、改標v2或自動送重算。收到明確重算意圖才依契約使用已核對的新產品。未知版本／混用欄位拒絕。
 - **重算結論的日期**：成功 `recompute` 的兩入口／推薦結論旁標實際 `source_dates` 與「固定快照重算，非重新抓取來源」；run完成日或新產品commit不是來源日期。9/30跑完9/26快照仍是9/26模型資料，不能稱9/30最新模型。`refresh`失敗照實報當次refresh及缺口，不用舊成功結果補位。
 
-- **本次來源退出**：從已驗證成功JSON的 `caveats` 原樣取 `來源退出：` 前綴行，在兩入口結論後、階梯表前明示；無退出就不造空警告。退役表示當次AA明確 `deprecated=true`，本次未參戰並退出後續強制追蹤，不宣稱服務永久下架。當前task cost缺值表示本次未參戰、未沿用舊價，未退役者仍追蹤；不是free，也不能手估價、拿相似模型／effort代入或塞入數字候選。完整B／係數／版本caveats仍保留；固定來源重算沿用該来源退出，不套今天deprecated或另抓來源。proof、前次追蹤與可信舊產品辨識見同版契約。
+- **本次來源退出**：從已驗證成功JSON的 `caveats` 原樣取 `來源退出：` 前綴行，網站與新 HTML 的全部供應商頁在最後明示，四家分頁不重複整批清單；Chat 結報在最後揭露，單一供應商查詢只說相關模型的已驗證狀態與理由。無退出就不造空警告。退役表示當次AA明確 `deprecated=true`，本次未參戰並退出後續強制追蹤，不宣稱服務永久下架。當前task cost缺值表示本次未參戰、未沿用舊價，未退役者仍追蹤；不是free，也不能手估價、拿相似模型／effort代入或塞入數字候選。完整B／係數／版本caveats仍保留；固定來源重算沿用該来源退出，不套今天deprecated或另抓來源。proof、前次追蹤與可信舊產品辨識見同版契約。
 
 已知身份更正（2026-09-27）：Meta官方models文件明載Muse Spark1.3的max僅限Standard，`Muse Spark 1.3 max Meta Contributor`不可用。讀到含該行的歷史CSV／舊表時，帶上`docs/superpowers/notes/2026-09-27-contributor-effort-correction.md`的更正，不把它推薦為可用服務，也不能拿max分數代入xhigh。需要更新選型時先讀同版更正記錄，確認所用產品已含身份修復並完成驗收，再依使用者重算意圖重新計算整條鏈；若記錄仍是修復中／未部署，不把舊產品的成功結果當作修正後的新推薦，也不由Chat手刪一列或手推替補。固定來源仍是原始快照；新計算的excluded狀態及理由供稽核。
 

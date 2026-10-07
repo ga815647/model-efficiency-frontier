@@ -3,7 +3,7 @@ from html import escape
 
 from .window_report import _context, _html, _metadata, _number, _source_exits, _tables, _upgrade
 
-WEBSITE_VERSION = '1.2.0'
+WEBSITE_VERSION = '1.2.1'
 
 CSS = '''
 :root{color-scheme:light;--ink:#19352f;--muted:#52675f;--line:#d9e2d9;--accent:#14614d;--paper:#fffefa;--bg:#f4f5ee}
@@ -132,7 +132,7 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
     same = '<p class="note">兩個入口是同一模型與 effort，這次推薦不必再做二選一。</p>' if anchors[0] and anchors[0] == anchors[1] else ''
     exits = _source_exits(calculation)
     exit_section = ('<section class="panel exit" data-family="source-exits"><h2>本次來源退出</h2><ul>'
-                    + ''.join('<li>' + _html(x) + '</li>' for x in exits) + '</ul></section>') if exits else ''
+                    + ''.join('<li>' + _html(x) + '</li>' for x in exits) + '</ul></section>') if exits and not provider_name else ''
     ranked = list(enumerate(calculation['ladder'], 1))
     selected = [(i, r) for i, r in ranked if not r['comparison_only']]
     comparison = [(i, r) for i, r in ranked if r['comparison_only']]
@@ -161,7 +161,7 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
     for key in ('product_sha', 'request_commit_sha', 'request_id', 'run_id', 'run_attempt'):
         if key in calculation:
             metadata += f'<p>{key}：{_html(calculation[key])}</p>'
-    context = ''.join('<li>' + _html(x) + '</li>' for x in _context(calculation))
+    context = ''.join('<li>' + _html(x) + '</li>' for x in _context(calculation) if x not in exits)
     downloads = ''.join(f'<li><a href="{escape(url, quote=True)}">{_html(label)}</a></li>' for label, url in links)
     provider_summary=''
     if provider_views:
@@ -187,7 +187,6 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
 {provider_nav}{scope_note}
 </header>
 <section id="recommendations" class="cards" aria-label="保留檔入口">{''.join(cards)}</section>{same}
-{exit_section}
 {provider_summary}
 <section id="ladder" class="panel" data-family="ladder"><h2>推薦階梯</h2><p class="note">分數由高至低。每一檔列出相對下一檔的能力與成本差異。</p>{_ladder(selected, by_id)}
 {comparison_section}</section>
@@ -198,5 +197,6 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
 <noscript><p>搜尋需要 JavaScript；你仍可展開全部候選、來源狀態及推薦細節。</p></noscript></section>
 <details id="calculation" class="panel audit"><summary>計算與來源 · 全候選稽核、selection_trace、GRADE-B 與版本</summary>
 <div class="source-meta">{metadata}</div>{''.join(audit)}<section><h2>來源與限制</h2><ul>{context}</ul></section><ul>{downloads}</ul></details>
+{exit_section}
 <footer class="footer">模型效率前線 · 網站版本 {WEBSITE_VERSION} · 資料日期以上方來源日期為準，部署日期不代表資料更新。</footer>
 </main><script id="model-search-script">{SEARCH_JS}</script></body></html>'''
