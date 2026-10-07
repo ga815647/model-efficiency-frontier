@@ -1,0 +1,37 @@
+{
+  "source_url": "https://dev.meta.ai/docs/pricing-rate-limits",
+  "models": {
+    "Standard": [
+      "muse-spark-1.3",
+      "muse-spark-1.2",
+      "muse-spark-1.1"
+    ],
+    "Contributor": [
+      "muse-spark-1.3-contributor",
+      "muse-spark-1.2-contributor"
+    ]
+  },
+  "USD_per_1M_tokens": {
+    "Standard": {
+      "cached_input": "0.15",
+      "input": "1.25",
+      "output": "4.25"
+    },
+    "Contributor": {
+      "cached_input": "0.002",
+      "input": "0.10",
+      "output": "0.20"
+    }
+  },
+  "rate_limits_per_team": {
+    "Standard": {
+      "RPM": 3000,
+      "TPM": 4000000
+    },
+    "Contributor": {
+      "RPM": 100,
+      "TPM": 3000000
+    }
+  },
+  "training_note": "Contributor permits prompts/completions for training; Standard does not. Notes only, no filtering."
+}
