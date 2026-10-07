@@ -57,6 +57,9 @@ class ChoiceBrowserTests(unittest.TestCase):
         site.write_site([record],cls.root/'provider-demo',formal_parameters=PARAMS,
                         site_product_commit='d'*40,base_path='/provider-demo/',formal_result_schema_version=4,
                         personal_choices=dict(schema_version=1,choices={choice_path:choice}))
+        (cls.root/'expected.json').write_bytes(record['result_bytes'])
+        (cls.root/'personal-policy.json').write_bytes(json.dumps(
+            dict(schema_version=1,choices={choice_path:choice})).encode())
         edge=deepcopy(payload)
         edge['anchors']=dict.fromkeys(edge['anchors'])
         for row in edge['ladder']:
@@ -119,6 +122,20 @@ class ChoiceBrowserTests(unittest.TestCase):
                         self.assertIn('並非 AA 的統計誤差',card.inner_text())
                         self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
                     page.close()
+
+    def test_verifier_direct_cli_checks_personal_choice_and_exact_product(self):
+        import subprocess,sys
+        root=Path(__file__).resolve().parents[1]
+        command=[sys.executable,str(root/'scripts/verify_site.py'),
+                 '--url',self.url+'provider-demo/', '--expected-json',str(self.root/'expected.json'),
+                 '--personal-policy',str(self.root/'personal-policy.json'),
+                 '--expected-site-product','d'*40,'--output',str(self.root/'cli-evidence')]
+        result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stderr)
+        import json
+        evidence=json.loads((self.root/'cli-evidence/browser-evidence.json').read_bytes())
+        self.assertEqual(evidence['personal_cp']['minimum_score'],self.personal['minimum_score'])
+        self.assertTrue(evidence['no_javascript'])
 
     def test_subscription_factors_are_readable_without_overflow_or_javascript(self):
         for width in (360,390,1280):

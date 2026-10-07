@@ -9,6 +9,11 @@ from pathlib import Path
 from urllib.parse import urljoin
 from urllib.request import urlopen
 
+# The documented direct CLI must resolve bridge modules as well as -m usage.
+if __package__ in (None, ''):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 
 def verify_site(url, expected, output, *, expected_site_product=None, personal_policy=None):
     from playwright.sync_api import sync_playwright
