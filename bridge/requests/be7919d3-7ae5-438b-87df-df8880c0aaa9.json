@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "request_id": "be7919d3-7ae5-438b-87df-df8880c0aaa9",
+  "created_at": "2026-10-07T09:01:00+08:00",
+  "product_sha": "8a9b1dfe3f426eff0b86a40231ca0399ded3b4f7",
+  "operation": "refresh",
+  "parameters": {
+    "gpt_factor": 18,
+    "grok_factor": 16,
+    "min_score": 0,
+    "min_score_reason": "同版本全候選情境比較",
+    "max_cost": null
+  }
+}
