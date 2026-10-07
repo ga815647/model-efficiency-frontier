@@ -468,8 +468,16 @@ class RefreshSourcesTest(unittest.TestCase):
                          ('Qwen3.8 Max (0902)', 'unspecified', 'qwen3-8-max'))
         self.assertEqual(_model_effort('Grok 4.7 (high)', 'grok-4-7-high'),
                          ('Grok 4.7', 'high', 'grok-4-7-high'))
+        self.assertEqual(_model_effort('Claude Sonnet 5.5 (Medium, Default Fallback)',
+                                       'claude-sonnet-5-5-medium'),
+                         ('Claude Sonnet 5.5', 'medium', 'claude-sonnet-5-5-medium'))
+        self.assertEqual(_model_effort('Claude Fable 5 (Max, Opus 4.8 Fallback)',
+                                       'claude-fable-5'),
+                         ('Claude Fable 5', 'max', 'claude-fable-5'))
         with self.assertRaises(SourceError):
             _model_effort('Unknown (unreviewed suffix)', 'unknown-suffix')
+        with self.assertRaises(SourceError):
+            _model_effort('Unknown (medium, unreviewed suffix)', 'unknown-medium')
 
     def test_conflicting_duplicate_and_markup(self):
         html = (FIX / 'leader.html').read_text()
