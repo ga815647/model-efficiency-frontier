@@ -75,14 +75,30 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
         card=page.locator('#personal-cp')
         assert card.count()==int(personal is not None)
         if personal:
+            assert page.locator('#recommendations > article > h2').all_inner_texts()==[
+                '推薦中能力最高','能力與成本平衡推薦','推薦中情境成本最低']
             row=personal['scopes'][scope]['selected']
             assert card.locator('.model-name').inner_text()==(row['model'] if row else '從缺')
-            assert f'≥ {personal["minimum_score"]:.2f}' in card.locator('[data-personal-threshold]').inner_text()
-            assert personal['benchmark']['model'] in card.locator('[data-personal-benchmark]').inner_text()
-            assert '並非 AA 的統計誤差' in card.inner_text()
+            assert f'≥ {personal["minimum_score"]:.2f}' in card.locator('[data-personal-threshold]').text_content()
+            assert personal['benchmark']['model'] in card.locator('[data-personal-benchmark]').text_content()
+            assert '並非 AA 的統計誤差' in card.text_content()
             if row:
                 assert row['effort'] in card.locator('.effort').inner_text()
                 assert card.locator('.metrics b').all_inner_texts()==[f'{row["score"]:.2f}',f'${row["cost_adj"]:.4f}']
+            else:
+                assert card.locator('.metrics').count()==0
+            if scope=='all':
+                for key,entry in manifest.get('provider_views',{}).items():
+                    summary=page.locator(f'[data-provider-summary="{key}"] [data-personal-summary]')
+                    selected=personal['scopes'][key]['selected']
+                    assert '能力與成本平衡推薦' in summary.inner_text()
+                    assert summary.locator('strong').inner_text()==(
+                        selected['model']+' · '+selected['effort'] if selected else '從缺')
+                    if selected:
+                        assert f'分數 {selected["score"]:.2f}' in summary.inner_text()
+                        assert f'${selected["cost_adj"]:.4f}／任務' in summary.inner_text()
+                    else:
+                        assert '／任務' not in summary.inner_text()
 
     evidence=[]
     with sync_playwright() as p:
