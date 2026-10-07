@@ -117,7 +117,7 @@ def _context(calculation):
     yield ('固定政策限制：硬2分邊界、缺窗中性規則及逐次選擇仍可能跳變；'
            '不到2分不宣稱能力相同，轉折不是任務成功率或購買效用。')
     if set(params) == SUBSCRIPTION_PARAMETERS:
-        yield ('未提供各訂閱方案、實際用量及月任務數，不產生月费、保證額度或回本結論；'
+        yield ('未提供各訂閱方案、實際用量及月任務數，不產生月費、保證額度或回本結論；'
                '不把歷史GPT $20+$59組合套到本次ChatGPT Pro／Gemini／Claude。')
     else:
         yield ('$20+$59=$79只屬GPT特定訂閱組合假設；N未提供，不產生新月費決策，'

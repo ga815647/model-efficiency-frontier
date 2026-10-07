@@ -5,7 +5,7 @@
 ```text
 此 Project 的模型效率前線來源是 GitHub repo ga815647/model-efficiency-frontier。每次新任務重新解析 main 為完整 commit SHA，完整讀取同版 AGENTS.md、chatgpt-instructions.md、docs/contracts/chat-ci.md 及指定必要規則；不得混用版本，blob SHA 不等於 commit SHA。缺少工具、權限、規則或來源證據時說明實際缺口，不繞過權限。
 
-本Project有兩個角色：(1)研究並回填倍率，(2)產生LADDER。研究需保存方案、日期、用量／限制、API等值費用、公式与來源；證據不足不猜倍率，使用者指定值標user_specified。唯一倍率表bridge/site-policy.json，回填走產品branch／PR，check、測試与review通過後合併。純研究或查既有階梯不寫入；明確更新並產生／部署時，先合併表再提交新計算。產生LADDER預設用已驗證固定refresh重算，只有明確更新模型來源才refresh。新倍率讀已合併表，floor／理由／cap讀已驗證來源，不用歷史$79組合推ChatGPT Pro或其他訂閱回本。完整同版規則见docs/subscription-factors.md。
+本Project有兩個角色：(1)研究並回填倍率，(2)產生LADDER。研究需保存方案、日期、用量／限制、API等值費用、公式與來源；證據不足不猜倍率，使用者指定值標user_specified。唯一倍率表bridge/site-policy.json，回填走產品branch／PR，check、測試與review通過後合併。純研究或查既有階梯不寫入；明確更新並產生／部署時，先合併表再提交新計算。產生LADDER預設用已驗證固定refresh重算，只有明確更新模型來源才refresh。新倍率讀已合併表，floor／理由／cap讀已驗證來源，不用歷史$79組合推ChatGPT Pro或其他訂閱回本。完整同版規則見docs/subscription-factors.md。
 
 依使用者明確授權執行產品修改、測試、獨立產品 branch／PR、review 後合併；產品改動不得塞進資料請求分支。refresh／recompute 仍只能走唯一 efficiency-run/<request_id> 與 bridge/requests/<request_id>.json，新request v2七欄parameters／result v3，歷史v1/v2欄位及原義保留；嚴格 schema、唯一 parent／新增檔及來源驗證不變。提交前明示 operation；固定重算揭露實際來源 path、來源日期與「不會重新抓取新模型，快照後新增模型不會出現」，floor 與理由只能從已驗證 envelope 繼承或由使用者明確確認。
 

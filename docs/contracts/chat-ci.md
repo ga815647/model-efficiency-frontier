@@ -1,4 +1,4 @@
-# Chat → CI 契約（request v1／result v2＋歷史v1；2026-09-27）
+# Chat → CI 契約（request v1/v2；result v1/v2/v3；2026-10-07）
 
 **2026-10-07 倍率與兩種 Chat 操作增量（優先於下方舊倍率／schema敘述）**：Chat 可研究並回填 repo 的倍率表，也可依保存倍率產生 LADDER。單一表 `bridge/site-policy.json`：ChatGPT Pro ×18.9、Gemini 訂閱 ×6、Claude 訂閱 ×37（仍僅比較），Grok沿用×16、Contributor×1。本次三個新倍率均為使用者指定，不冒稱研究驗證；證據、日期與限制同步保存。更新表走產品 branch／PR；產生新LADDER走唯一 request bridge。新 request v2／result v3 承載七欄參數，歷史 request v1／result v1/v2 的精確欄位與原義保留，算法與原始來源不改。完整流程及schema見 [倍率操作契約](subscription-factors.md)，本檔及該契約須同commit讀取。公開／Pages門檻仍未解除，不能將建置成功稱為上線。
 
@@ -19,6 +19,8 @@
 每次對話任務 GET `/commits/main` 的 `sha` 得**產品 commit**；以該 SHA 完整讀 `chatgpt-instructions.md`、本契約及必要規則。同一任務不在讀到一半改用新 main。`fetch_file` 回傳 `sha` 是 **blob SHA**，不是產品／請求／發佈 commit。`request_commit_sha` 來自 create_file 的 `result.commit_sha` 或 GET 分支 HEAD；結果的 commit 須另 GET `/commits/results` 或查該 run 發佈摘要取得並固定。三者不能互換。
 
 ## 請求與使用者意圖
+
+本節以下五欄request v1／result v2為保留的精確相容契約，不代表新請求的倍率預設。2026-10-07新增操作及request v2／result v3以同版 [倍率操作契約](../subscription-factors.md) 為準；新請求讀取policy七欄參數，保留此處的唯一transport與來源驗證。
 
 查既有結果只讀，不發 CI；只有明確刷新來源（`refresh`）或對固定快照重算（`recompute`）才提交。因用戶明確要求單次請求而非日常手動 Actions，不以手動按鈕替代缺失的 Git write。係數未另指定時 `gpt_factor=18`、`grok_factor=16`；Contributor 仍 ×1。無全域 floor：新刷新缺 `min_score` 時提案數字、**請使用者確認理由**，不能偷用 0；重算缺 floor 時可從選定的**已驗證來源成功 envelope**明示繼承其 `parameters.min_score` 和 `min_score_reason`，歷史 CSV 無相鄰 envelope 或無法驗證時請用戶確認。`max_cost` 未指定用 `null`；它限制調整後成本。EPS 由產品規則決定，不是請求欄位。
 
