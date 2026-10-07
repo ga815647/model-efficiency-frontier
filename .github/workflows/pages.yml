@@ -2,9 +2,9 @@ name: Publish Pages
 
 on:
   # workflow_run is emitted even when the result push used GITHUB_TOKEN.
-  # Always run trusted main code; never execute an upstream artifact/checkout.
+  # Only execute trusted main code; upstream request/fork artifacts are data.
   workflow_run:
-    workflows: ["Chat execution"]
+    workflows: ["Chat execution", "Product CI"]
     types: [completed]
   workflow_dispatch:
 
@@ -24,9 +24,19 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'push' &&
-        github.event.workflow_run.repository.full_name == github.repository))
+        github.event.workflow_run.repository.full_name == github.repository &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.name == 'Chat execution' ||
+         (github.event.workflow_run.name == 'Product CI' &&
+          github.event.workflow_run.path == '.github/workflows/product-ci.yml' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_sha == github.sha))))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      artifact_name: ${{ steps.artifact-name.outputs.name }}
+      product_commit: ${{ steps.pin.outputs.product }}
+      results_commit: ${{ steps.pin.outputs.results }}
     permissions:
       contents: read
       actions: read
@@ -35,14 +45,17 @@ jobs:
       # Official releases resolved through their Git tag refs on 2026-10-06.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Product CI' && github.event.workflow_run.head_sha || 'main' }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Reject superseded product CI
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Product CI'
+        run: test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
       - name: Read authenticated upstream run
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Chat execution'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -51,7 +64,7 @@ jobs:
         run: gh api "repos/$REPOSITORY/actions/runs/$UPSTREAM_ID/attempts/$UPSTREAM_ATTEMPT" > "$RUNNER_TEMP/upstream.json"
       - name: Validate upstream identity
         id: upstream
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Chat execution'
         env:
           REPOSITORY: ${{ github.repository }}
         run: python3 -m bridge.site verify-upstream --run-json "$RUNNER_TEMP/upstream.json" --repository "$REPOSITORY" --github-output "$GITHUB_OUTPUT"
@@ -60,6 +73,7 @@ jobs:
         run: |
           git update-ref refs/bridge/approved-main "$(git rev-parse HEAD)"
           git update-ref refs/heads/results refs/remotes/origin/results
+          echo "product=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "results=$(git rev-parse refs/heads/results)" >> "$GITHUB_OUTPUT"
       - name: Configure Pages
         id: pages
@@ -83,8 +97,12 @@ jobs:
           python3 -m bridge.site --results-commit "$RESULTS_COMMIT" \
             --output _site --base-path "${BASE_PATH%/}/" "${args[@]}" > "$RUNNER_TEMP/site-manifest.json"
           cat "$RUNNER_TEMP/site-manifest.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Select artifact name
+        id: artifact-name
+        run: echo "name=github-pages-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
+          name: ${{ steps.artifact-name.outputs.name }}
           path: _site
           retention-days: 7
           include-hidden-files: true
@@ -95,15 +113,30 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Reject superseded site build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PRODUCT_COMMIT: ${{ needs.build.outputs.product_commit }}
+          RESULTS_COMMIT: ${{ needs.build.outputs.results_commit }}
+        run: |
+          test -n "$PRODUCT_COMMIT" && test -n "$RESULTS_COMMIT"
+          current_product=$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          current_results=$(gh api "repos/$REPOSITORY/git/ref/heads/results" --jq .object.sha)
+          test "$current_product" = "$PRODUCT_COMMIT"
+          test "$current_results" = "$RESULTS_COMMIT"
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        with:
+          artifact_name: ${{ needs.build.outputs.artifact_name }}
       - name: Record actual deployment URL
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}

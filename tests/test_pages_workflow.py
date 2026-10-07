@@ -25,9 +25,42 @@ class PagesTriggerTests(unittest.TestCase):
         root=Path(__file__).resolve().parents[1]
         pages=yaml.load((root/'.github/workflows/pages.yml').read_text(),Loader=yaml.BaseLoader)
         self.assertEqual(set(pages['on']),{'workflow_run','workflow_dispatch'})
-        self.assertEqual(pages['on']['workflow_run']['workflows'],['Chat execution'])
+        self.assertEqual(pages['on']['workflow_run']['workflows'],['Chat execution','Product CI'])
+        build=pages['jobs']['build']
+        for guard in ("conclusion == 'success'", "event == 'push'",
+                      'repository.full_name == github.repository',
+                      'head_repository.full_name == github.repository',
+                      "name == 'Product CI'", "head_branch == 'main'",
+                      'head_sha == github.sha', "path == '.github/workflows/product-ci.yml'"):
+            self.assertIn(guard,build['if'])
+        checkout=build['steps'][0]['with']['ref']
+        self.assertIn("name == 'Product CI'",checkout)
+        self.assertIn('workflow_run.head_sha',checkout)
+        current=next(step for step in build['steps'] if step.get('name')=='Reject superseded product CI')
+        self.assertIn('refs/remotes/origin/main',current['run'])
+        self.assertIn("name == 'Product CI'",current['if'])
+        for name in ('Read authenticated upstream run','Validate upstream identity'):
+            step=next(step for step in build['steps'] if step.get('name')==name)
+            self.assertIn("name == 'Chat execution'",step['if'])
+        upload=next(step for step in build['steps'] if step.get('uses','').startswith('actions/upload-pages-artifact@'))
+        deploy=next(step for step in pages['jobs']['deploy']['steps'] if step.get('name')=='Deploy Pages')
+        naming=next(step for step in build['steps'] if step.get('id')=='artifact-name')
+        self.assertIn('GITHUB_RUN_ID',naming['run'])
+        self.assertIn('GITHUB_RUN_ATTEMPT',naming['run'])
+        self.assertEqual(upload['with']['name'],'${{ steps.artifact-name.outputs.name }}')
+        self.assertEqual(build['outputs']['artifact_name'],'${{ steps.artifact-name.outputs.name }}')
+        self.assertEqual(build['outputs']['product_commit'],'${{ steps.pin.outputs.product }}')
+        self.assertEqual(build['outputs']['results_commit'],'${{ steps.pin.outputs.results }}')
+        self.assertEqual(deploy['with']['artifact_name'],'${{ needs.build.outputs.artifact_name }}')
         self.assertEqual(pages['permissions'],{'contents':'read'})
-        self.assertEqual(pages['jobs']['deploy']['permissions'],{'pages':'write','id-token':'write'})
+        self.assertEqual(pages['jobs']['deploy']['permissions'],{'contents':'read','pages':'write','id-token':'write'})
+        freshness=pages['jobs']['deploy']['steps'][0]
+        self.assertEqual(freshness['env']['PRODUCT_COMMIT'],'${{ needs.build.outputs.product_commit }}')
+        self.assertEqual(freshness['env']['RESULTS_COMMIT'],'${{ needs.build.outputs.results_commit }}')
+        for guard in ('git/ref/heads/main','git/ref/heads/results',
+                      '"$current_product" = "$PRODUCT_COMMIT"',
+                      '"$current_results" = "$RESULTS_COMMIT"'):
+            self.assertIn(guard,freshness['run'])
         self.assertIn('PUBLICATION_REVIEW_PASSED',pages['jobs']['deploy']['if'])
         self.assertEqual(pages['concurrency']['cancel-in-progress'],'false')
         ci=yaml.load((root/'.github/workflows/product-ci.yml').read_text(),Loader=yaml.BaseLoader)
