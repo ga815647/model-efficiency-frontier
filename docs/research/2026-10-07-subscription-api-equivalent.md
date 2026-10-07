@@ -33,6 +33,8 @@ token 等值須依當時真正模型的 input、output、cache read/write 價格
 - [DevelopersIO 三帳號研究](https://dev.classmethod.jp/articles/claude-max-20x-weekly-limit-not-4x/)（2026-08-20）：已核對 JSONL 去重、ccusage 交叉檢查、上述每週 API-equivalent 區間與促銷背景。比較帳號的模型使用不同，部分帳號的網頁使用紀錄不完整；並非三個完全相同 workload 的完整對照。
 - [Danube Labs](https://danubelabs.net/en/blog/claude-max-weekly-limits-cut)：已核對其 +50%→+25% 轉述與單帳號 calendar-week 量測。額度調整的原始公告未在本次取得；重算的正常化仍是有條件假設。reset 不一定對齊日曆週，模型與費率改動也可能影響等值。獨立 Agent SDK credit 不算入40×。
 
+近期反向證據也須保留：同篇單帳號研究的9/21–10/4兩個日曆週，平均約$420 API-equivalent/week，比8月平均下降62%；直接月化約18.2×，低於使用者建議區間。9/21單週約$727，但9/28週在匯出時仍進行中，且日曆週不對齊quota reset。這份資料不足以取代完整可比週的測量，卻足以提醒40×不是目前每個帳號都能達成的通用值。40×保留為使用者選定、以8月樣本正常化的情境；其範圍／信心同樣是使用者建議，後續應以當期完整reset週logs更新。
+
 ### ChatGPT：17×
 
 使用者下緣：`959.87 / 3 × 52/12 / 100 ≈ 13.86×`；上緣：`481 × 52/12 / 100 ≈ 20.84×`。採乘法中點 `sqrt(13.86 × 20.84) ≈ 17.0`。
