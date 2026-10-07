@@ -16,8 +16,8 @@ class CostPolicyTests(unittest.TestCase):
     def test_current_table_has_explicit_provenance_for_every_factor(self):
         policy = self.policy()
         self.assertEqual(validate_policy(policy), policy)
-        self.assertEqual(policy['formal_parameters'], dict(PARAMS, min_score_reason='同版本全候選情境比較'))
-        for key in ('gpt_factor', 'gemini_factor', 'claude_factor'):
+        self.assertEqual(policy['formal_parameters'], dict(PARAMS, gpt_factor=17, gemini_factor=3.6, claude_factor=40, grok_factor=5.2, min_score_reason='同版本全候選情境比較'))
+        for key in ('gpt_factor', 'gemini_factor', 'claude_factor', 'grok_factor'):
             self.assertEqual(policy['factor_evidence'][key]['basis'], 'user_specified')
             self.assertEqual(policy['factor_evidence'][key]['as_of'], '2026-10-07')
         legacy = {k:v for k,v in policy.items() if k in ('formal_parameters', 'source_refresh')}
@@ -42,7 +42,7 @@ class CostPolicyTests(unittest.TestCase):
 
     def test_new_factors_can_differ_from_snapshot_but_floor_must_be_inherited(self):
         policy = self.policy()
-        original = dict(policy['formal_parameters'], gpt_factor=18)
+        original = dict(policy['formal_parameters'], gpt_factor=18, grok_factor=16)
         del original['gemini_factor']; del original['claude_factor']
         validate_source_parameters(policy, original)
         for field, value in (('min_score', 10), ('min_score_reason', 'guessed'), ('max_cost', 1)):
