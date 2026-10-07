@@ -54,6 +54,9 @@ class ChoiceBrowserTests(unittest.TestCase):
         choice_path=f'results/{env["request_id"]}/{env["run_id"]}-{env["run_attempt"]}/result.json'
         from bridge.personal_cp import calculate_personal_cp
         cls.personal=calculate_personal_cp(env,choice)
+        same=deepcopy(env)
+        same['anchors']=dict.fromkeys(same['anchors'],cls.personal['scopes']['all']['selected'])
+        (cls.root/'same-winner.html').write_text(render_html(same,personal_cp=cls.personal))
         site.write_site([record],cls.root/'provider-demo',formal_parameters=PARAMS,
                         site_product_commit='d'*40,base_path='/provider-demo/',formal_result_schema_version=4,
                         personal_choices=dict(schema_version=1,choices={choice_path:choice}))
@@ -115,13 +118,58 @@ class ChoiceBrowserTests(unittest.TestCase):
                         suffix='' if scope=='all' else f'providers/{scope}/'
                         page.goto(self.url+'provider-demo/'+suffix)
                         card=page.locator('#personal-cp')
+                        self.assertEqual(page.locator('#recommendations > article > h2').all_inner_texts(),
+                            ['推薦中能力最高','能力與成本平衡推薦','推薦中情境成本最低'])
+                        self.assertEqual(card.locator('h2').inner_text(),'能力與成本平衡推薦')
+                        positions=[item.bounding_box() for item in page.locator('#recommendations > article').all()]
+                        if width>700:
+                            self.assertLess(positions[0]['x'],positions[1]['x'])
+                            self.assertLess(positions[1]['x'],positions[2]['x'])
+                            self.assertEqual(len({item['y'] for item in positions}),1)
+                        else:
+                            self.assertLess(positions[0]['y'],positions[1]['y'])
+                            self.assertLess(positions[1]['y'],positions[2]['y'])
                         row=self.personal['scopes'][scope]['selected']
                         self.assertEqual(card.locator('.model-name').inner_text(),row['model'] if row else '從缺')
-                        if row: self.assertIn(row['effort'],card.locator('.effort').inner_text())
+                        if row:
+                            self.assertIn(row['effort'],card.locator('.effort').inner_text())
+                            self.assertEqual(card.locator('.metrics b').all_inner_texts(),
+                                [f'{row["score"]:.2f}',f'${row["cost_adj"]:.4f}'])
+                        else:
+                            self.assertEqual(card.locator('.metrics').count(),0)
+                        # Rules remain accessible with native disclosure even without JavaScript.
+                        card.locator('[data-personal-rules] > summary').click()
                         self.assertIn(f'≥ {self.personal["minimum_score"]:.2f}',card.locator('[data-personal-threshold]').inner_text())
                         self.assertIn('並非 AA 的統計誤差',card.inner_text())
+                        if scope=='all':
+                            for key in ('gpt','gemini','claude','grok'):
+                                summary=page.locator(f'[data-provider-summary="{key}"] [data-personal-summary]')
+                                selected=self.personal['scopes'][key]['selected']
+                                self.assertIn('能力與成本平衡推薦',summary.inner_text())
+                                if selected:
+                                    self.assertEqual(summary.locator('strong').inner_text(),
+                                        selected['model']+' · '+selected['effort'])
+                                    self.assertIn(f'分數 {selected["score"]:.2f}',summary.inner_text())
+                                    self.assertIn(f'${selected["cost_adj"]:.4f}／任務',summary.inner_text())
+                                else:
+                                    self.assertEqual(summary.locator('strong').inner_text(),'從缺')
+                                    self.assertNotIn('／任務',summary.inner_text())
                         self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
                     page.close()
+
+    def test_three_recommendation_directions_can_share_one_winner(self):
+        selected=self.personal['scopes']['all']['selected']
+        for width in (360,1280):
+            page=self.browser.new_page(viewport={'width':width,'height':900},java_script_enabled=False)
+            page.goto(self.url+'same-winner.html')
+            self.assertEqual(page.locator('#recommendations .model-name').all_inner_texts(),
+                             [selected['model']]*3)
+            self.assertEqual(page.locator('#recommendations .effort').all_inner_texts(),
+                             ['effort：'+selected['effort']]*3)
+            self.assertEqual(page.locator('#recommendations .metrics b').all_inner_texts(),
+                             [f'{selected["score"]:.2f}',f'${selected["cost_adj"]:.4f}']*3)
+            self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
+            page.close()
 
     def test_verifier_direct_cli_checks_personal_choice_and_exact_product(self):
         import subprocess,sys

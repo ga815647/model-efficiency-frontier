@@ -1,6 +1,6 @@
 # Model Efficiency Frontier
 
-**2026-10-07 個人主力 CP MVP**：以本次選定標竿 − 容許倍數×score EPS 為共同能力門檻，達標的完整可用候選中選 CP_adj 最高；更高分可參選，四家無候選從缺。標竿／容許值逐次選擇並綁精確結果，與原客觀 LADDER 並列。這是個人容許分差，不是 AA 統計誤差；[操作與驗收契約](docs/personal-cp.md)。
+**2026-10-07 能力與成本平衡推薦**：以本次選定標竿 − 容許倍數×score EPS 為共同能力門檻，達標的完整可用候選中選 CP_adj 最高；更高分可參選，四家無候選從缺。網站上方依序顯示能力最高、能力與成本平衡、情境成本最低；四家平衡摘要列出分數與每任務情境成本。同一模型可同時符合多個推薦方向。標竿／容許值逐次選擇並綁精確結果，與原客觀 LADDER 並列。這是個人容許分差，不是 AA 統計誤差；[操作與驗收契約](docs/personal-cp.md)。
 
 **2026-10-07 產品發布與重跑修正**：正式 Pages 除成功計算外，也在同庫 main 的 Product CI（push）通過後自動建置部署；PR、fork、失敗或已落後 main 的 CI 不可觸發產品發布，產品 checkout 固定為通過 CI 的完整 SHA。Chat execution 仍核對獨立 request/run/attempt，產品 CI 不冒充新計算。build 產生 `github-pages-<run_id>-<build_attempt>` 名稱並以 job output 傳給官方 upload/deploy action；只重跑 deploy 仍使用成功 build 的原 artifact，重跑 build 則產生新名稱，避免同名歧義及 attempt 漂移；不刪舊 artifacts 或歷史證據。deploy 前另以 contents:read 讀回 main／results refs，必須等於成功 build 固定的產品／results tip；較舊 artifact 不可透過 deploy-only 重跑蓋掉新產品或結果。所有來源／結果驗證、其餘最小權限及正式情境門檻維持。
 

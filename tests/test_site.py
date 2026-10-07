@@ -113,7 +113,7 @@ class SiteTests(unittest.TestCase):
                 self.assertIn('id="personal-cp"',page)
                 self.assertIn(f'能力門檻 ≥ {view["minimum_score"]:.2f}',page)
                 row=view['scopes'][scope]['selected']
-                personal=page.split('id="personal-cp"')[1].split('</section>')[0]
+                personal=page.split('id="personal-cp"')[1].split('</article>')[0]
                 self.assertIn(row['model'] if row else '從缺',personal)
             self.assertEqual((output/path/'result.json').read_bytes(),record['result_bytes'])
             self.assertEqual((output/path/'report.html').read_bytes(),record['report_bytes'])

@@ -3,12 +3,14 @@ from html import escape
 
 from .window_report import _context, _html, _metadata, _number, _source_exits, _tables, _upgrade
 
-WEBSITE_VERSION = '1.3.0'
+WEBSITE_VERSION = '1.3.1'
+BALANCED_RECOMMENDATION = '能力與成本平衡推薦'
 
 CSS = '''
 :root{color-scheme:light;--ink:#19352f;--muted:#52675f;--line:#d9e2d9;--accent:#14614d;--paper:#fffefa;--bg:#f4f5ee}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--bg);font:16px/1.7 system-ui,-apple-system,sans-serif}main{max-width:1120px;margin:auto;padding:28px 24px 70px}h1{font-size:clamp(2.1rem,5vw,3.8rem);letter-spacing:-.05em;line-height:1.17;margin:28px 0 16px}h2{font-size:1.45rem;line-height:1.4;margin:0 0 16px}h3{font-size:1.1rem}p{margin:.6em 0}a{color:var(--accent);text-underline-offset:4px}a,summary,input{touch-action:manipulation}a:focus-visible,summary:focus-visible,input:focus-visible{outline:3px solid #bd702a;outline-offset:4px}nav{display:flex;flex-wrap:wrap;gap:12px 24px;font-size:.9rem}nav a{padding:8px 0}.eyebrow{font-size:.8rem;letter-spacing:.13em;font-weight:700;color:var(--accent)}.muted,small,.intro{color:var(--muted)}.intro{max-width:750px}.stamp{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.stamp span,.badge{border-radius:6px;padding:3px 9px;background:#e6eddf;font-size:.8rem}.panel,.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:26px;min-width:0;overflow-wrap:anywhere}.panel{margin:24px 0}.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:28px 0 12px}.card h2{font-size:.9rem;color:var(--accent);margin-bottom:18px}.model-name{display:block;font-size:1.5rem;line-height:1.4}.effort{display:block;font-size:.9rem;color:var(--muted);margin:4px 0 18px}.metrics{display:flex;gap:32px;flex-wrap:wrap;margin:18px 0}.metrics b{font-size:1.35rem;display:block;font-variant-numeric:tabular-nums}.metrics span{font-size:.8rem;color:var(--muted)}.note{font-size:.88rem;color:var(--muted)}summary{cursor:pointer;padding:8px 0;font-weight:600;color:var(--accent)}details[open]>summary{margin-bottom:16px}.table-wrap{overflow-x:auto;max-width:100%}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:18px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:.8rem;color:var(--muted)}.chooser th:first-child{width:29%}.chooser th:last-child{width:35%}.chooser td strong{display:block}.chooser td small{display:block}.chooser .effort{margin:0}.chooser .number{white-space:nowrap;font-variant-numeric:tabular-nums}.chooser details{font-size:.8rem}.audit table{min-width:1100px}.audit td{max-width:360px}.audit td:last-child{min-width:220px}.candidate-list{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.candidate-list li{border:1px solid var(--line);border-radius:12px;padding:20px;min-width:0}.candidate-list h3{margin:0 0 8px}.candidate-list p{font-size:.9rem}.candidate-list small{display:block}.search-control label{display:block;font-weight:600}.search-control input{font:inherit;width:100%;border:1px solid var(--muted);border-radius:10px;padding:13px 16px;margin:8px 0}.search-control{margin-bottom:16px}.source-meta{font-size:.85rem;overflow-wrap:anywhere}.source-meta code{word-break:break-all}.skip{position:absolute;left:16px;top:-100px}.skip:focus{top:16px;background:white;padding:10px}.exit{border-left:4px solid #b47b37}.footer{font-size:.8rem;color:var(--muted);margin-top:40px}[hidden]{display:none!important}
-@media(max-width:700px){main{padding:20px 16px 48px}.cards,.candidate-list{grid-template-columns:1fr}.panel,.card{padding:22px 18px}h1{margin-top:22px}.chooser,.chooser tbody,.chooser tr,.chooser td{display:block;width:100%}.chooser thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.chooser tr{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}.chooser td{padding:6px 0;border:none}.chooser td[data-label]:before{content:attr(data-label);display:inline-block;color:var(--muted);font-size:.8rem;min-width:85px}.chooser td:first-child{padding-bottom:12px}.chooser td:last-child{padding-top:12px;border-top:1px solid var(--line);margin-top:8px}.chooser .number{white-space:normal}.table-wrap:has(.chooser){overflow:visible}}
+.cards.with-balanced{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:700px){main{padding:20px 16px 48px}.cards,.cards.with-balanced,.candidate-list{grid-template-columns:1fr}.panel,.card{padding:22px 18px}h1{margin-top:22px}.chooser,.chooser tbody,.chooser tr,.chooser td{display:block;width:100%}.chooser thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.chooser tr{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}.chooser td{padding:6px 0;border:none}.chooser td[data-label]:before{content:attr(data-label);display:inline-block;color:var(--muted);font-size:.8rem;min-width:85px}.chooser td:first-child{padding-bottom:12px}.chooser td:last-child{padding-top:12px;border-top:1px solid var(--line);margin-top:8px}.chooser .number{white-space:normal}.table-wrap:has(.chooser){overflow:visible}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 .provider-chooser{margin:18px 0;gap:8px}.provider-chooser a{padding:9px 14px;border:1px solid var(--line);border-radius:9px;background:var(--paper)}.provider-chooser a[aria-current=page]{background:var(--accent);color:white}.provider-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.provider-cards article{border:1px solid var(--line);border-radius:12px;padding:20px;min-width:0}.provider-cards h3{margin:0 0 12px}.provider-cards strong{display:block;overflow-wrap:anywhere}@media(max-width:700px){.provider-cards{grid-template-columns:1fr}}
 '''
@@ -118,8 +120,10 @@ def _personal_card(view, scope):
                f'<span class="effort">effort：{_html(row["effort"])}</span>' + _metrics(row)
                + f'<p>CP_adj {_number(row["cp_adj"])}</p>' + _row_details(row) if row else
                '<strong class="model-name">從缺</strong><p>本頁沒有達到共同門檻的可用候選。</p>')
-    return ('<section id="personal-cp" class="panel" aria-label="本次個人主力 CP MVP">'
-            '<h2>本次個人主力 CP MVP</h2>' + content
+    return (f'<article id="personal-cp" class="card" aria-label="{BALANCED_RECOMMENDATION}">'
+            f'<h2>{BALANCED_RECOMMENDATION}</h2>' + content
+            + '<p class="note">先看平衡：在達到本次能力門檻的完整可用候選中，選情境 CP 最高者。</p>'
+            + '<details data-personal-rules><summary>平衡推薦門檻與假設</summary>'
             + f'<p data-personal-benchmark>本次標竿：{_html(benchmark["model"])} · {_html(benchmark["effort"])}'
             + f'（{benchmark["score"]:.2f} 分）。</p>'
             + f'<p data-personal-threshold>能力門檻 ≥ {view["minimum_score"]:.2f} 分；'
@@ -128,7 +132,7 @@ def _personal_card(view, scope):
             + '<p class="note">在完整可用候選中選 CP_adj 最高者；綜合與四家共用同一門檻，無人達標就從缺。'
             + '既有情境的最低分數與成本上限仍適用。</p>'
             + '<p class="note">標竿與容許分差是本次個人選擇，並非 AA 的統計誤差或通用能力結論。'
-            + '每次新計算重新選擇，不自動沿用。</p></section>')
+            + '每次新計算重新選擇，不自動沿用。</p></details></article>')
 
 
 def render_html(calculation, *, observations=(), links=(), provider_links=(), provider=None, provider_views=None,
@@ -138,11 +142,14 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
     provider_name=PROVIDERS.get(provider)
     heading=f'{provider_name} 訂閱，<br>模型與檔位怎麼選？' if provider_name else '模型怎麼選？<br>先看這兩個入口。'
     if personal_cp and not provider_name:
-        heading='模型怎麼選？<br>先看本次主力與推薦。'
+        heading='模型怎麼選？<br>先看這三個入口。'
+    directions='能力優先、能力與成本平衡，或成本優先。' if personal_cp else '能力優先，或成本優先。'
+    description=('先看推薦中能力最高、能力與成本平衡推薦與情境成本最低，再比較每一檔模型與 effort。'
+                 if personal_cp else '先看推薦中能力最高與情境成本最低，再比較每一檔模型與 effort。')
     provider_nav='<nav id="provider-chooser" class="provider-chooser" aria-label="選供應商">'+''.join(
         f'<a data-provider="{_html(key)}" href="{escape(url,quote=True)}"'+(' aria-current="page"' if key==(provider or 'all') else '')+f'>{_html(label)}</a>' for key,label,url in provider_links)+'</nav>' if provider_links else ''
     scope_note=(f'<p class="note" data-selection-scope="{provider}">本頁只在{_html(provider_name)}候選內，使用相同來源、情境成本與選型政策算出建議模型及effort檔位。訂閱方案當期可用模型／檔位，仍需以供應商介面確認。</p>' if provider_name else '')
-    personal_section = _personal_card(personal_cp, provider or 'all')
+    personal_card = _personal_card(personal_cp, provider or 'all')
     cards = []
     for key, title, explanation in (
         ('highest_retained_score', '推薦中能力最高', '先看能力：這是本次正式推薦中分數最高的保留檔。'),
@@ -154,8 +161,10 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
         if row:
             content += (f'<p class="note">GRADE-B 推導成本，假設見細節。</p>' if row['grade'] == 'B' else '') + _row_details(row)
         cards.append(f'<article class="card" data-anchor="{key}"><h2>{title}</h2>{content}<p class="note">{explanation}</p></article>')
+        if key == 'highest_retained_score' and personal_card:
+            cards.append(personal_card)
     anchors = list(calculation['anchors'].values())
-    same = '<p class="note">兩個入口是同一模型與 effort，這次推薦不必再做二選一。</p>' if anchors[0] and anchors[0] == anchors[1] else ''
+    same = '<p class="note">能力最高與成本最低兩個入口是同一模型與 effort，這次推薦不必再做二選一。</p>' if anchors[0] and anchors[0] == anchors[1] else ''
     exits = _source_exits(calculation)
     exit_section = ('<section class="panel exit" data-family="source-exits"><h2>本次來源退出</h2><ul>'
                     + ''.join('<li>' + _html(x) + '</li>' for x in exits) + '</ul></section>') if exits and not provider_name else ''
@@ -198,26 +207,26 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
             for anchor,label in (('highest_retained_score','能力優先'),('lowest_retained_cost','成本優先')):
                 row=view['calculation']['anchors'][anchor]
                 summaries.append(f'<p>{label}<strong>{_html(row["model"])} · {_html(row["effort"])}</strong>分數 {row["score"]:.2f} · ${row["cost_adj"]:.4f}／任務</p>' if row else f'<p>{label}：從缺'+('（此歷史版本Claude僅比較）' if key=='claude' and not all_eligible else '')+'</p>')
-            if personal_cp:
-                row=personal_cp['scopes'][key]['selected']
-                summaries.append('<p data-personal-summary>個人主力 CP MVP<strong>'
-                    + (_html(row['model'])+' · '+_html(row['effort']) if row else '從缺') + '</strong></p>')
+                if anchor == 'highest_retained_score' and personal_cp:
+                    row=personal_cp['scopes'][key]['selected']
+                    summaries.append(f'<p data-personal-summary>{BALANCED_RECOMMENDATION}<strong>'
+                        + (_html(row['model'])+' · '+_html(row['effort']) if row else '從缺') + '</strong>'
+                        + (f'分數 {row["score"]:.2f} · ${row["cost_adj"]:.4f}／任務' if row else '') + '</p>')
             previews.append(f'<article data-provider-summary="{key}"><h3>{PROVIDERS[key]}</h3>'+''.join(summaries)+f'<a href="{escape(urls[key],quote=True)}">查看 {_html(PROVIDERS[key])} 完整階梯</a></article>')
         provider_summary='<section class="panel"><h2>四種訂閱，各自怎麼選？</h2><p class="note">每家獨立比較該家全部候選，檔位由既有選型政策決定。</p><div class="provider-cards">'+''.join(previews)+'</div></section>'
     return f'''<!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="先看推薦中能力最高與情境成本最低，再比較每一檔模型與 effort。">
+<meta name="description" content="{description}">
 <title>模型效率前線｜模型怎麼選</title><style>{CSS}</style></head><body>
 <a class="skip" href="#recommendations">跳到推薦</a><main>
 <nav aria-label="頁面導覽"><a href="#recommendations">先看結論</a><a href="#ladder">推薦階梯</a><a href="#lookup">查模型</a><a href="#calculation">計算與來源</a></nav>
 <header><p class="eyebrow">MODEL EFFICIENCY FRONTIER</p><h1>{heading}</h1>
-<p class="intro">能力優先，或成本優先。從已選好的推薦階梯開始，依照你的任務比較每一檔的差異。</p>
+<p class="intro">{directions}依照你的任務比較每一檔的差異。</p>
 <div class="stamp"><span>來源日期：{_html(', '.join(calculation['source_dates']))}</span><span>{_html(operation)} · {operation_note}</span></div>
 <p class="note">{_html(cost_note)}這是使用者情境，不是所有人的公開 API 售價；金額為美元／任務。</p>
 {provider_nav}{scope_note}
 </header>
-{personal_section}
-<section id="recommendations" class="cards" aria-label="保留檔入口">{''.join(cards)}</section>{same}
+<section id="recommendations" class="cards{' with-balanced' if personal_card else ''}" aria-label="{'推薦入口' if personal_card else '保留檔入口'}">{''.join(cards)}</section>{same}
 {provider_summary}
 <section id="ladder" class="panel" data-family="ladder"><h2>推薦階梯</h2><p class="note">分數由高至低。每一檔列出相對下一檔的能力與成本差異。</p>{_ladder(selected, by_id)}
 {comparison_section}</section>

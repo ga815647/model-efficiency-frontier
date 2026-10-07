@@ -168,7 +168,7 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
         links = [('固定結果頁', manifest['result_url']), ('下載已驗證 JSON', manifest['result_url']+'result.json'),
                  ('下載備用 HTML', manifest['result_url']+'report.html'), ('網站發布 manifest', manifest['result_url']+'manifest.json')]
         if personal:
-            links.append(('下載本次個人主力 CP 結果',manifest['personal_cp']['view_url']))
+            links.append(('下載本次能力與成本平衡推薦結果',manifest['personal_cp']['view_url']))
         views={}
         manifest['provider_views']={}
         provider_links=[('all','全部供應商',manifest['result_url'])]+[(key,label,manifest['result_url']+f'providers/{key}/') for key,label in PROVIDERS.items()]
