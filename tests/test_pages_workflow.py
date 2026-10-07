@@ -44,9 +44,12 @@ class PagesTriggerTests(unittest.TestCase):
             self.assertIn("name == 'Chat execution'",step['if'])
         upload=next(step for step in build['steps'] if step.get('uses','').startswith('actions/upload-pages-artifact@'))
         deploy=pages['jobs']['deploy']['steps'][0]
-        artifact='github-pages-${{ github.run_id }}-${{ github.run_attempt }}'
-        self.assertEqual(upload['with']['name'],artifact)
-        self.assertEqual(deploy['with']['artifact_name'],artifact)
+        naming=next(step for step in build['steps'] if step.get('id')=='artifact-name')
+        self.assertIn('GITHUB_RUN_ID',naming['run'])
+        self.assertIn('GITHUB_RUN_ATTEMPT',naming['run'])
+        self.assertEqual(upload['with']['name'],'${{ steps.artifact-name.outputs.name }}')
+        self.assertEqual(build['outputs']['artifact_name'],'${{ steps.artifact-name.outputs.name }}')
+        self.assertEqual(deploy['with']['artifact_name'],'${{ needs.build.outputs.artifact_name }}')
         self.assertEqual(pages['permissions'],{'contents':'read'})
         self.assertEqual(pages['jobs']['deploy']['permissions'],{'pages':'write','id-token':'write'})
         self.assertIn('PUBLICATION_REVIEW_PASSED',pages['jobs']['deploy']['if'])

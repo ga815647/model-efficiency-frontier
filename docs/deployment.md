@@ -1,6 +1,6 @@
 # GitHub Pages 展示與交付契約
 
-**2026-10-07 產品發布與重跑修正**：正式 Pages 除成功計算外，也在同庫 main 的 Product CI（push）通過後自動建置部署；PR、fork、失敗或已落後 main 的 CI 不可觸發產品發布，產品 checkout 固定為通過 CI 的完整 SHA。Chat execution 仍核對獨立 request/run/attempt，產品 CI 不冒充新計算。官方 upload/deploy action 使用一致的 `github-pages-<run_id>-<run_attempt>` 名稱，避免重跑產生同名 artifact 歧義；不刪舊 artifacts 或歷史證據。所有來源／結果驗證、最小權限及正式情境門檻維持。
+**2026-10-07 產品發布與重跑修正**：正式 Pages 除成功計算外，也在同庫 main 的 Product CI（push）通過後自動建置部署；PR、fork、失敗或已落後 main 的 CI 不可觸發產品發布，產品 checkout 固定為通過 CI 的完整 SHA。Chat execution 仍核對獨立 request/run/attempt，產品 CI 不冒充新計算。build 產生 `github-pages-<run_id>-<build_attempt>` 名稱並以 job output 傳給官方 upload/deploy action；只重跑 deploy 仍使用成功 build 的原 artifact，重跑 build 則產生新名稱，避免同名歧義及 attempt 漂移；不刪舊 artifacts 或歷史證據。所有來源／結果驗證、最小權限及正式情境門檻維持。
 
 **2026-10-07 最新來源退出呈現政策（優先於下方較早位置規則）**：依使用者要求，網站與新產生的 HTML 將完整「本次來源退出」清單原樣放在全部供應商頁的最後、計算與來源之後；四家供應商分頁不重複整批清單，也不在計算展開區重複。單一模型的缺值／退出狀態及來源理由仍保留，成功 JSON caveats、原始證據與已保存的歷史報告不改寫；無退出不造空區。此為展示更新，不變更算法、倍率或資料來源。
 
