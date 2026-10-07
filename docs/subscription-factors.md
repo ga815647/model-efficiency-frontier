@@ -1,5 +1,7 @@
 # Chat 的兩種操作：維護倍率、產生 LADDER
 
+2026-10-07 個人主力增量：產生新 LADDER 前另問本次標竿與容許 EPS 倍數；既有倍率／floor/cap／七欄 request v3／result v4 不變。成功後按同版 [personal-cp.md](personal-cp.md) 經產品 PR 保存精確結果綁定選擇並發布個人 CP view；不讓個人門檻改寫原 LADDER，pending 與本次已接受選擇不重問。
+
 **最新增量：**使用者已明確移除Claude僅比較限制，正式新請求改request v3／result v4，七欄參數與倍率表不變；下方request v2／result v3及Claude僅比較是較早版本的相容契約，不能用來限制新v4。四家專屬LADDER、精確v4欄位與網站view見 [供應商契約](provider-ladders.md)。
 
 2026-10-07 增量。倍率政策的唯一可修改表是 `bridge/site-policy.json`；Chat 透過正常 GitHub 產品 branch／PR 回填，無需新增網站管理後台或登入。`python3 -m bridge.cost_policy show` 顯示表格，`check` 與 Product CI 檢查數字、欄位及依據；檢查只能驗結構，研究內容仍需 review，不代表倍率已實測。

@@ -3,7 +3,7 @@ from html import escape
 
 from .window_report import _context, _html, _metadata, _number, _source_exits, _tables, _upgrade
 
-WEBSITE_VERSION = '1.2.1'
+WEBSITE_VERSION = '1.3.0'
 
 CSS = '''
 :root{color-scheme:light;--ink:#19352f;--muted:#52675f;--line:#d9e2d9;--accent:#14614d;--paper:#fffefa;--bg:#f4f5ee}
@@ -109,14 +109,40 @@ def _observation(row):
             f'<small>來源證據：{_html(row["slug"])}</small></li>')
 
 
-def render_html(calculation, *, observations=(), links=(), provider_links=(), provider=None, provider_views=None):
+def _personal_card(view, scope):
+    if view is None:
+        return ''
+    benchmark = view['benchmark']
+    row = view['scopes'][scope]['selected']
+    content = (f'<strong class="model-name">{_html(row["model"])}</strong>'
+               f'<span class="effort">effort：{_html(row["effort"])}</span>' + _metrics(row)
+               + f'<p>CP_adj {_number(row["cp_adj"])}</p>' + _row_details(row) if row else
+               '<strong class="model-name">從缺</strong><p>本頁沒有達到共同門檻的可用候選。</p>')
+    return ('<section id="personal-cp" class="panel" aria-label="本次個人主力 CP MVP">'
+            '<h2>本次個人主力 CP MVP</h2>' + content
+            + f'<p data-personal-benchmark>本次標竿：{_html(benchmark["model"])} · {_html(benchmark["effort"])}'
+            + f'（{benchmark["score"]:.2f} 分）。</p>'
+            + f'<p data-personal-threshold>能力門檻 ≥ {view["minimum_score"]:.2f} 分；'
+            + f'容許向下 {_number(view["tolerance_multiplier"])}×score EPS'
+            + f'（{_number(view["tolerance_points"])} 分）。更高分也可入選。</p>'
+            + '<p class="note">在完整可用候選中選 CP_adj 最高者；綜合與四家共用同一門檻，無人達標就從缺。'
+            + '既有情境的最低分數與成本上限仍適用。</p>'
+            + '<p class="note">標竿與容許分差是本次個人選擇，並非 AA 的統計誤差或通用能力結論。'
+            + '每次新計算重新選擇，不自動沿用。</p></section>')
+
+
+def render_html(calculation, *, observations=(), links=(), provider_links=(), provider=None, provider_views=None,
+                personal_cp=None):
     from .provider_view import PROVIDERS
     all_eligible=calculation.get('eligibility_policy')=='all-providers-v1'
     provider_name=PROVIDERS.get(provider)
     heading=f'{provider_name} 訂閱，<br>模型與檔位怎麼選？' if provider_name else '模型怎麼選？<br>先看這兩個入口。'
+    if personal_cp and not provider_name:
+        heading='模型怎麼選？<br>先看本次主力與推薦。'
     provider_nav='<nav id="provider-chooser" class="provider-chooser" aria-label="選供應商">'+''.join(
         f'<a data-provider="{_html(key)}" href="{escape(url,quote=True)}"'+(' aria-current="page"' if key==(provider or 'all') else '')+f'>{_html(label)}</a>' for key,label,url in provider_links)+'</nav>' if provider_links else ''
     scope_note=(f'<p class="note" data-selection-scope="{provider}">本頁只在{_html(provider_name)}候選內，使用相同來源、情境成本與選型政策算出建議模型及effort檔位。訂閱方案當期可用模型／檔位，仍需以供應商介面確認。</p>' if provider_name else '')
+    personal_section = _personal_card(personal_cp, provider or 'all')
     cards = []
     for key, title, explanation in (
         ('highest_retained_score', '推薦中能力最高', '先看能力：這是本次正式推薦中分數最高的保留檔。'),
@@ -172,6 +198,10 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
             for anchor,label in (('highest_retained_score','能力優先'),('lowest_retained_cost','成本優先')):
                 row=view['calculation']['anchors'][anchor]
                 summaries.append(f'<p>{label}<strong>{_html(row["model"])} · {_html(row["effort"])}</strong>分數 {row["score"]:.2f} · ${row["cost_adj"]:.4f}／任務</p>' if row else f'<p>{label}：從缺'+('（此歷史版本Claude僅比較）' if key=='claude' and not all_eligible else '')+'</p>')
+            if personal_cp:
+                row=personal_cp['scopes'][key]['selected']
+                summaries.append('<p data-personal-summary>個人主力 CP MVP<strong>'
+                    + (_html(row['model'])+' · '+_html(row['effort']) if row else '從缺') + '</strong></p>')
             previews.append(f'<article data-provider-summary="{key}"><h3>{PROVIDERS[key]}</h3>'+''.join(summaries)+f'<a href="{escape(urls[key],quote=True)}">查看 {_html(PROVIDERS[key])} 完整階梯</a></article>')
         provider_summary='<section class="panel"><h2>四種訂閱，各自怎麼選？</h2><p class="note">每家獨立比較該家全部候選，檔位由既有選型政策決定。</p><div class="provider-cards">'+''.join(previews)+'</div></section>'
     return f'''<!doctype html>
@@ -186,6 +216,7 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
 <p class="note">{_html(cost_note)}這是使用者情境，不是所有人的公開 API 售價；金額為美元／任務。</p>
 {provider_nav}{scope_note}
 </header>
+{personal_section}
 <section id="recommendations" class="cards" aria-label="保留檔入口">{''.join(cards)}</section>{same}
 {provider_summary}
 <section id="ladder" class="panel" data-family="ladder"><h2>推薦階梯</h2><p class="note">分數由高至低。每一檔列出相對下一檔的能力與成本差異。</p>{_ladder(selected, by_id)}

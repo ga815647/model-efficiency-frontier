@@ -5,6 +5,8 @@
 ```text
 此 Project 的模型效率前線來源是 GitHub repo ga815647/model-efficiency-frontier。每次新任務重新解析 main 為完整 commit SHA，完整讀取同版 AGENTS.md、chatgpt-instructions.md、docs/contracts/chat-ci.md 及指定必要規則；不得混用版本，blob SHA 不等於 commit SHA。缺少工具、權限、規則或來源證據時說明實際缺口，不繞過權限。
 
+每次新計算先依同版 docs/personal-cp.md 列已驗證代表模型／effort／identity／分數與 score EPS，問本次個人標竿與容許 EPS 倍數，不自動繼承前次；同一 pending 續查或已確認的本次選擇不重問。主力門檻＝標竿本次分數−倍數×本次 EPS，達標完整可用推薦候選中選 CP_adj 最高，無上限、綜合與四家共用門檻、無候選從缺。這是個人容許分差，不是 AA 統計誤差，不改 LADDER／anchors／upgrade 或 request v3／result v4。成功結果驗證後以產品 PR 保存已選 identity／倍數＋精確 result path／SHA 到 bridge/personal-cp-policy.json，發布獨立 personal-cp.json 及 manifest/hash；摘要只讀核對的本次 view，不硬編碼模型／分數或冒稱未部署。無產品寫入能力則明示個人選擇尚未發布。
+
 本Project有兩個角色：(1)研究並回填倍率，(2)產生LADDER。研究需保存方案、日期、用量／限制、API等值費用、公式與來源；證據不足不猜倍率，使用者指定值標user_specified。唯一倍率表bridge/site-policy.json，回填走產品branch／PR，check、測試與review通過後合併。純研究或查既有階梯不寫入；明確更新並產生／部署時，先合併表再提交新計算。產生LADDER預設用已驗證固定refresh重算，只有明確更新模型來源才refresh。新倍率讀已合併表，floor／理由／cap讀已驗證來源，不用歷史$79組合推ChatGPT Pro或其他訂閱回本。完整同版規則見docs/subscription-factors.md與docs/provider-ladders.md。網頁依四家訂閱產生專屬模型／effort LADDER，不由瀏覽器重新計算或改寫原result；專屬view另核對parent result hash與manifest。
 
 依使用者明確授權執行產品修改、測試、獨立產品 branch／PR、review 後合併；產品改動不得塞進資料請求分支。refresh／recompute 仍只能走唯一 efficiency-run/<request_id> 與 bridge/requests/<request_id>.json，新request v3七欄parameters／result v4，歷史request v1/v2及result v1/v2/v3欄位及原義保留；嚴格 schema、唯一 parent／新增檔及來源驗證不變。提交前明示 operation；固定重算揭露實際來源 path、來源日期與「不會重新抓取新模型，快照後新增模型不會出現」，floor 與理由只能從已驗證 envelope 繼承或由使用者明確確認。
