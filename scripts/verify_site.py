@@ -63,8 +63,35 @@ def verify_site(url, expected, output):
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
             assert not errors,errors
             assert page.goto(fixed,wait_until='networkidle').status==200
-            assert page.locator('[data-anchor="highest_retained_score"] .model-name').inner_text()==expected['anchors']['highest_retained_score']['model']
-            evidence.append(dict(width=width,http_status=response.status,search=True,empty=True,keyboard=True,overflow=False,script_errors=errors))
+            highest=expected['anchors']['highest_retained_score']
+            assert page.locator('[data-anchor="highest_retained_score"] .model-name').inner_text()==(highest['model'] if highest else '從缺')
+            providers=[]
+            for key,entry in manifest.get('provider_views',{}).items():
+                view_raw=urlopen(urljoin(root,entry['view_url'])).read()
+                assert hashlib.sha256(view_raw).hexdigest()==entry['view_sha256']
+                view=json.loads(view_raw)
+                assert view['parent_result_sha256']==manifest['result_sha256']
+                assert view['parent_publication_commit']==manifest['publication_commit']
+                assert view['provider']==key and view['kind']=='provider-ladder'
+                for field in ('parameters','source_dates','request_id','run_id','run_attempt'):
+                    assert view['calculation'][field]==expected[field]
+                scoped_manifest=json.loads(urlopen(urljoin(root,entry['url']+'manifest.json')).read())
+                assert scoped_manifest['selection_scope']==key
+                assert scoped_manifest['provider_view_sha256']==entry['view_sha256']
+                page.locator(f'#provider-chooser [data-provider="{key}"]').focus()
+                page.locator(f'#provider-chooser [data-provider="{key}"]').press('Enter')
+                page.wait_for_load_state('networkidle')
+                assert page.url==urljoin(root,entry['url'])
+                assert page.locator('#effort-filter').count()==0
+                assert page.locator('[data-selection-scope]').get_attribute('data-selection-scope')==key
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+                for anchor,row in view['calculation']['anchors'].items():
+                    assert page.locator(f'[data-anchor="{anchor}"] .model-name').inner_text()==(row['model'] if row else '從缺')
+                page.screenshot(path=str(output/f'{key}-{width}.png'),full_page=True)
+                assert urlopen(urljoin(root,f'providers/{key}/')).status==200
+                providers.append(dict(provider=key,url=page.url,view_sha256=entry['view_sha256'],anchors=True,overflow=False))
+            assert not errors,errors
+            evidence.append(dict(width=width,http_status=response.status,search=True,empty=True,keyboard=True,overflow=False,script_errors=errors,providers=providers))
             page.close()
         page=browser.new_page(java_script_enabled=False,viewport={'width':360,'height':900})
         assert page.goto(root).status==200
