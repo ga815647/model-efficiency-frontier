@@ -1,12 +1,12 @@
 {
   "formal_parameters": {
-    "gpt_factor": 18.9,
-    "grok_factor": 16,
+    "gpt_factor": 17,
+    "grok_factor": 5.2,
     "min_score": 0,
     "min_score_reason": "同版本全候選情境比較",
     "max_cost": null,
-    "gemini_factor": 6,
-    "claude_factor": 37
+    "gemini_factor": 3.6,
+    "claude_factor": 40
   },
   "source_refresh": {
     "commit": "77a72784521da1825718e23b0c9e1266720e6cd6",
@@ -18,37 +18,48 @@
       "basis": "user_specified",
       "as_of": "2026-10-07",
       "references": [
-        "本次使用者指定固定倍率表：Gemini 訂閱6×、Claude 訂閱37×、ChatGPT Pro18.9×"
+        "使用者於2026-10-07提供統一US$100方案研究並明確要求正式替換倍率",
+        "https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers",
+        "https://modeldial.com/en/subscriptions?period=week"
       ],
-      "calculation": null,
-      "limitations": "指定情境值，尚未取得完整用量、方案限制與API等值費用推導；不是供應商保證額度、公開API售價或AA實測。"
+      "calculation": "sqrt((959.87/3)*(52/12)/100 * (481*(52/12)/100)) ≈ 17.0",
+      "limitations": "ChatGPT Pro 100 / 5x；US$100/月；使用者建議範圍約14–21×、信心中。僅文字／推理／coding／agent模型運算API-equivalent，排除空間、影音、Voice、雲端credits及其他周邊福利。以訂閱額度可用且用滿為情境，未用滿、限流或workload/model mix不同時不保證相同倍率。959.87/3完整weekly meter的原始引用在使用者文字中僅有未解析content-reference；481/week來自2% meter外推，不可當完整週實測。 使用者提供研究不等於本專案已獨立驗證全部來源，亦非AA實測或公開API售價。"
     },
     "gemini_factor": {
       "basis": "user_specified",
       "as_of": "2026-10-07",
       "references": [
-        "本次使用者指定固定倍率表：Gemini 訂閱6×、Claude 訂閱37×、ChatGPT Pro18.9×"
+        "使用者於2026-10-07提供統一US$100方案研究並明確要求正式替換倍率",
+        "https://gemini.google/subscriptions/",
+        "https://levelup.gitconnected.com/geminis-new-usage-limits-set-reddit-aflame-with-hate-mail-fb2c2452bf3b",
+        "https://roninforge.org/antigravity-credits/weekly-quota-lockout/",
+        "https://www.llmperks.com/subscriptions/google/google-ai-ultra-5x"
       ],
-      "calculation": null,
-      "limitations": "指定情境值，尚未取得完整用量、方案限制與API等值費用推導；不是供應商保證額度、公開API售價或AA實測。"
+      "calculation": "(1.5*(2800/250)*(52/12)/19.99) ≈ 3.64；使用者假設Ultra價格與額度皆為Pro約5倍，固定3.6",
+      "limitations": "Google AI Ultra 5x；US$99.99/月；使用者建議範圍約3.5–6×、信心低～中。僅文字／推理／coding／agent模型運算API-equivalent，排除空間、影音、Voice、雲端credits及其他周邊福利。以訂閱額度可用且用滿為情境，未用滿、限流或workload/model mix不同時不保證相同倍率。1.5/window與11.2 weekly window equivalents來自不同量測；thinking tokens不完整、產品／共享quota是否可比仍需獨立證據。 使用者提供研究不等於本專案已獨立驗證全部來源，亦非AA實測或公開API售價。"
     },
     "claude_factor": {
       "basis": "user_specified",
       "as_of": "2026-10-07",
       "references": [
-        "本次使用者指定固定倍率表：Gemini 訂閱6×、Claude 訂閱37×、ChatGPT Pro18.9×"
+        "使用者於2026-10-07提供統一US$100方案研究並明確要求正式替換倍率",
+        "https://support.claude.com/zh-TW/articles/11049741-%E4%BB%80%E9%BA%BC%E6%98%AF-max-%E6%96%B9%E6%A1%88",
+        "https://dev.classmethod.jp/articles/claude-max-20x-weekly-limit-not-4x/",
+        "https://danubelabs.net/en/blog/claude-max-weekly-limits-cut"
       ],
-      "calculation": null,
-      "limitations": "指定情境值，尚未取得完整用量、方案限制與API等值費用推導；不是供應商保證額度、公開API售價或AA實測。"
+      "calculation": "((1000+1200)/2)*(1.25/1.50)*(52/12)/100 ≈ 39.72；固定40",
+      "limitations": "Claude Max 5x；US$100/月；使用者建議範圍約32–45×、信心中。僅文字／推理／coding／agent模型運算API-equivalent，排除空間、影音、Voice、雲端credits及其他周邊福利。以訂閱額度可用且用滿為情境，未用滿、限流或workload/model mix不同時不保證相同倍率。臨時額度1.50→1.25的正常化是使用者提供推導；calendar week不必等於quota reset週。獨立Agent SDK credit不計入。 使用者提供研究不等於本專案已獨立驗證全部來源，亦非AA實測或公開API售價。"
     },
     "grok_factor": {
-      "basis": "inherited",
+      "basis": "user_specified",
       "as_of": "2026-10-07",
       "references": [
-        "https://github.com/ga815647/model-efficiency-frontier/blob/77a72784521da1825718e23b0c9e1266720e6cd6/results/4ab43e6d-54ab-4ae0-985f-5dc0ba9b4487/37555947564-1/result.json"
+        "使用者於2026-10-07提供統一US$100方案研究並明確要求正式替換倍率",
+        "https://x.ai/pricing",
+        "https://modeldial.com/en/subscriptions?period=week"
       ],
-      "calculation": null,
-      "limitations": "沿用已驗證來源成功envelope的Grok16使用者情境；非實測，本次未要求改動。"
+      "calculation": "121*(52/12)/100 ≈ 5.24；固定5.2",
+      "limitations": "SuperGrok Plus；US$100/月；使用者建議範圍約3–6×、信心中低。僅文字／推理／coding／agent模型運算API-equivalent，排除空間、影音、Voice、雲端credits及其他周邊福利。以訂閱額度可用且用滿為情境，未用滿、限流或workload/model mix不同時不保證相同倍率。121/week由15 percentage points外推；官方沒有可驗證固定weekly token quota，Heavy方案僅方向交叉檢查。 使用者提供研究不等於本專案已獨立驗證全部來源，亦非AA實測或公開API售價。"
     }
   }
 }
