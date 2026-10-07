@@ -5,6 +5,11 @@
       "result_sha256": "153d781415b9bd990a193c9e46ab2c6a56b2a8f6dfb4251283644e1d51dc545c",
       "benchmark_identity": "GPT-6.1 Sol xhigh AA-public published-price",
       "tolerance_multiplier": 1
+    },
+    "results/fd3651df-7eae-4ffe-8cd6-95ea5b885050/37602511953-1/result.json": {
+      "result_sha256": "5896b5f5183664ccd5e48c8a5917922e427b1cbf90c2c4270dc6ec572d3409bf",
+      "benchmark_identity": "GPT-6.1 Sol xhigh AA-public published-price",
+      "tolerance_multiplier": 1
     }
   }
 }
