@@ -1,5 +1,7 @@
 # Chat → CI 契約（request v1／result v2＋歷史v1；2026-09-27）
 
+**2026-10-07 倍率與兩種 Chat 操作增量（優先於下方舊倍率／schema敘述）**：Chat 可研究並回填 repo 的倍率表，也可依保存倍率產生 LADDER。單一表 `bridge/site-policy.json`：ChatGPT Pro ×18.9、Gemini 訂閱 ×6、Claude 訂閱 ×37（仍僅比較），Grok沿用×16、Contributor×1。本次三個新倍率均為使用者指定，不冒稱研究驗證；證據、日期與限制同步保存。更新表走產品 branch／PR；產生新LADDER走唯一 request bridge。新 request v2／result v3 承載七欄參數，歷史 request v1／result v1/v2 的精確欄位與原義保留，算法與原始來源不改。完整流程及schema見 [倍率操作契約](subscription-factors.md)，本檔及該契約須同commit讀取。公開／Pages門檻仍未解除，不能將建置成功稱為上線。
+
 **10/6 實作與重跑已完成：** [PR #3](https://github.com/ga815647/model-efficiency-frontier/pull/3) 已合併，產品 `1f487a2bddf121acfe3d24993edc2fe2cc8b7b43`；295 項測試、獨立 review 與產品 CI 通過。新固定快照 recompute [37501847653-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501847653) 成功，publication `c3cd3307b956b776334a4668c62b6580a80f864e`。自動 Pages build [37501895642-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37501895642) 成功，**deploy job skipped、repo 仍 private、沒有已上線網址**；來源為 2026-09-30，不是新抓來源。詳見本次驗收紀錄。
 
 **2026-10-06 展示與交付增量（優先於下方歷史狀態）**：正式入口改為 GitHub Pages，HTML artifact 為備用；產品實作使用獨立 branch／PR，資料 refresh／recompute 仍走本契約唯一 request bridge，精確 schema、演算法與來源驗證不改。公開檢查通過後才能 public 及部署，目前第三方再散布問題阻擋公開，見 [公開檢查](../publication-review.md)。完整 Pages 權限、流程、allowlist、manifest、正式情境與順序控制見 [部署契約](../deployment.md)。以下過去「私人 repo／不部署／bootstrap 不改」均描述歷史，不再禁止本次已授權網站實作，也不改寫歷史驗收。Git 文件更新不代表 Project Settings 已更新。

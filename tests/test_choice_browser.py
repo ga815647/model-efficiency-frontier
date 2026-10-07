@@ -32,6 +32,10 @@ class ChoiceBrowserTests(unittest.TestCase):
                 'source-missing':dict(state='observed_unusable',reason='missing_task_cost'),
                 'minimax-m2-7':dict(state='retired',reason='deprecated')}}})
         (cls.root/'index.html').write_text(render_html(payload,observations=observations))
+        from bridge.result import calculate_snapshot
+        from test_subscription_scenario import PARAMS
+        subscription, _ = calculate_snapshot(SNAPSHOT, PARAMS, PROVENANCE)
+        (cls.root/'subscription.html').write_text(render_html(subscription))
         edge=deepcopy(payload)
         edge['anchors']=dict.fromkeys(edge['anchors'])
         for row in edge['ladder']:
@@ -77,6 +81,16 @@ class ChoiceBrowserTests(unittest.TestCase):
         page.locator('#search-results > summary').click()
         self.assertGreater(page.locator('[data-search]:visible').count(),150)
         page.close()
+
+    def test_subscription_factors_are_readable_without_overflow_or_javascript(self):
+        for width in (360,390,1280):
+            page=self.browser.new_page(viewport={'width':width,'height':900},java_script_enabled=False)
+            page.goto(self.url+'subscription.html')
+            for text in ('GPT ×18.9','Gemini ×6','Claude ×37','Grok ×16','Contributor ×1'):
+                self.assertIn(text,page.locator('header').inner_text())
+            self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
+            self.assertEqual(page.locator('[data-anchor]').count(),2)
+            page.close()
 
 
 if __name__=='__main__': unittest.main()

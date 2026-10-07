@@ -3,7 +3,7 @@ from html import escape
 
 from .window_report import _context, _html, _metadata, _number, _source_exits, _tables, _upgrade
 
-WEBSITE_VERSION = '1.0.0'
+WEBSITE_VERSION = '1.1.0'
 
 CSS = '''
 :root{color-scheme:light;--ink:#19352f;--muted:#52675f;--line:#d9e2d9;--accent:#14614d;--paper:#fffefa;--bg:#f4f5ee}
@@ -140,6 +140,11 @@ def render_html(calculation, *, observations=(), links=()):
     operation = calculation.get('operation') or ('refresh' if calculation['source_snapshot'].get('kind') == 'acquired' else 'recompute')
     operation_note = '固定快照重算，非重新抓取來源' if operation == 'recompute' else '重新取得公開來源的固定快照'
     params = calculation['parameters']
+    from .subscription_cost import SUBSCRIPTION_PARAMETERS, scenario_label
+    cost_note = ('使用者成本情境：' + scenario_label(params) + '。倍率不是保證額度；Claude 僅供比較。'
+                 if set(params) == SUBSCRIPTION_PARAMETERS else
+                 f'使用者成本情境：GPT ×{params["gpt_factor"]}／Grok ×{params["grok_factor"]}／Contributor ×1。'
+                 'GPT 預設 ×18 由個人約18.9倍保守取整；Grok 預設 ×16 為指定情境、非實測。')
     metadata = ''.join(f'<p>{_html(x)}</p>' for x in _metadata(calculation))
     for key in ('product_sha', 'request_commit_sha', 'request_id', 'run_id', 'run_attempt'):
         if key in calculation:
@@ -155,7 +160,7 @@ def render_html(calculation, *, observations=(), links=()):
 <header><p class="eyebrow">MODEL EFFICIENCY FRONTIER</p><h1>模型怎麼選？<br>先看這兩個入口。</h1>
 <p class="intro">能力優先，或成本優先。從已選好的推薦階梯開始，依照你的任務比較每一檔的差異。</p>
 <div class="stamp"><span>來源日期：{_html(', '.join(calculation['source_dates']))}</span><span>{_html(operation)} · {operation_note}</span></div>
-<p class="note">使用者成本情境：GPT ×{_html(params['gpt_factor'])}／Grok ×{_html(params['grok_factor'])}／Contributor ×1。GPT 預設 ×18 由個人約18.9倍保守取整；Grok 預設 ×16 為指定情境、非實測。這是使用者情境，不是所有人的公開 API 售價；金額為美元／任務。</p>
+<p class="note">{_html(cost_note)}這是使用者情境，不是所有人的公開 API 售價；金額為美元／任務。</p>
 </header>
 <section id="recommendations" class="cards" aria-label="保留檔入口">{''.join(cards)}</section>{same}
 {exit_section}

@@ -13,6 +13,7 @@ from scripts.meta_availability import unavailable_reason
 
 from . import result_v1 as v1
 from .window_ladder import calculate_ladder, select_anchors
+from .subscription_cost import LEGACY_PARAMETERS, SUBSCRIPTION_PARAMETERS, adjust_rows, factor_for
 
 ResultError = v1.ResultError
 extra = v1.extra
@@ -27,11 +28,12 @@ _SUCCESS = {'selection_policy', 'selection_parameters', 'eps', 'ladder', 'anchor
 _ROW_FIELDS = set(v1._FIELDS) | {'comparison_only', 'upgrade'}
 
 
-def _parameters(params):
+def _parameters(params, schema_version=2):
+    keys = LEGACY_PARAMETERS if schema_version == 2 else SUBSCRIPTION_PARAMETERS
     if (type(params) is not dict or set(params) !=
-            {'gpt_factor', 'grok_factor', 'min_score', 'min_score_reason', 'max_cost'}
-            or not v1._number(params['gpt_factor'], positive=True)
-            or not v1._number(params['grok_factor'], positive=True)
+            keys
+            or any(not v1._number(params[k], positive=True)
+                   for k in keys - {'min_score', 'min_score_reason', 'max_cost'})
             or not v1._number(params['min_score'])
             or not v1._nonempty(params['min_score_reason'])
             or params['max_cost'] is not None and not v1._number(params['max_cost'], positive=True)):
@@ -39,6 +41,10 @@ def _parameters(params):
 
 
 def calculate_v2(csv_path: Path, parameters: dict, provenance: dict) -> dict:
+    return _calculate(csv_path, parameters, provenance, schema_version=2)
+
+
+def _calculate(csv_path, parameters, provenance, *, schema_version):
     """Validate source bytes and provenance before invoking the window calculator."""
     v1._provenance(provenance)
     if provenance['benchmark'] != 'AA-Intelligence-Index':
@@ -47,9 +53,8 @@ def calculate_v2(csv_path: Path, parameters: dict, provenance: dict) -> dict:
     if locator.get('kind') == 'acquired' and hashlib.sha256(
             Path(csv_path).read_bytes()).hexdigest().lower() != locator['sha256'].lower():
         raise ResultError('source_hash_mismatch')
-    _parameters(parameters)
-    paid = extra.adjust_rows(extra.load_rows(csv_path), parameters['gpt_factor'],
-                             'GPT-', parameters['grok_factor'])
+    _parameters(parameters, schema_version)
+    paid = adjust_rows(extra.load_rows(csv_path), parameters)
     if not paid:
         raise ResultError('empty_paid')
     expected = (provenance['benchmark'], provenance['benchmark_version'], provenance['cost_basis'])
@@ -116,9 +121,7 @@ def _rows(envelope):
         if (row['is_grok'] != extra._grok(row) or row['is_contributor'] != extra._contributor(row)
                 or row['comparison_only'] != extra._is_claude(row['identity'])):
             raise ResultError('invalid_family_flags')
-        factor = (1 if row['is_contributor'] else params['gpt_factor']
-                  if row['identity'].startswith('GPT-') else params['grok_factor']
-                  if row['is_grok'] else 1)
+        factor = factor_for(row, params)
         if (row['factor'] != factor
                 or not _close(row['cost_adj'], row['cost_orig'] / factor)
                 or not _close(row['cp_orig'], row['score'] / row['cost_orig'])
@@ -243,10 +246,10 @@ def validate_v2_envelope(envelope: dict) -> dict:
         raise ResultError('invalid_numeric_result') from exc
 
 
-def _validate(envelope):
+def _validate(envelope, schema_version=2):
     if type(envelope) is not dict or not _COMMON <= set(envelope):
         raise ResultError('incomplete_envelope')
-    if type(envelope['schema_version']) is not int or envelope['schema_version'] != 2:
+    if type(envelope['schema_version']) is not int or envelope['schema_version'] != schema_version:
         raise ResultError('invalid_result_schema')
     if (type(envelope['request_commit_sha']) is not str or not v1._SHA.fullmatch(envelope['request_commit_sha'])
             or not v1._nonempty(envelope['run_id'])
@@ -276,7 +279,7 @@ def _validate(envelope):
             raise ResultError('unsupported_benchmark')
         if (set(envelope['source_snapshot']) == {'commit', 'path'}) != (envelope['operation'] == 'recompute'):
             raise ResultError('operation_source_mismatch')
-        _parameters(envelope['parameters'])
+        _parameters(envelope['parameters'], schema_version)
         if (envelope['selection_policy'] != POLICY
                 or not _constants(envelope['eps'], {'score': 2.0, 'cp': 0.05})
                 or not _constants(envelope['selection_parameters'], {'window_score': 2.0, 'replacement_score': 2.0})):
@@ -303,12 +306,16 @@ def _validate(envelope):
 
 def make_v2_envelope(request: dict, execution: dict, *, calculation: dict | None,
                      errors: list[dict]) -> dict:
+    return _make_envelope(request, execution, calculation=calculation, errors=errors, schema_version=2)
+
+
+def _make_envelope(request, execution, *, calculation, errors, schema_version):
     """Assemble correlated v2 output; failures discard every calculation field."""
     status = 'failed' if errors else 'success'
     if status == 'success' and calculation is None:
         raise ResultError('missing_calculation')
     envelope = {
-        'schema_version': 2, 'operation': request['operation'], 'status': status,
+        'schema_version': schema_version, 'operation': request['operation'], 'status': status,
         'request_id': request['request_id'], 'request_commit_sha': execution['request_commit_sha'],
         'product_sha': request['product_sha'], 'created_at': request['created_at'],
         'run_id': execution['run_id'], 'run_attempt': execution['run_attempt'], 'run_url': execution['run_url'],
@@ -322,4 +329,7 @@ def make_v2_envelope(request: dict, execution: dict, *, calculation: dict | None
         if set(calculation) != _SUCCESS | {'parameters', 'source_snapshot', 'source_dates'}:
             raise ResultError('invalid_calculation_fields')
         envelope.update({k: calculation[k] for k in _SUCCESS})
-    return validate_v2_envelope(envelope)
+    try:
+        return _validate(envelope, schema_version)
+    except (OverflowError, ZeroDivisionError) as exc:
+        raise ResultError('invalid_numeric_result') from exc

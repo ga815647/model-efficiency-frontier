@@ -488,7 +488,8 @@ def execute_request(request: dict, *, execution: dict, repository: Path,
         # Event-ref UUID and commit are trusted for correlation, not arbitrary JSON identity.
         branch = execution.get('branch', '')
         identity = branch.removeprefix('efficiency-run/') if branch.startswith('efficiency-run/') else None
-        safe_request = {'operation': request.get('operation') if type(request) is dict else None,
+        safe_request = {'schema_version': 2 if type(request) is dict and type(request.get('schema_version')) is int and request['schema_version'] == 2 else 1,
+                        'operation': request.get('operation') if type(request) is dict else None,
                         'request_id': identity if identity and UUID.fullmatch(identity) else None,
                         'product_sha': execution.get('product_sha'),
                         'created_at': request.get('created_at') if type(request) is dict else None,
