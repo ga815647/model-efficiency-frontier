@@ -58,7 +58,7 @@ class WindowReportTests(unittest.TestCase):
         self.assertIn('2026-09-26', page.split('aria-label="保留檔入口"')[0])
         self.assertIn('<details id="calculation"', page)
 
-    def test_source_exits_are_visible_before_ladder_and_escaped(self):
+    def test_source_exits_are_at_html_end_and_escaped(self):
         payload = deepcopy(self.payload)
         exits = [
             DISCLOSURE_PREFIX + 'MiniMax-M2.7：當次 deprecated=true，排行退役。',
@@ -71,7 +71,8 @@ class WindowReportTests(unittest.TestCase):
         self.assertLess(md.index('最低情境成本保留檔'), md.index('## 本次來源退出'))
         self.assertLess(md.index('## 本次來源退出'), md.index('## 已選好階梯'))
         self.assertLess(page.index('aria-label="保留檔入口"'), page.index('data-family="source-exits"'))
-        self.assertLess(page.index('data-family="source-exits"'), page.index('data-family="ladder"'))
+        self.assertGreater(page.index('data-family="source-exits"'), page.index('id="calculation"'))
+        self.assertLess(page.index('data-family="source-exits"'), page.index('<footer'))
         md_summary = md.split('## 本次來源退出', 1)[1].split('## 已選好階梯', 1)[0]
         html_summary = page.split('data-family="source-exits"', 1)[1].split('</section>', 1)[0]
         for summary in (md_summary, html_summary):
@@ -80,8 +81,10 @@ class WindowReportTests(unittest.TestCase):
             self.assertNotIn('<img src=x', summary)
         self.assertIn('&#124;line<br>next', md_summary)
         self.assertIn(escape(exits[1]), html_summary)
-        # The summary supplements, rather than removes, the complete footer.
-        self.assertIn(escape(exits[0]), page.split('<h2>來源與限制</h2>', 1)[1])
+        # Keep each exit once at the end, while preserving the source payload.
+        for note in exits:
+            self.assertEqual(page.count(escape(note)), 1)
+        self.assertIn('GRADE-B', page.split('<h2>來源與限制</h2>', 1)[1])
         self.assertEqual(payload['caveats'][-2:], exits)
 
     def test_no_source_exits_means_no_empty_warning_and_other_caveats_remain(self):

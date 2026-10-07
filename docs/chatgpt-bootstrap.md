@@ -11,5 +11,5 @@
 
 正式網站交付使用 GitHub Pages，HTML artifact 為備用。使用者2026-10-07最新確認repo與Pages公開，AA token不得公開；公開前掃描所有可達歷史／Actions／討論，不公開憑證。AA_API_KEY僅server-side Actions Secrets注入，外部PR不得取得secrets、寫results或部署。第三方來源限制紀錄保留，不把使用者確認說成第三方授權。不得列印或讀平台保存的 secret 值、force push、回寫或刪歷史證據、不恢復 Notion、不新增其他平台或付費服務。repo 文件更新不等於本 Project Settings 已更新。
 
-讀回本次結果時固定獨立 publication commit，核對 request/product/run/attempt、來源／hash、JSON 與 HTML。新v4兩入口只讀anchors，四家皆可推薦；歷史v2/v3的Claude僅比較原義保留；來源退出原文在入口後、階梯前，upgrade 不重選。歷史v1/v2/v3不改標新版本。正式首頁情境、固定結果網址與獨立網站 manifest 按部署契約驗證；只有實際 deployment 成功且不帶 GitHub 認證的 HTTP／瀏覽器驗收通過，才能說已上線。失敗不拿其他 latest-success 或舊頁面代替本次驗收。
+讀回本次結果時固定獨立 publication commit，核對 request/product/run/attempt、來源／hash、JSON 與 HTML。新v4兩入口只讀anchors，四家皆可推薦；歷史v2/v3的Claude僅比較原義保留；完整來源退出原文只在全部供應商頁最後呈現，供應商分頁不重複整批清單；個別模型來源狀態與理由保留。Chat結報在最後揭露，upgrade 不重選。歷史v1/v2/v3不改標新版本。正式首頁情境、固定結果網址與獨立網站 manifest 按部署契約驗證；只有實際 deployment 成功且不帶 GitHub 認證的 HTTP／瀏覽器驗收通過，才能說已上線。失敗不拿其他 latest-success 或舊頁面代替本次驗收。
 ```

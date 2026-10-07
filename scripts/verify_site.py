@@ -26,6 +26,21 @@ def verify_site(url, expected, output):
     assert json.loads(urlopen(urljoin(fixed,'manifest.json')).read())==manifest
     report=urlopen(urljoin(fixed,'report.html')).read()
     assert hashlib.sha256(report).hexdigest()==manifest['report_sha256']
+    source_exits=[note for note in expected['caveats'] if note.startswith('來源退出：')]
+    def check_global_source_exits(page):
+        section=page.locator('[data-family="source-exits"]')
+        assert section.count()==int(bool(source_exits))
+        if source_exits:
+            assert section.locator('li').all_inner_texts()==source_exits
+            assert section.evaluate('(node) => node.previousElementSibling.id === "calculation"')
+        context=page.locator('#calculation').text_content()
+        assert all(note not in context for note in source_exits)
+
+    def check_provider_source_exits(page):
+        assert page.locator('[data-family="source-exits"]').count()==0
+        content=page.locator('body').text_content()
+        assert all(note not in content for note in source_exits)
+
     evidence=[]
     with sync_playwright() as p:
         browser=p.chromium.launch()
@@ -34,6 +49,7 @@ def verify_site(url, expected, output):
             errors=[]
             page.on('pageerror',lambda e:errors.append(str(e)))
             response=page.goto(root,wait_until='networkidle'); assert response.status==200
+            check_global_source_exits(page)
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
             for key,row in expected['anchors'].items():
                 card=page.locator(f'[data-anchor="{key}"]')
@@ -63,6 +79,7 @@ def verify_site(url, expected, output):
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
             assert not errors,errors
             assert page.goto(fixed,wait_until='networkidle').status==200
+            check_global_source_exits(page)
             highest=expected['anchors']['highest_retained_score']
             assert page.locator('[data-anchor="highest_retained_score"] .model-name').inner_text()==(highest['model'] if highest else '從缺')
             providers=[]
@@ -84,14 +101,17 @@ def verify_site(url, expected, output):
                 assert page.url==urljoin(root,entry['url'])
                 assert page.locator('#effort-filter').count()==0
                 assert page.locator('[data-selection-scope]').get_attribute('data-selection-scope')==key
+                check_provider_source_exits(page)
                 assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
                 for anchor,row in view['calculation']['anchors'].items():
                     assert page.locator(f'[data-anchor="{anchor}"] .model-name').inner_text()==(row['model'] if row else '從缺')
                 page.screenshot(path=str(output/f'{key}-{width}.png'),full_page=True)
-                assert urlopen(urljoin(root,f'providers/{key}/')).status==200
-                providers.append(dict(provider=key,url=page.url,view_sha256=entry['view_sha256'],anchors=True,overflow=False))
+                provider_url=page.url
+                assert page.goto(urljoin(root,f'providers/{key}/'),wait_until='networkidle').status==200
+                check_provider_source_exits(page)
+                providers.append(dict(provider=key,url=provider_url,view_sha256=entry['view_sha256'],anchors=True,overflow=False,source_exit_summary=False))
             assert not errors,errors
-            evidence.append(dict(width=width,http_status=response.status,search=True,empty=True,keyboard=True,overflow=False,script_errors=errors,providers=providers))
+            evidence.append(dict(width=width,http_status=response.status,search=True,empty=True,keyboard=True,overflow=False,script_errors=errors,providers=providers,source_exits_at_end=True))
             page.close()
         page=browser.new_page(java_script_enabled=False,viewport={'width':360,'height':900})
         assert page.goto(root).status==200

@@ -45,7 +45,13 @@ class ChoiceReportTests(unittest.TestCase):
         self.assertIn('id="comparison"', page)
         self.assertNotIn('<img src=x', page)
         self.assertIn(escape(payload['candidate_statuses'][0]['notes']), page)
-        self.assertLess(page.index('data-family="source-exits"'), page.index('data-family="ladder"'))
+        self.assertGreater(page.index('data-family="source-exits"'), page.index('id="calculation"'))
+        self.assertEqual(page.count(escape(payload['caveats'][-1])), 1)
+        from bridge.choice_report import render_html as render_provider_html
+        provider_page = render_provider_html(payload, provider='gpt')
+        self.assertNotIn('data-family="source-exits"', provider_page)
+        self.assertNotIn(escape(payload['caveats'][-1]), provider_page)
+        self.assertIn('GRADE-B', provider_page)
         for r in payload['ladder']:
             if r['upgrade']:
                 self.assertIn(escape(r['upgrade']['cheaper_identity']), page)
