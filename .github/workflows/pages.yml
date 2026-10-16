@@ -37,6 +37,7 @@ jobs:
       artifact_name: ${{ steps.artifact-name.outputs.name }}
       product_commit: ${{ steps.pin.outputs.product }}
       results_commit: ${{ steps.pin.outputs.results }}
+      formal_result_path: ${{ steps.site-path.outputs.result }}
     permissions:
       contents: read
       actions: read
@@ -97,6 +98,20 @@ jobs:
           python3 -m bridge.site --results-commit "$RESULTS_COMMIT" \
             --output _site --base-path "${BASE_PATH%/}/" "${args[@]}" > "$RUNNER_TEMP/site-manifest.json"
           cat "$RUNNER_TEMP/site-manifest.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve verified formal result locator
+        id: site-path
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          from bridge.site import RESULT_PATH
+          manifest=json.loads((Path(os.environ['RUNNER_TEMP'])/'site-manifest.json').read_bytes())
+          path=f'results/{manifest["request_id"]}/{manifest["run_id"]}-{manifest["run_attempt"]}/result.json'
+          if not RESULT_PATH.fullmatch(path):
+              raise ValueError('invalid_formal_result_locator')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
+              stream.write('result='+path+'\n')
+          PY
       - name: Select artifact name
         id: artifact-name
         run: echo "name=github-pages-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
@@ -141,3 +156,34 @@ jobs:
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: echo "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
+      - name: Checkout verified site product
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.product_commit }}
+          persist-credentials: false
+      - name: Checkout verified results
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.results_commit }}
+          path: verified-results
+          persist-credentials: false
+          sparse-checkout: ${{ needs.build.outputs.formal_result_path }}
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Install public verification dependencies
+        run: |
+          python3 -m pip install PyYAML==6.0.3 playwright==1.62.0
+          python3 -m playwright install --with-deps chromium
+      - name: Verify actual public Pages
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          SITE_PRODUCT: ${{ needs.build.outputs.product_commit }}
+          FORMAL_RESULT_PATH: ${{ needs.build.outputs.formal_result_path }}
+        run: |
+          python3 scripts/verify_site.py --url "$PAGE_URL" \
+            --expected-json "verified-results/$FORMAL_RESULT_PATH" \
+            --expected-site-product "$SITE_PRODUCT" \
+            --personal-policy bridge/personal-cp-policy.json --require-serving-plans \
+            --output "$RUNNER_TEMP/public-site-verification"

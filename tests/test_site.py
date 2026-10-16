@@ -81,6 +81,58 @@ class SiteTests(unittest.TestCase):
                                     site_product_commit='d'*40, base_path='/model-efficiency-frontier/')
                 self.assertEqual((output/'index.html').read_text(), 'previous success')
 
+    def test_serving_sidecars_are_hash_bound_allowlisted_and_visible_in_five_scopes(self):
+        from bridge.serving_plan import calculate_plan_view, validate_bundle
+        root=Path(__file__).resolve().parents[1]
+        registry_raw=(root/'bridge/serving-plans.json').read_bytes()
+        research_raw=(root/json.loads(registry_raw)['research']['path']).read_bytes()
+        registry,research=validate_bundle(registry_raw,research_raw)
+        record=self.record();original=deepcopy(record)
+        fixed=f'results/{record["envelope"]["request_id"]}/123-1/'
+        with tempfile.TemporaryDirectory() as d:
+            output=Path(d)/'site'
+            manifest=site.write_site([record],output,formal_parameters=PARAMETERS,
+                site_product_commit='d'*40,base_path='/demo/',serving_registry=registry_raw,serving_research=research_raw)
+            entry=manifest['serving_plans']
+            for name,key in (('serving-plans.json','registry'),('plan-research.json','research'),('plan-view.json','view')):
+                raw=(output/fixed/name).read_bytes()
+                self.assertEqual(hashlib.sha256(raw).hexdigest(),entry[key+'_sha256'])
+                self.assertEqual(entry[key+'_url'],'/demo/'+fixed+name)
+                self.assertEqual((output/name).read_bytes(),raw)
+            view=json.loads((output/'plan-view.json').read_bytes())
+            expected=calculate_plan_view(record['envelope'],registry,research)
+            self.assertEqual({k:view[k] for k in expected},expected)
+            self.assertEqual(view['parent_result_sha256'],manifest['result_sha256'])
+            for scope in ('all','gpt','gemini','claude','grok'):
+                prefix='' if scope=='all' else f'providers/{scope}/'
+                page=(output/prefix/'index.html').read_text()
+                self.assertIn('id="serving-plans"',page)
+                self.assertIn('BytePlus ModelArk',page)
+                self.assertIn('尚未套用數值優惠',page)
+                self.assertIn('Coding Plan Lite',page);self.assertIn('Coding Plan Pro',page)
+                self.assertEqual(page.count('data-provider="'),5)
+                scoped_manifest=json.loads((output/prefix/'manifest.json').read_bytes())
+                self.assertEqual(scoped_manifest['serving_plans'],entry)
+                self.assertLess(page.index('id="serving-plans"'),page.index('id="calculation"'))
+            self.assertEqual((output/fixed/'result.json').read_bytes(),record['result_bytes'])
+            self.assertEqual((output/fixed/'report.html').read_bytes(),record['report_bytes'])
+            self.assertFalse((output/'bridge').exists())
+        self.assertEqual(record,original)
+
+    def test_invalid_serving_registry_or_research_fails_before_any_write(self):
+        root=Path(__file__).resolve().parents[1]
+        raw=(root/'bridge/serving-plans.json').read_bytes()
+        research=(root/json.loads(raw)['research']['path']).read_bytes()
+        bad=json.loads(raw);bad['research']['path']='../../secret'
+        for registry_bytes,research_bytes in ((raw,research+b' '),(json.dumps(bad).encode(),research),
+                                             (raw,None),(None,research)):
+            with self.subTest(registry=registry_bytes is not None),tempfile.TemporaryDirectory() as d:
+                output=Path(d)/'site'
+                with self.assertRaises(ValueError):
+                    site.write_site([self.record()],output,formal_parameters=PARAMETERS,
+                        site_product_commit='d'*40,base_path='/demo/',serving_registry=registry_bytes,serving_research=research_bytes)
+                self.assertFalse(output.exists())
+
     def test_rejects_unsafe_project_paths(self):
         for path in ('//evil.test/', '/x/../', 'javascript:x', '/x"/', '/x?y/'):
             with self.subTest(path=path), self.assertRaises(site.SiteError):

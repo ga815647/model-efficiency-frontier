@@ -15,11 +15,44 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
-def verify_site(url, expected, output, *, expected_site_product=None, personal_policy=None):
+def validate_serving_payloads(manifest, expected, registry_raw, research_raw, view_raw, *,
+                              trusted_registry_raw=None, trusted_research_raw=None):
+    """Check exact sidecar bytes and independently reproduce the server view."""
+    from bridge.serving_plan import calculate_plan_view, validate_bundle, validate_registry
+    if trusted_registry_raw is None and trusted_research_raw is None:
+        product_root=Path(__file__).resolve().parents[1]
+        trusted_registry_raw=(product_root/'bridge/serving-plans.json').read_bytes()
+        trusted_registry=validate_registry(json.loads(trusted_registry_raw))
+        trusted_research_raw=(product_root/trusted_registry['research']['path']).read_bytes()
+    assert type(trusted_registry_raw) is bytes and type(trusted_research_raw) is bytes,'trusted_serving_bundle'
+    validate_bundle(trusted_registry_raw,trusted_research_raw)
+    assert registry_raw==trusted_registry_raw,'trusted_serving_registry'
+    assert research_raw==trusted_research_raw,'trusted_serving_research'
+    entry=manifest['serving_plans']
+    assert set(entry)=={'research_id','registry_url','registry_sha256','research_url','research_sha256','view_url','view_sha256'}
+    for key,name,raw in (('registry','serving-plans.json',registry_raw),('research','plan-research.json',research_raw),
+                         ('view','plan-view.json',view_raw)):
+        assert entry[key+'_url']==manifest['result_url']+name, key+'_url'
+        assert hashlib.sha256(raw).hexdigest()==entry[key+'_sha256'],key+'_sha256'
+    registry,research=validate_bundle(registry_raw,research_raw)
+    view=json.loads(view_raw)
+    assert entry['research_id']==research['research_id']
+    recalculated=calculate_plan_view(expected,registry,research,as_of=view['evaluated_as_of'])
+    recalculated.update(parent_result_sha256=manifest['result_sha256'],
+                        parent_publication_commit=manifest['publication_commit'],
+                        registry_sha256=entry['registry_sha256'],research_sha256=entry['research_sha256'])
+    assert view==recalculated,'serving_plan_recalculation'
+    return view
+
+
+def verify_site(url, expected, output, *, expected_site_product=None, personal_policy=None,
+                require_serving_plans=False):
     from playwright.sync_api import sync_playwright
     output=Path(output); output.mkdir(parents=True,exist_ok=True)
     root=url.rstrip('/')+'/'
-    manifest=json.loads(urlopen(urljoin(root,'manifest.json')).read())
+    manifest_raw=urlopen(urljoin(root,'manifest.json')).read()
+    manifest=json.loads(manifest_raw)
+    (output/'manifest.json').write_bytes(manifest_raw)
     if expected_site_product:
         assert manifest['site_product_commit']==expected_site_product, 'site_product_commit'
     for field in ('request_id','run_id','run_attempt','operation','parameters','source_dates'):
@@ -31,6 +64,12 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
     assert json.loads(raw)==expected
     assert hashlib.sha256(raw).hexdigest()==manifest['result_sha256']
     assert json.loads(urlopen(urljoin(fixed,'manifest.json')).read())==manifest
+    assert not require_serving_plans or 'serving_plans' in manifest,'serving_plans_missing'
+    serving=None
+    if 'serving_plans' in manifest:
+        entry=manifest['serving_plans']
+        payloads=[urlopen(urljoin(root,entry[key+'_url'])).read() for key in ('registry','research','view')]
+        serving=validate_serving_payloads(manifest,expected,*payloads)
     personal=None
     if personal_policy is not None:
         from bridge.personal_cp import validate_choices
@@ -100,9 +139,32 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
                     else:
                         assert '／任務' not in summary.inner_text()
 
+    def check_serving_plans(page):
+        section=page.locator('#serving-plans')
+        assert section.count()==int(serving is not None),'serving_section'
+        if serving:
+            assert section.is_visible()
+            assert page.locator('#provider-chooser a').count()==5
+            assert page.locator('nav [href="#serving-plans"]').count()==1
+            assert section.locator('[data-serving-plan]').count()==len(serving['plans'])
+            assert section.locator('[data-advertised-alias]').count()==len(serving['advertised_routes'])
+            assert section.locator('[data-plan-candidate]').count()==len(serving['candidates'])
+            text=section.text_content()
+            if not serving['numeric_benefit_applied']:
+                assert '尚未套用數值優惠' in text
+            for plan in serving['plans']:
+                card=section.locator(f'[data-serving-plan="{plan["id"]}"]')
+                assert plan['label'] in card.inner_text()
+                assert '$'+str(plan['monthly_price']) in card.inner_text()
+            for alias in serving['advertised_routes']:
+                assert alias['alias'] in text
+            assert research_check['research_id'] in text
+
+    research_check=json.loads(payloads[1]) if serving else None
     evidence=[]
     with sync_playwright() as p:
         browser=p.chromium.launch()
+        browser_version=browser.version
         for width in (360,390,1280):
             page=browser.new_page(viewport={'width':width,'height':900})
             errors=[]
@@ -110,6 +172,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
             response=page.goto(root,wait_until='networkidle'); assert response.status==200
             check_global_source_exits(page)
             check_personal_cp(page)
+            check_serving_plans(page)
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
             for key,row in expected['anchors'].items():
                 card=page.locator(f'[data-anchor="{key}"]')
@@ -141,6 +204,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
             assert page.goto(fixed,wait_until='networkidle').status==200
             check_global_source_exits(page)
             check_personal_cp(page)
+            check_serving_plans(page)
             highest=expected['anchors']['highest_retained_score']
             assert page.locator('[data-anchor="highest_retained_score"] .model-name').inner_text()==(highest['model'] if highest else '從缺')
             providers=[]
@@ -156,6 +220,8 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
                 scoped_manifest=json.loads(urlopen(urljoin(root,entry['url']+'manifest.json')).read())
                 assert scoped_manifest['selection_scope']==key
                 assert scoped_manifest['provider_view_sha256']==entry['view_sha256']
+                if serving:
+                    assert scoped_manifest['serving_plans']==manifest['serving_plans']
                 page.locator(f'#provider-chooser [data-provider="{key}"]').focus()
                 page.locator(f'#provider-chooser [data-provider="{key}"]').press('Enter')
                 page.wait_for_load_state('networkidle')
@@ -164,6 +230,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
                 assert page.locator('[data-selection-scope]').get_attribute('data-selection-scope')==key
                 check_provider_source_exits(page)
                 check_personal_cp(page,key)
+                check_serving_plans(page)
                 assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
                 for anchor,row in view['calculation']['anchors'].items():
                     assert page.locator(f'[data-anchor="{anchor}"] .model-name').inner_text()==(row['model'] if row else '從缺')
@@ -172,23 +239,39 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
                 assert page.goto(urljoin(root,f'providers/{key}/'),wait_until='networkidle').status==200
                 check_provider_source_exits(page)
                 check_personal_cp(page,key)
+                check_serving_plans(page)
                 providers.append(dict(provider=key,url=provider_url,view_sha256=entry['view_sha256'],anchors=True,overflow=False,source_exit_summary=False))
             assert not errors,errors
             evidence.append(dict(width=width,http_status=response.status,search=True,empty=True,keyboard=True,overflow=False,script_errors=errors,providers=providers,source_exits_at_end=True))
             page.close()
-        page=browser.new_page(java_script_enabled=False,viewport={'width':360,'height':900})
-        assert page.goto(root).status==200
-        check_personal_cp(page)
-        assert page.locator('[data-anchor]').count()==2
-        assert page.locator('#ladder > .table-wrap tbody tr').count()==len(formal)
-        page.locator('#search-results > summary').click()
-        assert page.locator('[data-search]:visible').count()>=expected['candidate_count']
-        for key in manifest.get('provider_views',{}):
-            assert page.goto(urljoin(root,f'providers/{key}/')).status==200
-            check_personal_cp(page,key)
+        for width in (360,390,1280):
+            page=browser.new_page(java_script_enabled=False,viewport={'width':width,'height':900})
+            errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+            assert page.goto(root).status==200
+            check_personal_cp(page);check_serving_plans(page);check_global_source_exits(page)
+            assert page.locator('[data-anchor]').count()==2
+            assert page.locator('#ladder > .table-wrap tbody tr').count()==len(formal)
+            page.locator('#search-results > summary').click()
+            assert page.locator('[data-search]:visible').count()>=expected['candidate_count']
+            if serving:
+                page.locator('[data-plan-research] > summary').click()
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+            for key in manifest.get('provider_views',{}):
+                assert page.goto(urljoin(root,f'providers/{key}/')).status==200
+                check_personal_cp(page,key);check_serving_plans(page);check_provider_source_exits(page)
+                if serving:
+                    page.locator('[data-plan-research] > summary').click()
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+            assert not errors,errors
+            page.close()
         browser.close()
-    result=dict(url=root,fixed_url=fixed,manifest=manifest,viewports=evidence,no_javascript=True,personal_cp=personal)
+    result=dict(url=root,fixed_url=fixed,manifest=manifest,viewports=evidence,no_javascript=True,
+                personal_cp=personal,serving_plans=serving,browser_version=browser_version,
+                manifest_sha256=hashlib.sha256(manifest_raw).hexdigest(),
+                site_product_commit=manifest['site_product_commit'],
+                publication_commit=manifest['publication_commit'],result_sha256=manifest['result_sha256'],
+                serving_hashes=({key:manifest['serving_plans'][key] for key in
+                    ('registry_sha256','research_sha256','view_sha256')} if serving else None))
     (output/'browser-evidence.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     return result
 
@@ -200,7 +283,9 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--expected-site-product')
     parser.add_argument('--personal-policy',type=Path)
+    parser.add_argument('--require-serving-plans',action='store_true')
     args=parser.parse_args()
     print(json.dumps(verify_site(args.url,json.loads(args.expected_json.read_bytes()),args.output,
         expected_site_product=args.expected_site_product,
-        personal_policy=json.loads(args.personal_policy.read_bytes()) if args.personal_policy else None),ensure_ascii=False))
+        personal_policy=json.loads(args.personal_policy.read_bytes()) if args.personal_policy else None,
+        require_serving_plans=args.require_serving_plans),ensure_ascii=False))

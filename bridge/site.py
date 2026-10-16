@@ -15,6 +15,7 @@ from bridge.runner import (_git, _read, _publication_origin, _verified_transport
 from bridge.cost_policy import validate_policy, validate_source_parameters
 from bridge.provider_view import PROVIDERS, calculate_provider_view, provider_for
 from bridge.personal_cp import calculate_personal_cp, validate_choices
+from bridge.serving_plan import calculate_plan_view, validate_bundle, validate_registry
 
 
 class SiteError(ValueError):
@@ -133,8 +134,14 @@ def _manifest(record, product, base_path):
 
 
 def write_site(records, output, *, formal_parameters, site_product_commit, base_path,
-               formal_result_schema_version=None, personal_choices=None):
+               formal_result_schema_version=None, personal_choices=None,
+               serving_registry=None, serving_research=None):
     validate_base_path(base_path)
+    registry = research = None
+    if serving_registry is not None or serving_research is not None:
+        if type(serving_registry) is not bytes or type(serving_research) is not bytes:
+            raise SiteError('incomplete_serving_bundle')
+        registry,research = validate_bundle(serving_registry,serving_research)
     choices = validate_choices({'schema_version':1, 'choices':{}} if personal_choices is None else personal_choices)
     used_choices = set()
     home = select_home(records, formal_parameters, formal_result_schema_version)
@@ -169,6 +176,25 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
                  ('下載備用 HTML', manifest['result_url']+'report.html'), ('網站發布 manifest', manifest['result_url']+'manifest.json')]
         if personal:
             links.append(('下載本次能力與成本平衡推薦結果',manifest['personal_cp']['view_url']))
+        plan_view = None
+        if registry is not None:
+            plan_view = calculate_plan_view(envelope,registry,research)
+            plan_view.update(parent_result_sha256=manifest['result_sha256'],
+                             parent_publication_commit=record['publication_commit'],
+                             registry_sha256=hashlib.sha256(serving_registry).hexdigest(),
+                             research_sha256=hashlib.sha256(serving_research).hexdigest())
+            raw_view=(json.dumps(plan_view,ensure_ascii=False,indent=2)+'\n').encode()
+            sidecars={'serving-plans.json':serving_registry,'plan-research.json':serving_research,'plan-view.json':raw_view}
+            manifest['serving_plans'] = dict(research_id=research['research_id'])
+            for key,name in (('registry','serving-plans.json'),('research','plan-research.json'),('view','plan-view.json')):
+                manifest['serving_plans'][key+'_url']=manifest['result_url']+name
+                manifest['serving_plans'][key+'_sha256']=hashlib.sha256(sidecars[name]).hexdigest()
+            files.update({path+name:raw for name,raw in sidecars.items()})
+            if record is home:
+                files.update(sidecars)
+            links.extend((('下載代管方案研究結果',manifest['serving_plans']['view_url']),
+                          ('下載方案研究證據',manifest['serving_plans']['research_url']),
+                          ('下載代管方案 registry',manifest['serving_plans']['registry_url'])))
         views={}
         manifest['provider_views']={}
         provider_links=[('all','全部供應商',manifest['result_url'])]+[(key,label,manifest['result_url']+f'providers/{key}/') for key,label in PROVIDERS.items()]
@@ -183,14 +209,15 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
             scoped_manifest=dict(manifest,selection_scope=key,provider_view_sha256=hashlib.sha256(raw).hexdigest())
             scoped_page=render_html(view['calculation'],observations=[r for r in record['observations'] if provider_for(r)==key],
                 links=links+[('下載供應商專屬結果',manifest['provider_views'][key]['view_url'])],
-                provider_links=provider_links,provider=key,personal_cp=personal).encode()
+                provider_links=provider_links,provider=key,personal_cp=personal,
+                plan_view=plan_view,plan_research=research).encode()
             scoped_files={'index.html':scoped_page,'view.json':raw,'manifest.json':(json.dumps(scoped_manifest,ensure_ascii=False,indent=2)+'\n').encode()}
             files.update({path+f'providers/{key}/'+name:data for name,data in scoped_files.items()})
             if record is home:
                 files.update({f'providers/{key}/'+name:data for name,data in scoped_files.items()})
         page = render_html(envelope, observations=record['observations'], links=links,
                            provider_links=provider_links,provider_views={k:v[0] for k,v in views.items()},
-                           personal_cp=personal).encode()
+                           personal_cp=personal,plan_view=plan_view,plan_research=research).encode()
         manifest_bytes = (json.dumps(manifest, ensure_ascii=False, indent=2)+'\n').encode()
         files.update({path+'index.html':page, path+'result.json':record['result_bytes'],
                       path+'report.html':record['report_bytes'], path+'manifest.json':manifest_bytes})
@@ -236,10 +263,17 @@ def build_site(repository, results_commit, output, *, base_path, expected_run=No
         if marker != {'policy':'all-providers-v1','result_schema_version':4}:
             raise SiteError('invalid_recommendation_policy')
         version=4
+    serving_registry = serving_research = None
+    if _has_file(repo,product,'bridge/serving-plans.json'):
+        serving_registry = _read(repo,product,'bridge/serving-plans.json')
+        registry = validate_registry(_json(serving_registry))
+        serving_research = _read(repo,product,registry['research']['path'])
+        validate_bundle(serving_registry,serving_research)
     return write_site(records,output,formal_parameters=policy['formal_parameters'],
                       site_product_commit=product,base_path=base_path,formal_result_schema_version=version,
                       personal_choices=(_json(_read(repo,product,'bridge/personal-cp-policy.json'))
-                                        if _has_file(repo,product,'bridge/personal-cp-policy.json') else None))
+                                        if _has_file(repo,product,'bridge/personal-cp-policy.json') else None),
+                      serving_registry=serving_registry,serving_research=serving_research)
 
 
 def main(argv=None):

@@ -67,6 +67,15 @@ def main(argv=None):
     args = parser.parse_args(argv)
     from .request import decode_request
     policy = validate_policy(decode_request(args.policy.read_text()))
+    serving_path=args.policy.with_name('serving-plans.json')
+    if serving_path.exists():
+        from .serving_plan import validate_bundle, validate_registry
+        registry_raw=serving_path.read_bytes()
+        registry=validate_registry(decode_request(registry_raw.decode('utf-8')))
+        # The locator is validated before reading; it is always beneath this
+        # product's bridge/research directory, independent of the working dir.
+        research_path=args.policy.parent/'research'/Path(registry['research']['path']).name
+        validate_bundle(registry_raw,research_path.read_bytes())
     marker_path=args.policy.with_name('recommendation-policy.json')
     include_claude=False
     if marker_path.exists():

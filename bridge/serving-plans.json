@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "research": {
+    "path": "bridge/research/byteplus-2026-10-16.json",
+    "sha256": "0d5812f2f3af055a828be0e00d3eec80b8d55bd319368405b32cc9aae7a3cf8d"
+  },
+  "providers": [
+    {
+      "id": "byteplus",
+      "label": "BytePlus ModelArk"
+    }
+  ],
+  "plans": [
+    {
+      "id": "byteplus-coding-lite",
+      "provider_id": "byteplus",
+      "label": "Coding Plan Lite",
+      "currency": "USD",
+      "monthly_price": 10,
+      "factor": null,
+      "route_ids": [
+        "byteplus-dola-seed-2.0-pro",
+        "byteplus-dola-seed-2.0-lite",
+        "byteplus-dola-seed-2.0-code",
+        "byteplus-bytedance-seed-code",
+        "byteplus-glm-5.3-flash",
+        "byteplus-glm-5.2",
+        "byteplus-glm-5.1",
+        "byteplus-kimi-k2.5",
+        "byteplus-gpt-oss-120b",
+        "byteplus-deepseek-v4.1-flash",
+        "byteplus-deepseek-v4-flash",
+        "byteplus-deepseek-v4-pro"
+      ]
+    },
+    {
+      "id": "byteplus-coding-pro",
+      "provider_id": "byteplus",
+      "label": "Coding Plan Pro",
+      "currency": "USD",
+      "monthly_price": 50,
+      "factor": null,
+      "route_ids": [
+        "byteplus-dola-seed-2.0-pro",
+        "byteplus-dola-seed-2.0-lite",
+        "byteplus-dola-seed-2.0-code",
+        "byteplus-bytedance-seed-code",
+        "byteplus-glm-5.3-flash",
+        "byteplus-glm-5.2",
+        "byteplus-glm-5.1",
+        "byteplus-kimi-k2.5",
+        "byteplus-gpt-oss-120b",
+        "byteplus-deepseek-v4.1-flash",
+        "byteplus-deepseek-v4-flash",
+        "byteplus-deepseek-v4-pro"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": "byteplus-dola-seed-2.0-pro",
+      "provider_id": "byteplus",
+      "alias": "dola-seed-2.0-pro",
+      "model_owner": "ByteDance",
+      "matches": []
+    },
+    {
+      "id": "byteplus-dola-seed-2.0-lite",
+      "provider_id": "byteplus",
+      "alias": "dola-seed-2.0-lite",
+      "model_owner": "ByteDance",
+      "matches": []
+    },
+    {
+      "id": "byteplus-dola-seed-2.0-code",
+      "provider_id": "byteplus",
+      "alias": "dola-seed-2.0-code",
+      "model_owner": "ByteDance",
+      "matches": []
+    },
+    {
+      "id": "byteplus-bytedance-seed-code",
+      "provider_id": "byteplus",
+      "alias": "bytedance-seed-code",
+      "model_owner": "ByteDance",
+      "matches": []
+    },
+    {
+      "id": "byteplus-glm-5.3-flash",
+      "provider_id": "byteplus",
+      "alias": "glm-5.3-flash",
+      "model_owner": "Z AI",
+      "matches": [
+        {
+          "model": "GLM 5.3 Flash",
+          "effort": "unspecified",
+          "identity": "GLM 5.3 Flash unspecified AA-public published-price",
+          "label": "potential",
+          "reason": "Advertised GLM Flash alias is confirmed; exact dated backend, unspecified effort and quantization are not established.",
+          "proof": {
+            "alias": {
+              "value": "glm-5.3-flash",
+              "source_ids": [
+                "quick-start"
+              ],
+              "checked_date": "2026-10-16",
+              "valid_until": "2026-10-16"
+            },
+            "version": null,
+            "effort": null,
+            "quantization": null,
+            "region": null,
+            "use_case": null,
+            "current_terms": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "byteplus-glm-5.2",
+      "provider_id": "byteplus",
+      "alias": "glm-5.2",
+      "model_owner": "Z AI",
+      "matches": []
+    },
+    {
+      "id": "byteplus-glm-5.1",
+      "provider_id": "byteplus",
+      "alias": "glm-5.1",
+      "model_owner": "Z AI",
+      "matches": []
+    },
+    {
+      "id": "byteplus-kimi-k2.5",
+      "provider_id": "byteplus",
+      "alias": "kimi-k2.5",
+      "model_owner": "Moonshot AI",
+      "matches": []
+    },
+    {
+      "id": "byteplus-gpt-oss-120b",
+      "provider_id": "byteplus",
+      "alias": "gpt-oss-120b",
+      "model_owner": "OpenAI",
+      "matches": [
+        {
+          "model": "gpt-oss-120b",
+          "effort": "high",
+          "identity": "gpt-oss-120b high AA-public published-price",
+          "label": "potential",
+          "reason": "Advertised alias is confirmed; exact checkpoint, high effort and quantization are not established.",
+          "proof": {
+            "alias": {
+              "value": "gpt-oss-120b",
+              "source_ids": [
+                "quick-start"
+              ],
+              "checked_date": "2026-10-16",
+              "valid_until": "2026-10-16"
+            },
+            "version": null,
+            "effort": null,
+            "quantization": null,
+            "region": null,
+            "use_case": null,
+            "current_terms": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "byteplus-deepseek-v4.1-flash",
+      "provider_id": "byteplus",
+      "alias": "deepseek-v4.1-flash",
+      "model_owner": "DeepSeek",
+      "matches": [
+        {
+          "model": "DeepSeek V4.1 Flash",
+          "effort": "non-reasoning",
+          "identity": "DeepSeek V4.1 Flash non-reasoning AA-public published-price",
+          "label": "potential",
+          "reason": "V4.1 non-reasoning support is confirmed in supplied research; max is uncertain. Dated backend, exact effort/quantization, region and terms still gate any numeric effect.",
+          "proof": {
+            "alias": {
+              "value": "deepseek-v4.1-flash",
+              "source_ids": [
+                "quick-start"
+              ],
+              "checked_date": "2026-10-16",
+              "valid_until": "2026-10-16"
+            },
+            "version": null,
+            "effort": null,
+            "quantization": null,
+            "region": null,
+            "use_case": null,
+            "current_terms": null
+          }
+        },
+        {
+          "model": "DeepSeek V4.1 Flash",
+          "effort": "max",
+          "identity": "DeepSeek V4.1 Flash max AA-public published-price",
+          "label": "potential",
+          "reason": "V4.1 non-reasoning support is confirmed in supplied research; max is uncertain. Dated backend, exact effort/quantization, region and terms still gate any numeric effect.",
+          "proof": {
+            "alias": {
+              "value": "deepseek-v4.1-flash",
+              "source_ids": [
+                "quick-start"
+              ],
+              "checked_date": "2026-10-16",
+              "valid_until": "2026-10-16"
+            },
+            "version": null,
+            "effort": null,
+            "quantization": null,
+            "region": null,
+            "use_case": null,
+            "current_terms": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "byteplus-deepseek-v4-flash",
+      "provider_id": "byteplus",
+      "alias": "deepseek-v4-flash",
+      "model_owner": "DeepSeek",
+      "matches": []
+    },
+    {
+      "id": "byteplus-deepseek-v4-pro",
+      "provider_id": "byteplus",
+      "alias": "deepseek-v4-pro",
+      "model_owner": "DeepSeek",
+      "matches": [
+        {
+          "model": "DeepSeek V4 Pro 0813",
+          "effort": "non-reasoning",
+          "identity": "DeepSeek V4 Pro 0813 non-reasoning AA-public published-price",
+          "label": "potential",
+          "reason": "V4Pro0813 is a potential version match; alias may reference another checkpoint. Effort/quantization and the high quota deduction coefficient remain unresolved.",
+          "proof": {
+            "alias": {
+              "value": "deepseek-v4-pro",
+              "source_ids": [
+                "quick-start"
+              ],
+              "checked_date": "2026-10-16",
+              "valid_until": "2026-10-16"
+            },
+            "version": null,
+            "effort": null,
+            "quantization": null,
+            "region": null,
+            "use_case": null,
+            "current_terms": null
+          }
+        },
+        {
+          "model": "DeepSeek V4 Pro 0813",
+          "effort": "max",
+          "identity": "DeepSeek V4 Pro 0813 max AA-public published-price",
+          "label": "potential",
+          "reason": "V4Pro0813 is a potential version match; alias may reference another checkpoint. Effort/quantization and the high quota deduction coefficient remain unresolved.",
+          "proof": {
+            "alias": {
+              "value": "deepseek-v4-pro",
+              "source_ids": [
+                "quick-start"
+              ],
+              "checked_date": "2026-10-16",
+              "valid_until": "2026-10-16"
+            },
+            "version": null,
+            "effort": null,
+            "quantization": null,
+            "region": null,
+            "use_case": null,
+            "current_terms": null
+          }
+        }
+      ]
+    }
+  ]
+}

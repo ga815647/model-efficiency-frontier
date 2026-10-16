@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "research_id": "byteplus-modelark-coding-plan-2026-10-16-v1",
+  "as_of": "2026-10-16",
+  "provider_id": "byteplus",
+  "sources": [
+    {
+      "id": "pricing",
+      "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/model-pricing",
+      "updated_at": "2026-10-13",
+      "checked_date": "2026-10-16",
+      "verification": "retrieved_official",
+      "notes": "Official regional pricing mirror; main docs shell separately displays October 8, 2026 13:17:02. Published standard prices, not checkout verification."
+    },
+    {
+      "id": "overview",
+      "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/coding-plan-personal-plan-overview",
+      "updated_at": "2026-10-14",
+      "checked_date": "2026-10-16",
+      "verification": "retrieved_official",
+      "notes": "Official regional overview; main docs shell displays October 14, 2026 15:34:12."
+    },
+    {
+      "id": "quick-start",
+      "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/coding-plan-personal-get-started",
+      "updated_at": "2026-10-13",
+      "checked_date": "2026-10-16",
+      "verification": "retrieved_official",
+      "notes": "Official regional quick start; main docs shell displays September 28, 2026 05:30:53."
+    },
+    {
+      "id": "data-authorization",
+      "url": "https://docs.byteplus.com/en/docs/legal/data_authorization_agreement_modelark",
+      "updated_at": "2025-05-21",
+      "checked_date": "2026-10-16",
+      "verification": "retrieved_official",
+      "notes": "Agreement applies to linked projects/services; Personal enrollment linkage and consent were not independently verified."
+    },
+    {
+      "id": "historical-faq",
+      "url": "https://docs.byteplus.com/en/docs/modelark/coding-plan-personal-faq",
+      "updated_at": "2026-09-28 shell; historical body not retrieved",
+      "checked_date": "2026-10-16",
+      "verification": "owner_supplied_not_retrieved",
+      "notes": "Prior FAQ observations supplied in the approved scope. Current FAQ retrieval returned shell/errors; do not label this body independently verified."
+    },
+    {
+      "id": "historical-promotion",
+      "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/coding-plan-personal-plan-overview",
+      "updated_at": "Historical September 2026 offer; not independently retrieved",
+      "checked_date": "2026-10-16",
+      "verification": "owner_supplied_not_retrieved",
+      "notes": "Supplied expired promotion and referral observations. Current overview referral link does not establish current offer terms."
+    }
+  ],
+  "findings": [
+    {
+      "label": "confirmed",
+      "text": "Standard monthly prices: Lite USD10 and Pro USD50; three-month prices USD30 and USD150. No promotional or referral benefit enters the registry.",
+      "source_ids": [
+        "pricing"
+      ]
+    },
+    {
+      "label": "confirmed",
+      "text": "October14 overview: Lite approximately 1900 invocations/5h, 12000/week, 24000/subscription-month; Pro5× approximately9500/60000/120000. All caps apply together. The explicit monthly cap must not be replaced by weekly ×52/12.",
+      "source_ids": [
+        "overview"
+      ]
+    },
+    {
+      "label": "confirmed",
+      "text": "One user prompt can trigger multiple model invocations. Quota depends on model, thinking, context, repository complexity, tools and auto-accept; prompts are not calls. Shared tool quota is not a fixed token allowance or an API-equivalent multiplier.",
+      "source_ids": [
+        "overview"
+      ]
+    },
+    {
+      "label": "confirmed",
+      "text": "Overview resets: five-hour window from first request; weekly Monday00:00; monthly first day of each subscription month00:00. Timezone is unstated. Region availability remains subject to the console.",
+      "source_ids": [
+        "overview"
+      ]
+    },
+    {
+      "label": "conflicting",
+      "text": "Earlier supplied FAQ: Lite1200/5h,9000/week,18000/month; Pro5×, with different rolling reset descriptions. FAQ estimates use dola-seed-2.0-lite with Claude Code and depend on model/context. This historical body was not independently recovered; latest retrieved overview differs. Do not combine the two quota sets or reset schedules.",
+      "source_ids": [
+        "historical-faq",
+        "overview"
+      ]
+    },
+    {
+      "label": "historical",
+      "text": "Supplied introductory Lite USD5/Pro USD25 and referral offer expired2026-09-30; excluded from standard prices and value. The current overview referral link has unresolved current terms; no referral assumption is made.",
+      "source_ids": [
+        "historical-promotion",
+        "overview"
+      ]
+    },
+    {
+      "label": "confirmed",
+      "text": "Exact advertised aliases: dola-seed-2.0-pro, dola-seed-2.0-lite, dola-seed-2.0-code, bytedance-seed-code, glm-5.3-flash, glm-5.2, glm-5.1, kimi-k2.5, gpt-oss-120b, deepseek-v4.1-flash, deepseek-v4-flash, deepseek-v4-pro. Support is advertised; regional availability can differ.",
+      "source_ids": [
+        "quick-start"
+      ]
+    },
+    {
+      "label": "confirmed",
+      "text": "Use is limited to supported coding tools. Anthropic coding base ends /api/coding; OpenAI coding base /api/coding/v3. Ordinary /api/v3 uses separate API billing. No endpoints, enrollment, purchases or consent are executed by this research.",
+      "source_ids": [
+        "quick-start",
+        "overview"
+      ]
+    },
+    {
+      "label": "potential",
+      "text": "The pricing table separately lists glm-5-3-flash-260828, gpt-oss-120b-250805, deepseek-v4-1-flash-260910, deepseek-v4-pro-ga-260813 and older deepseek-v4-pro-260425. These API versions do not prove Coding Plan alias-to-backend equality. Exact version, effort, quantization and route remain pending.",
+      "source_ids": [
+        "pricing",
+        "quick-start"
+      ]
+    },
+    {
+      "label": "potential",
+      "text": "Six fixed-snapshot opportunities counted once across Lite/Pro: GLM5.3Flash unspecified; gpt-oss-120b high; DeepSeekV4.1Flash non-reasoning/max; DeepSeekV4Pro0813 non-reasoning/max. Supplied research confirms V4.1 non-reasoning support but max remains uncertain; no dated backend or quantization equality follows. GLM alias support is not exact dated backend proof; V4Pro0813 is a potential version match.",
+      "source_ids": [
+        "quick-start",
+        "historical-faq"
+      ]
+    },
+    {
+      "label": "confirmed",
+      "text": "DeepSeekV4-Pro uses a higher quota deduction coefficient, but the retrieved overview does not specify a numeric coefficient. Do not invent it or reuse another model coefficient.",
+      "source_ids": [
+        "overview"
+      ]
+    },
+    {
+      "label": "potential",
+      "text": "No mapping to Flash Vision, non-Flash GLM5.3, KimiK3/K2.7, MiniMaxM3 or Qwen is established by these aliases. No similar identity borrows a score, effort, cost or factor.",
+      "source_ids": [
+        "quick-start"
+      ]
+    },
+    {
+      "label": "confirmed",
+      "text": "Linked ModelArk Data Authorization Agreement grants broad continuing rights for service/AI improvement, permits storage outside the service region, and says opt-out stops new content use while already authorized data cannot technically be deleted. Section3.2 excludes confidential/personal material and disclaims confidentiality duties for authorized data.",
+      "source_ids": [
+        "data-authorization"
+      ]
+    },
+    {
+      "label": "potential",
+      "text": "Personal enrollment/terms linkage and any separate Team no-recording promise are not independently verified. Team claims cannot establish Personal handling or confidential suitability. Owner terms acceptance and confidential-use suitability are not assumed.",
+      "source_ids": [
+        "data-authorization"
+      ]
+    },
+    {
+      "label": "potential",
+      "text": "No owner-accepted BytePlus factor exists. M equals same-workload API-equivalent spend divided by subscription spend. Price/quota alone cannot establish M; monthly caps, model mix, token/cache/thinking rates and actual applicable use are required. Missing evidence retains API-only cost and value.",
+      "source_ids": [
+        "pricing",
+        "overview"
+      ]
+    }
+  ]
+}
