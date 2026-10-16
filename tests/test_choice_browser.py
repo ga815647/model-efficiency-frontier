@@ -60,6 +60,13 @@ class ChoiceBrowserTests(unittest.TestCase):
         site.write_site([record],cls.root/'provider-demo',formal_parameters=PARAMS,
                         site_product_commit='d'*40,base_path='/provider-demo/',formal_result_schema_version=4,
                         personal_choices=dict(schema_version=1,choices={choice_path:choice}))
+        product_root=Path(__file__).resolve().parents[1]
+        registry_raw=(product_root/'bridge/serving-plans.json').read_bytes()
+        research_raw=(product_root/json.loads(registry_raw)['research']['path']).read_bytes()
+        site.write_site([record],cls.root/'plan-demo',formal_parameters=PARAMS,
+                        site_product_commit='d'*40,base_path='/plan-demo/',formal_result_schema_version=4,
+                        personal_choices=dict(schema_version=1,choices={choice_path:choice}),
+                        serving_registry=registry_raw,serving_research=research_raw)
         (cls.root/'expected.json').write_bytes(record['result_bytes'])
         (cls.root/'personal-policy.json').write_bytes(json.dumps(
             dict(schema_version=1,choices={choice_path:choice})).encode())
@@ -175,8 +182,9 @@ class ChoiceBrowserTests(unittest.TestCase):
         import subprocess,sys
         root=Path(__file__).resolve().parents[1]
         command=[sys.executable,str(root/'scripts/verify_site.py'),
-                 '--url',self.url+'provider-demo/', '--expected-json',str(self.root/'expected.json'),
+                 '--url',self.url+'plan-demo/', '--expected-json',str(self.root/'expected.json'),
                  '--personal-policy',str(self.root/'personal-policy.json'),
+                 '--require-serving-plans',
                  '--expected-site-product','d'*40,'--output',str(self.root/'cli-evidence')]
         result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=90)
         self.assertEqual(result.returncode,0,result.stderr)
@@ -184,6 +192,11 @@ class ChoiceBrowserTests(unittest.TestCase):
         evidence=json.loads((self.root/'cli-evidence/browser-evidence.json').read_bytes())
         self.assertEqual(evidence['personal_cp']['minimum_score'],self.personal['minimum_score'])
         self.assertTrue(evidence['no_javascript'])
+        self.assertFalse(evidence['serving_plans']['numeric_benefit_applied'])
+        self.assertEqual(evidence['site_product_commit'],'d'*40)
+        import hashlib
+        self.assertEqual(evidence['manifest_sha256'],hashlib.sha256((self.root/'cli-evidence/manifest.json').read_bytes()).hexdigest())
+        self.assertTrue(evidence['browser_version'])
 
     def test_subscription_factors_are_readable_without_overflow_or_javascript(self):
         for width in (360,390,1280):
@@ -234,6 +247,40 @@ class ChoiceBrowserTests(unittest.TestCase):
         self.assertTrue(page.locator('[data-anchor="highest_retained_score"] .model-name').is_visible())
         self.assertGreater(page.locator('#ladder > .table-wrap tbody tr').count(),0)
         page.close()
+
+    def test_byteplus_research_all_five_scopes_all_widths_with_and_without_javascript(self):
+        import hashlib,json
+        for width in (360,390,1280):
+            for js in (True,False):
+                with self.subTest(width=width,javascript=js):
+                    page=self.browser.new_page(viewport={'width':width,'height':900},java_script_enabled=js)
+                    errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
+                    for scope in ('all','gpt','gemini','claude','grok'):
+                        suffix='' if scope=='all' else f'providers/{scope}/'
+                        response=page.goto(self.url+'plan-demo/'+suffix)
+                        self.assertEqual(response.status,200)
+                        section=page.locator('#serving-plans')
+                        self.assertTrue(section.is_visible())
+                        self.assertIn('尚未套用數值優惠',section.inner_text())
+                        self.assertEqual(page.locator('#provider-chooser a').count(),5)
+                        self.assertEqual(section.locator('[data-serving-plan]').count(),2)
+                        section.locator('[data-plan-research] > summary').click()
+                        self.assertIn('24000',section.inner_text())
+                        self.assertIn('18000',section.inner_text())
+                        self.assertIn('52/12',section.inner_text())
+                        self.assertEqual(section.locator('[data-advertised-alias]').count(),12)
+                        self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
+                        exits=page.locator('[data-family="source-exits"]')
+                        self.assertEqual(exits.count(),int(scope=='all'))
+                        if scope=='all':
+                            self.assertTrue(exits.evaluate('(node) => node.previousElementSibling.id === "calculation"'))
+                        manifest=page.request.get(page.url+'manifest.json').json()
+                        entry=manifest['serving_plans']
+                        for key in ('registry','research','view'):
+                            raw=page.request.get(self.url.rstrip('/')+entry[key+'_url']).body()
+                            self.assertEqual(hashlib.sha256(raw).hexdigest(),entry[key+'_sha256'])
+                    self.assertEqual(errors,[])
+                    page.close()
 
 
 if __name__=='__main__': unittest.main()

@@ -1,5 +1,7 @@
 # Chat 的兩種操作：維護倍率、產生 LADDER
 
+2026-10-16 增量：BytePlus ModelArk Coding Plan 研究在獨立 [serving provider／plan／route registry](serving-plans.md)，不新增第八個 request 參數、不將代管平台當模型 family。現在 BytePlus factor 未知；Lite／Pro 月費或配額不構成倍率，所有適用門檻與使用者明確接受前保留 API-only。下列四個已接受情境及 Contributor×1 維持。
+
 2026-10-07 個人主力增量：產生新 LADDER 前另問本次標竿與容許 EPS 倍數；既有倍率／floor/cap／七欄 request v3／result v4 不變。成功後按同版 [personal-cp.md](personal-cp.md) 經產品 PR 保存精確結果綁定選擇並發布個人 CP view；不讓個人門檻改寫原 LADDER，pending 與本次已接受選擇不重問。
 
 **最新增量：**使用者已明確移除Claude僅比較限制，正式新請求改request v3／result v4，七欄參數與倍率表不變；下方request v2／result v3及Claude僅比較是較早版本的相容契約，不能用來限制新v4。四家專屬LADDER、精確v4欄位與網站view見 [供應商契約](provider-ladders.md)。

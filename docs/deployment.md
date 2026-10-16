@@ -8,6 +8,10 @@
 
 **2026-10-07 公開與部署現況（本節優先於下方較早狀態）**：使用者最新明確確認「repo 和 page 都改 public，Artificial Analysis token 不會被公開就好」，並已完成管理設定。本庫 visibility 已讀回 public；Pages Source 為 GitHub Actions，`github-pages` environment 只允許 main，正式部署開關已由成功 configure/deploy 實證生效。[正式首頁](https://ga815647.github.io/model-efficiency-frontier/) 匿名 HTTP 200；[Pages run 37565960035-1](https://github.com/ga815647/model-efficiency-frontier/actions/runs/37565960035) build/deploy 均成功，deployment `6900788565` success。正式結果為 request `680ad45c-3818-4fbd-809e-59b3a68117ff`／run `37564382191-1`，結果 publication `f4d85b7ab0c939b2770b6d79a26a85f52bc8a960`，來源日期 2026-10-07、固定快照 recompute，不是新抓來源。四家倍率 ChatGPT17／Gemini3.6／Claude40／Grok5.2、新 v4 Claude 可推薦；下方舊倍率、僅比較及 private／未部署描述保留歷史身份。AA_API_KEY 仍只由 server-side Actions Secrets 注入，不放 repository variables、來源檔、網站或瀏覽器；不得讀保存的 secret 值。第三方條款的歷史發現保留，使用者確認不冒稱第三方授權。完整固定網址、雜湊、公開驗收見 `docs/acceptance/2026-10-07-public-pages.md`。Git 文件更新不代表 ChatGPT Project Settings 已更新。
 
+2026-10-16 增量：[代管方案研究](serving-plans.md) 只增加首頁 alias 與每個固定結果的 `serving-plans.json`、`plan-research.json`、`plan-view.json`。registry 的相對研究 locator 先驗證，再讀同版 Git bytes 並核對 SHA；manifest 綁定三份 sidecar，供應商頁共用其完整結果 view。原始研究路徑不直接加入網站。五個 scope 都可讀 BytePlus 研究，沒有第六個 family tab；原始 result/report 不改。
+
+Pages 在現有 deploy 成功後，以相同權限讀取固定 product/results commit，使用 build 已驗證的正式結果 locator 對實際 `page_url` 執行 `scripts/verify_site.py --expected-site-product … --personal-policy bridge/personal-cp-policy.json --require-serving-plans`。查驗 sidecar hashes、重新計算 view、五個 scope 的 360／390／1280px 與 JS／no-JS；保存原 manifest bytes、其 SHA、product/publication/result/serving hashes 與實際 Chromium 版本於 runner 暫存證據。沒有變更 trigger、權限、environment 或部署門檻，也沒有發布 screenshots。建置成功與真正公開驗收仍分開。
+
 2026-10-07最新增量：新正式request v3／result v4允許Claude推薦，網站新增四種訂閱專屬階梯及view/hash；以同版 [供應商契約](provider-ladders.md) 為準，下方v2/v3僅是相容歷史。allowlist另增加每個固定結果與首頁alias的四家`providers/<key>/index.html`、`view.json`、`manifest.json`。首頁要求新v4，不讓舊資格結果代替。
 
 本網站沿用 Python bridge／靜態單檔 HTML。選型、來源取得及歷史精確 schema 保留；新版倍率使用request v2／result v3，見[倍率契約](subscription-factors.md)，瀏覽器只做文字搜尋與展開；JavaScript 關閉仍可讀兩入口、階梯與全部候選。

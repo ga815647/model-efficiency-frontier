@@ -1,8 +1,11 @@
 """Chat can update a table without weakening the result/source contracts."""
 from copy import deepcopy
+from contextlib import redirect_stdout
+import io
 import json
 from pathlib import Path
 import unittest
+import tempfile
 
 from bridge.cost_policy import validate_policy, validate_source_parameters
 from bridge.subscription_cost import factor_for
@@ -57,6 +60,18 @@ class CostPolicyTests(unittest.TestCase):
             self.assertEqual(factor_for(row, PARAMS), expected, identity)
             row.update(pricing_plan='Contributor', provider='Meta')
             self.assertEqual(factor_for(row, PARAMS),1)
+
+    def test_check_also_validates_adjacent_serving_research_hash(self):
+        from bridge.cost_policy import main
+        root=Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as d:
+            bridge=Path(d)/'bridge';bridge.mkdir()
+            (bridge/'site-policy.json').write_text(json.dumps(self.policy()))
+            registry=json.loads((root/'bridge/serving-plans.json').read_bytes())
+            (bridge/'serving-plans.json').write_text(json.dumps(registry))
+            target=Path(d)/registry['research']['path'];target.parent.mkdir();target.write_bytes(b'{}')
+            with self.assertRaisesRegex(ValueError,'serving_research_hash_mismatch'),redirect_stdout(io.StringIO()):
+                main(['check','--policy',str(bridge/'site-policy.json')])
 
 
 if __name__ == '__main__': unittest.main()

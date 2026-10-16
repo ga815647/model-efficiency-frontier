@@ -1,0 +1,10 @@
+# Serving-plan registry implementation plan
+
+The accepted scope adds BytePlus research without changing the strict calculation contracts or acquiring new model data. Implementation uses the existing Python/static-site architecture and TDD.
+
+1. Add failing tests for unknown factors, each independent applicability gate, exact identity, provider/plan/route binding, date/terms validity, Contributor ×1, nonstacking and strict request/result compatibility. Implement pure validation, route evaluation and candidate deduplication.
+2. Save a versioned research sidecar distinguishing retrieved official facts from supplied historical claims. Register the 12 exact advertised aliases, Lite USD10/Pro USD50, and six potential fixed-snapshot matches. Pin the sidecar bytes by SHA-256; accept no BytePlus factor.
+3. Add failing site tests for pre-write validation, explicit sidecar allowlist, hash manifests, all five scopes, unchanged result/report bytes and unchanged source-exit placement. Integrate server-generated research views and native HTML disclosure; preserve optional builder arguments for existing fixtures.
+4. Extend Chromium regressions at 360/390/1280 with JavaScript enabled/disabled, five scopes, native disclosures, sidecar hashes, no overflow and no script errors. Extend the public verifier to independently reconstruct the plan view and record exact provenance.
+5. Extend the existing Pages deployment job after deployment to verify its actual URL using exact product/results commits and the build-selected result. Preserve all permissions, triggers, environment and deployment gates. Use the same pinned dependency versions as Product CI.
+6. Run `python3 -m bridge.cost_policy check`, `python3 -m unittest discover -s tests`, and the existing opt-in browser command. Where the selected execution environment denies browser sockets, report that limitation and use existing CI for browser execution without requesting grants or changing security settings. Source/history verification and publication acceptance remain separate evidence.

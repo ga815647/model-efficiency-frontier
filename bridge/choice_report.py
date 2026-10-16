@@ -3,7 +3,7 @@ from html import escape
 
 from .window_report import _context, _html, _metadata, _number, _source_exits, _tables, _upgrade
 
-WEBSITE_VERSION = '1.3.1'
+WEBSITE_VERSION = '1.4.0'
 BALANCED_RECOMMENDATION = '能力與成本平衡推薦'
 
 CSS = '''
@@ -135,11 +135,76 @@ def _personal_card(view, scope):
             + '每次新計算重新選擇，不自動沿用。</p></details></article>')
 
 
+def _serving_plans(view, research):
+    if view is None:
+        return ''
+    labels={'confirmed':'已確認','potential':'可能／待確認','conflicting':'來源衝突','historical':'歷史資料'}
+    gates={'owner_accepted_factor':'使用者接受的倍率','owner_accepted_terms':'使用者明確接受條款',
+           'scenario_current':'情境有效日期','current_research':'當期研究','provider_plan_route':'供應商／方案／route',
+           'exact_identity':'精確候選身份','confirmed_route':'已確認對應路徑','alias':'精確 alias','version':'版本',
+           'effort':'effort','quantization':'量化','region':'地區','use_case':'用途','current_terms':'當期條款',
+           'contributor_fixed_factor':'Contributor 固定 ×1'}
+    active=[r for candidate in view['candidates'] for r in candidate['routes'] if not r['pending_gates']]
+    plans=[]
+    for plan in view['plans']:
+        applicable=[r for r in active if r['plan_id']==plan['id']]
+        factor=plan['factor']
+        factor_note=(f'已驗證適用的假設情境 ×{_number(applicable[0]["factor"])}；不是公開 API 售價。' if applicable else
+            f'已接受情境 ×{_number(factor["value"])}；適用門檻尚待通過。' if factor and factor['accepted_by_owner'] else
+            '倍率：待確認；不由月費或配額推定。')
+        plans.append(f'<article data-serving-plan="{_html(plan["id"])}"><h3>{_html(plan["label"])}</h3>'
+            f'<p>{_html(plan["currency"])} <strong>${_number(plan["monthly_price"])}</strong>／月（標準價）</p>'
+            f'<p>{factor_note}</p></article>')
+    aliases=''.join(f'<li data-advertised-alias><code>{_html(r["alias"])}</code> · 模型原廠 {_html(r["model_owner"])}</li>'
+                    for r in view['advertised_routes'])
+    candidates=[]
+    for row in view['candidates']:
+        pending=sorted({g for r in row['routes'] for g in r['pending_gates']})
+        classification='已驗證適用的假設情境' if row['label']=='confirmed' else '可能對應'
+        scenarios=''.join(f'<p data-plan-scenario>{_html(r["plan_id"])} · 假設情境 ×{_number(r["factor"])}'
+            f' · Cost_adj ${_number(r["cost_adj"])}／任務 · CP_adj {_number(r["cp_adj"])}</p>'
+            for r in row['routes'] if not r['pending_gates'])
+        candidates.append(f'<li data-plan-candidate><strong>{_html(row["model"])} · {_html(row["effort"])}</strong>'
+            f'<p>{classification}；共用 {_html(" / ".join(row["plan_ids"]))}，只計一個候選。</p>'
+            f'<p>原 API 成本 ${_number(row["api_cost_per_task"])}／任務 · 原 API CP {_number(row["api_cp"])}</p>'
+            +scenarios+(f'<p>其他適用門檻待確認：{_html("、".join(gates[g] for g in pending))}</p>' if pending else '')
+            + ''.join('<p class="note">'+_html(reason)+'</p>' for reason in row['reasons'])+'</li>')
+    sources={s['id']:s for s in research['sources']}
+    findings=[]
+    for finding in research['findings']:
+        citations='、'.join(f'<a href="{escape(sources[s]["url"],quote=True)}">{_html(s)}'
+            f'（{_html(sources[s]["updated_at"])}；'
+            + ('已讀官方來源' if sources[s]['verification']=='retrieved_official' else '使用者提供，未重新取得')
+            + '）</a>' for s in finding['source_ids'])
+        findings.append(f'<li><span class="badge">{labels[finding["label"]]}</span> {_html(finding["text"])}'
+                        f'<p class="note">{citations}</p></li>')
+    status='已驗證適用的假設情境；原階梯仍採既有情境' if view['numeric_benefit_applied'] else '研究中 · 尚未套用數值優惠'
+    acceptance=('已接受的倍率仍須逐路徑驗證當期適用性。' if any(p['factor'] and p['factor']['accepted_by_owner'] for p in view['plans'])
+                else '目前沒有使用者接受的 BytePlus 倍率。')
+    return ('<section id="serving-plans" class="panel" aria-label="代管方案研究"><h2>BytePlus ModelArk Coding Plan</h2>'
+        f'<p data-plan-status><strong>{status}</strong></p>'
+        '<p>模型原廠與代管供應商不同。這份跨模型代管方案研究不代表本分頁訂閱支援這些模型；既有推薦與倍率維持原情境。</p>'
+        '<div class="provider-cards">'+''.join(plans)+'</div>'
+        f'<p>本次快照可能對應 {view["potential_candidate_count"]} 個候選（Lite／Pro 共用、只計一次）。'
+        f'已驗證適用的假設情境候選 {view["confirmed_candidate_count"]} 個。'
+        '精確版本、effort、量化、地區、coding用途與當期條款都須各自驗證；接受倍率或 alias 不能略過其他門檻。</p>'
+        f'<p class="note">{acceptance}不推定 Personal 的機密資料適用性，不代替使用者接受條款。</p>'
+        '<details data-plan-research><summary>查看已確認支援、可能對應與研究來源</summary>'
+        '<h3>已確認：官方列出的 alias</h3><p>此清單僅確認 advertised support；不是精確後端與快照身份等同。</p><ul>'
+        +aliases+'</ul><h3>可能對應：本次快照</h3><ul>'
+        +(''.join(candidates) if candidates else '<li>本次快照沒有登錄的可能對應候選；不新增或借用其他模型分數。</li>')
+        +'</ul><h3>價格、配額與條款證據</h3><ul>'+''.join(findings)+'</ul>'
+        +f'<p class="note">研究版本 {_html(research["research_id"])} · 查證日期 {_html(research["as_of"])}。'
+        '研究與 registry 的精確 SHA-256 見本站發布 manifest。</p></details></section>')
+
+
 def render_html(calculation, *, observations=(), links=(), provider_links=(), provider=None, provider_views=None,
-                personal_cp=None):
+                personal_cp=None, plan_view=None, plan_research=None):
     from .provider_view import PROVIDERS
     all_eligible=calculation.get('eligibility_policy')=='all-providers-v1'
     provider_name=PROVIDERS.get(provider)
+    plan_section=_serving_plans(plan_view,plan_research)
+    plan_nav='<a href="#serving-plans">BytePlus 方案研究</a>' if plan_view else ''
     heading=f'{provider_name} 訂閱，<br>模型與檔位怎麼選？' if provider_name else '模型怎麼選？<br>先看這兩個入口。'
     if personal_cp and not provider_name:
         heading='模型怎麼選？<br>先看這三個入口。'
@@ -219,7 +284,7 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
 <meta name="description" content="{description}">
 <title>模型效率前線｜模型怎麼選</title><style>{CSS}</style></head><body>
 <a class="skip" href="#recommendations">跳到推薦</a><main>
-<nav aria-label="頁面導覽"><a href="#recommendations">先看結論</a><a href="#ladder">推薦階梯</a><a href="#lookup">查模型</a><a href="#calculation">計算與來源</a></nav>
+<nav aria-label="頁面導覽"><a href="#recommendations">先看結論</a><a href="#ladder">推薦階梯</a><a href="#lookup">查模型</a>{plan_nav}<a href="#calculation">計算與來源</a></nav>
 <header><p class="eyebrow">MODEL EFFICIENCY FRONTIER</p><h1>{heading}</h1>
 <p class="intro">{directions}依照你的任務比較每一檔的差異。</p>
 <div class="stamp"><span>來源日期：{_html(', '.join(calculation['source_dates']))}</span><span>{_html(operation)} · {operation_note}</span></div>
@@ -235,6 +300,7 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
 <p id="search-empty" hidden>本次來源沒有觀測到符合查詢的模型與 effort。這不代表模型太差、已退役或不存在；試試完整名稱，或查看其他 effort。</p>
 <details id="search-results"><summary>查看候選與來源狀態</summary><ul class="candidate-list">{''.join(_candidate(r) for r in calculation['candidate_statuses'])}{''.join(_observation(r) for r in observations)}</ul></details>
 <noscript><p>搜尋需要 JavaScript；你仍可展開全部候選、來源狀態及推薦細節。</p></noscript></section>
+{plan_section}
 <details id="calculation" class="panel audit"><summary>計算與來源 · 全候選稽核、selection_trace、GRADE-B 與版本</summary>
 <div class="source-meta">{metadata}</div>{''.join(audit)}<section><h2>來源與限制</h2><ul>{context}</ul></section><ul>{downloads}</ul></details>
 {exit_section}
