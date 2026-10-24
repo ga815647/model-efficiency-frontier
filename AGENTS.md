@@ -1,5 +1,7 @@
 # model-efficiency-frontier — workspace 規約
 
+**2026-10-24 Kimi 第一方訂閱方案研究增量（最新）**：按使用者新指示研究並增加 Kimi 方案；Plus USD19、Pro USD39、Max USD99、Ultra USD199（月繳），K3.1 Pro 於 10/23 發布；驗證研究見 `docs/kimi-plans.md`，payload `bridge/kimi-plans.json`（`factor: null`）。發布採獨立 hash/manifest 與公開 Pages 驗證，網站五個既有 scope 可看研究；Kimi 不冒充 BytePlus 等代管商、不增正式第五條訂閱階梯、未有可信月度 API-equivalent 用量前不捏造倍率。`bridge/site-policy.json` 正式四家 ×17／×3.6／×40／×5.2、Contributor×1、request v3／result v4、算法及歷史原義全不變。10/7 來源快照沒有 10/23 新 K3.1 Pro；未明確要求來源 refresh，不直接塞新分數入正式排名。產品變更須 PR／測試／review，合併與部署另驗。
+
 **2026-10-16 BytePlus 代管方案研究增量**：模型原廠與 serving provider／plan／route 分開；`bridge/serving-plans.json` 以 SHA-256 固定版本化研究 sidecar，網站以獨立 `plan-view.json`／manifest 呈現。Lite 標準 USD10／Pro USD50，只有已確認 advertised alias 與可能快照對應；目前沒有使用者接受的 BytePlus 倍率，不改正式排名。未完整通過精確 alias、版本、effort、量化、地區、coding用途、當期條款及明確接受門檻前，保留 API-only 成本／CP；接受倍率或 alias 不可略過其他門檻，不推定 Personal 的機密資料適用性或代為接受條款。四家既有倍率、Contributor×1、七欄 request v3／result v4、全部輸入與歷史結果維持。五個網站 scope 都可見研究，來源退出完整清單仍只在全部頁最後。詳見 [代管方案契約](docs/serving-plans.md)。此為重新實作，不宣稱復原遺失的本地候選；發布／部署狀態以獨立驗收紀錄為準。
 
 **2026-10-07 個人主力 CP 最新規則**：每次新計算先明示選標竿 identity 與容許 EPS 倍數，不沿用前次選擇；本次已接受 Sol XHIGH／1×score EPS，不重問。門檻為標竿當次分數 − 倍數×當次 score EPS，`score >= 門檻`、無上限，在完整可用且符合既有 floor/cap 的推薦候選選 CP_adj 最高者，平手依分數高／成本低／identity；綜合與四家共用門檻，沒有達標者從缺。EPS 在此是個人容許值，不是 AA 統計誤差。這是獨立個人 view，不改 LADDER／anchors／upgrade／七欄 request v3／result v4 或歷史資料。選擇綁精確結果 path＋SHA，經產品 PR 保存、同版來源／publication 驗證後部署，不硬編碼分數或勝者。完整新增流程與 allowlist 以同版 [docs/personal-cp.md](docs/personal-cp.md) 為準。
