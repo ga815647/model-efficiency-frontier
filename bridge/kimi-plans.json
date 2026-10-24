@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "research_id": "kimi-international-membership-2026-10-24-v1",
+  "as_of": "2026-10-24",
+  "region": "international",
+  "currency": "USD",
+  "pricing_capture_date": "2026-10-19",
+  "factor": null,
+  "factor_basis": "insufficient_api_equivalent_quota_evidence",
+  "factor_formula": "monthly API-equivalent spending on text/reasoning/coding/agent model compute / monthly subscription fee",
+  "model": {
+    "name": "Kimi K3.1 Pro",
+    "released_on": "2026-10-23",
+    "benchmark": "Artificial Analysis Intelligence Index",
+    "benchmark_score": 55,
+    "api_usd_per_million_input_tokens": 2,
+    "api_usd_per_million_output_tokens": 10,
+    "thinking_levels": [
+      "low",
+      "high",
+      "max"
+    ]
+  },
+  "plans": [
+    {
+      "id": "kimi-plus",
+      "label": "Plus",
+      "monthly_usd": 19,
+      "annual_total_usd": 180,
+      "annual_monthly_equivalent_usd": 15,
+      "relative_agent_credits": 1,
+      "context_tokens": 262144,
+      "highspeed": false,
+      "kimi_code": true
+    },
+    {
+      "id": "kimi-pro",
+      "label": "Pro",
+      "monthly_usd": 39,
+      "annual_total_usd": 372,
+      "annual_monthly_equivalent_usd": 31,
+      "relative_agent_credits": 2,
+      "context_tokens": 1000000,
+      "highspeed": true,
+      "kimi_code": true
+    },
+    {
+      "id": "kimi-max",
+      "label": "Max",
+      "monthly_usd": 99,
+      "annual_total_usd": 948,
+      "annual_monthly_equivalent_usd": 79,
+      "relative_agent_credits": 5,
+      "context_tokens": 1000000,
+      "highspeed": true,
+      "kimi_code": true
+    },
+    {
+      "id": "kimi-ultra",
+      "label": "Ultra",
+      "monthly_usd": 199,
+      "annual_total_usd": 1908,
+      "annual_monthly_equivalent_usd": 159,
+      "relative_agent_credits": 10,
+      "context_tokens": 1000000,
+      "highspeed": true,
+      "kimi_code": true
+    }
+  ],
+  "quotas": {
+    "rolling_five_hour_window": true,
+    "weekly_limit_new_plans": false,
+    "monthly_shared_pool": true,
+    "published_api_equivalent_budget_usd": null
+  },
+  "sources": [
+    {
+      "id": "price",
+      "url": "https://www.kimi.ai/help/membership/membership-pricing",
+      "checked_date": "2026-10-24",
+      "verification": "retrieved_official",
+      "note": "International pricing table, captured 2026-10-19, distinguishes recurring monthly and prepaid annual prices; Kimi Code shares monthly credit pool."
+    },
+    {
+      "id": "benefits",
+      "url": "https://www.kimi.ai/help/membership/membership-overview",
+      "checked_date": "2026-10-24",
+      "verification": "retrieved_official",
+      "note": "Plus/Pro/Max/Ultra relative Agent credits 1/2/5/10x are not API-equivalent quotas."
+    },
+    {
+      "id": "code",
+      "url": "https://www.kimi.com/code/docs/en/kimi-code/membership.html",
+      "checked_date": "2026-10-24",
+      "verification": "retrieved_official",
+      "note": "New plans remove weekly limit, keep rolling five-hour and monthly shared caps; K3.1 access and Highspeed minimum tier."
+    },
+    {
+      "id": "model",
+      "url": "https://www.kimi.com/code/docs/en/kimi-code/whats-new.html",
+      "checked_date": "2026-10-24",
+      "verification": "retrieved_official",
+      "note": "K3.1 Pro release 2026-10-23; coding model supports low/high/max thinking, Pro+ unlocks Highspeed."
+    },
+    {
+      "id": "aa",
+      "url": "https://artificialanalysis.ai/models/kimi-k3-1-pro",
+      "checked_date": "2026-10-24",
+      "verification": "retrieved_public_benchmark",
+      "note": "AA Intelligence Index 55, API $2 input/$10 output per million tokens; separate later model/version, not old site's Oct 7 source."
+    }
+  ],
+  "limitations": [
+    "No independently verified monthly model-token/API-equivalent spend cap or representative full-quota measurement. A factor is unknown, not 1x or 2/5/10x.",
+    "Published Agent-credit ratios include multiple product features and cannot be interpreted as API-equivalent compute or stacked with an existing subscription factor.",
+    "Kimi Code and web features share monthly credits; limits change with usage, workload, platform and plan terms. API billing is separate.",
+    "Only text, reasoning, coding and agent-model compute counts toward this project's eventual factor. Exclude cloud/storage, image/video/3D, non-model extras and separate API credits.",
+    "The 2026-10-07 verified model snapshot predates K3.1 Pro's 2026-10-23 release. Do not inject its AA score into that snapshot, historical results, provider ladders or rankings.",
+    "International public prices may vary at checkout due to locale, taxes, promotions or grandfathered legacy plan rules."
+  ]
+}
