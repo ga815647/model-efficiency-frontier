@@ -1,5 +1,7 @@
 # 模型效率前線｜Chat 日常指示
 
+**2026-10-24 Kimi 訂閱增量**：使用者要求新增 Kimi plan，研究導入於 `bridge/kimi-plans.json` 與 `docs/kimi-plans.md`；國際版 Plus/Pro/Max/Ultra 月費 USD19/39/99/199，K3.1 Pro 10/23 發布。Agent credits 比例不是 API-equivalent 本專案倍率，現 `factor:null`，不改正式 `bridge/site-policy.json` 四家係數、request v3／result v4，亦不宣稱 Kimi 已可獨立推薦。Pages 五 scope 只展示來源綁定研究，新 K3.1 Pro 不在 10/7 來源快照，除非另有明確 refresh 請求不可冒稱已列入階梯。執行產品 branch／PR、CI 與公開 Pages 獨立驗證；Git 更新不代表 Project Settings 更新。
+
 **2026-10-07 個人主力 CP 最新流程**：每次新計算先用已驗證來源列代表 identity／分數／score EPS，明示問本次標竿及容許幾個 EPS；pending 續查不重問，本次已接受 Sol XHIGH／1×EPS 亦不重問。門檻＝本次標竿分數 − 倍數×本次 EPS，完整可用推薦候選中達標者選 CP_adj 最高，無上限、四家共用門檻、無人達標從缺；這是個人容許分差，不是 AA 統計誤差。沿用 request v3／result v4，個人門檻不替代 LADDER floor。成功後把已選 identity／倍數及精確結果 path＋SHA 經獨立產品 PR 保存至 `bridge/personal-cp-policy.json`，Pages 發布獨立 view；摘要只讀本次 hash 核對的 view，不手推、硬編碼或承襲上輪主力。完整操作與錯誤處理以同版 [docs/personal-cp.md](docs/personal-cp.md) 為準，舊只讀 anchors 的要求仍適用客觀入口。Git 更新不表示 Settings 已更新。
 
 **2026-10-07 最新來源退出呈現政策（優先於下方較早位置規則）**：依使用者要求，網站與新產生的 HTML 將完整「本次來源退出」清單原樣放在全部供應商頁的最後、計算與來源之後；四家供應商分頁不重複整批清單，也不在計算展開區重複。單一模型的缺值／退出狀態及來源理由仍保留，成功 JSON caveats、原始證據與已保存的歷史報告不改寫；無退出不造空區。此為展示更新，不變更算法、倍率或資料來源。
