@@ -16,6 +16,7 @@ from bridge.cost_policy import validate_policy, validate_source_parameters
 from bridge.provider_view import PROVIDERS, calculate_provider_view, provider_for
 from bridge.personal_cp import calculate_personal_cp, validate_choices
 from bridge.serving_plan import calculate_plan_view, validate_bundle, validate_registry
+from bridge.kimi_plan import validate_kimi_research
 
 
 class SiteError(ValueError):
@@ -135,8 +136,9 @@ def _manifest(record, product, base_path):
 
 def write_site(records, output, *, formal_parameters, site_product_commit, base_path,
                formal_result_schema_version=None, personal_choices=None,
-               serving_registry=None, serving_research=None):
+               serving_registry=None, serving_research=None, kimi_research=None):
     validate_base_path(base_path)
+    kimi = validate_kimi_research(kimi_research) if kimi_research is not None else None
     registry = research = None
     if serving_registry is not None or serving_research is not None:
         if type(serving_registry) is not bytes or type(serving_research) is not bytes:
@@ -195,6 +197,14 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
             links.extend((('下載代管方案研究結果',manifest['serving_plans']['view_url']),
                           ('下載方案研究證據',manifest['serving_plans']['research_url']),
                           ('下載代管方案 registry',manifest['serving_plans']['registry_url'])))
+        if kimi is not None:
+            manifest['kimi_plans'] = dict(research_id=kimi['research_id'],
+                research_url=manifest['result_url']+'kimi-plans.json',
+                research_sha256=hashlib.sha256(kimi_research).hexdigest())
+            files[path+'kimi-plans.json'] = kimi_research
+            if record is home:
+                files['kimi-plans.json'] = kimi_research
+            links.append(('下載 Kimi 訂閱方案研究', manifest['kimi_plans']['research_url']))
         views={}
         manifest['provider_views']={}
         provider_links=[('all','全部供應商',manifest['result_url'])]+[(key,label,manifest['result_url']+f'providers/{key}/') for key,label in PROVIDERS.items()]
@@ -210,14 +220,14 @@ def write_site(records, output, *, formal_parameters, site_product_commit, base_
             scoped_page=render_html(view['calculation'],observations=[r for r in record['observations'] if provider_for(r)==key],
                 links=links+[('下載供應商專屬結果',manifest['provider_views'][key]['view_url'])],
                 provider_links=provider_links,provider=key,personal_cp=personal,
-                plan_view=plan_view,plan_research=research).encode()
+                plan_view=plan_view,plan_research=research,kimi_plans=kimi).encode()
             scoped_files={'index.html':scoped_page,'view.json':raw,'manifest.json':(json.dumps(scoped_manifest,ensure_ascii=False,indent=2)+'\n').encode()}
             files.update({path+f'providers/{key}/'+name:data for name,data in scoped_files.items()})
             if record is home:
                 files.update({f'providers/{key}/'+name:data for name,data in scoped_files.items()})
         page = render_html(envelope, observations=record['observations'], links=links,
                            provider_links=provider_links,provider_views={k:v[0] for k,v in views.items()},
-                           personal_cp=personal,plan_view=plan_view,plan_research=research).encode()
+                           personal_cp=personal,plan_view=plan_view,plan_research=research,kimi_plans=kimi).encode()
         manifest_bytes = (json.dumps(manifest, ensure_ascii=False, indent=2)+'\n').encode()
         files.update({path+'index.html':page, path+'result.json':record['result_bytes'],
                       path+'report.html':record['report_bytes'], path+'manifest.json':manifest_bytes})
@@ -269,11 +279,14 @@ def build_site(repository, results_commit, output, *, base_path, expected_run=No
         registry = validate_registry(_json(serving_registry))
         serving_research = _read(repo,product,registry['research']['path'])
         validate_bundle(serving_registry,serving_research)
+    kimi_research = (_read(repo,product,'bridge/kimi-plans.json')
+                     if _has_file(repo,product,'bridge/kimi-plans.json') else None)
     return write_site(records,output,formal_parameters=policy['formal_parameters'],
                       site_product_commit=product,base_path=base_path,formal_result_schema_version=version,
                       personal_choices=(_json(_read(repo,product,'bridge/personal-cp-policy.json'))
                                         if _has_file(repo,product,'bridge/personal-cp-policy.json') else None),
-                      serving_registry=serving_registry,serving_research=serving_research)
+                      serving_registry=serving_registry,serving_research=serving_research,
+                      kimi_research=kimi_research)
 
 
 def main(argv=None):

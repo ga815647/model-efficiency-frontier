@@ -1,5 +1,7 @@
 # Serving plans and BytePlus research
 
+2026-10-24 補充：Kimi 是模型原廠的第一方訂閱，新增的 [Kimi 訂閱研究](kimi-plans.md)／`bridge/kimi-plans.json` 與本文件的 BytePlus *serving provider/route* 研究分離。Kimi `factor:null`，只顯示獨立來源／價目與條件，不改 BytePlus registry、原始候選、正式階梯或四家倍率。
+
 This registry reconstruction adds a serving provider/plan/route layer beside model ownership. It does not recover or reuse the lost local candidate. Existing GPT ×17, Gemini ×3.6, Claude ×40 and Grok ×5.2 scenarios remain `user_specified`; Contributor remains ×1. Request v3 keeps seven parameters, result v4 and saved inputs/results/reports remain unchanged.
 
 `bridge/serving-plans.json` identifies providers, plans, exact advertised aliases, and potential snapshot matches. It pins the versioned research sidecar by SHA-256. Research distinguishes retrieved official facts from supplied historical observations. Aliases are evidence of advertised support, not proof of an exact backend, effort, or quantization. Lite and Pro share candidate opportunities; a shared candidate is counted once.

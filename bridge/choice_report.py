@@ -3,7 +3,7 @@ from html import escape
 
 from .window_report import _context, _html, _metadata, _number, _source_exits, _tables, _upgrade
 
-WEBSITE_VERSION = '1.4.0'
+WEBSITE_VERSION = '1.5.0'
 BALANCED_RECOMMENDATION = '能力與成本平衡推薦'
 
 CSS = '''
@@ -135,6 +135,56 @@ def _personal_card(view, scope):
             + '每次新計算重新選擇，不自動沿用。</p></details></article>')
 
 
+
+def _kimi_plans(research):
+    """Display new first-party memberships without inferring a subscription multiplier."""
+    if research is None:
+        return ''
+    cards=[]
+    for plan in research['plans']:
+        speed='K3.1 Pro Highspeed 可用' if plan['highspeed'] else 'K3.1 Pro 標準速度'
+        cards.append(
+            f'<article data-kimi-plan="{_html(plan["id"])}">'
+            f'<h3>{_html(plan["label"])}</h3>'
+            f'<p>USD <strong>${_number(plan["monthly_usd"])}</strong>／月（按月付）</p>'
+            f'<p>年繳 USD ${_number(plan["annual_total_usd"])}'
+            f'，相當於每月 ${_number(plan["annual_monthly_equivalent_usd"])}（一次收全年）</p>'
+            f'<p>Kimi Code：{_html(speed)}；context 最高 {plan["context_tokens"]:,} tokens。</p>'
+            f'<p class="note">官方 Agent credits 相對 Plus 為 '
+            f'{_number(plan["relative_agent_credits"])}×，並非 API-equivalent 倍率。</p></article>')
+    m=research['model']
+    sources=''.join(
+        f'<li><a href="{escape(s["url"],quote=True)}">{_html(s["id"])}</a>'
+        f' · {_html(s["verification"])} · 查證 {_html(s["checked_date"])}'
+        f'<p class="note">{_html(s["note"])}</p></li>'
+        for s in research['sources'])
+    limitations=''.join(f'<li>{_html(x)}</li>' for x in research['limitations'])
+    return (
+        '<section id="kimi-plans" class="panel" aria-label="Kimi 訂閱方案研究">'
+        '<h2>Kimi 訂閱方案與 K3.1 Pro</h2>'
+        '<p data-kimi-status><strong>研究中 · 倍率未知，不進正式 LADDER 倍率或排名</strong></p>'
+        '<p>這是 Kimi 第一方國際版訂閱，與 BytePlus 代管方案分開。'
+        '方案額度不等於 API 折扣；既有四家推薦、成本與舊結果完全不變。</p>'
+        f'<p>新模型：<strong>{_html(m["name"])}</strong> · {_html(m["released_on"])} 發布。'
+        f'Artificial Analysis Index <strong>{_number(m["benchmark_score"])}</strong> 分'
+        '（新版公開資料，不能混入 2026-10-07 固定快照）。'
+        f'API 定價 USD ${_number(m["api_usd_per_million_input_tokens"])} 輸入／'
+        f'${_number(m["api_usd_per_million_output_tokens"])} 輸出（各百萬 tokens）。'
+        '這是 API 價格，不是訂閱的每任務實際費用。</p>'
+        '<div class="provider-cards">'+''.join(cards)+'</div>'
+        '<p>新方案 Kimi Code 有滾動五小時限額及每月共享額度，'
+        '沒有舊方案的每週限額；月度 API-equivalent 可用運算尚未獨立驗證。</p>'
+        '<p class="note">訂閱倍率＝每月文字／推理／coding／agent 模型運算 API-equivalent 費用 ÷ 訂閱月費。'
+        '官方所寫 Agent credits 的 2×／5×／10× 不能代入這條公式。</p>'
+        '<details data-kimi-research><summary>展開證據、公式與限制</summary>'
+        f'<p>研究編號 {_html(research["research_id"])} · '
+        f'查證 {_html(research["as_of"])} · 價格截圖 {_html(research["pricing_capture_date"])}。'
+        f'倍率狀態：{_html(research["factor_basis"])}。</p>'
+        f'<p>公式：{_html(research["factor_formula"])}</p>'
+        '<h3>官方文件與基準連結</h3><ul>'+sources+'</ul>'
+        '<h3>限制</h3><ul>'+limitations+'</ul></details></section>')
+
+
 def _serving_plans(view, research):
     if view is None:
         return ''
@@ -199,11 +249,13 @@ def _serving_plans(view, research):
 
 
 def render_html(calculation, *, observations=(), links=(), provider_links=(), provider=None, provider_views=None,
-                personal_cp=None, plan_view=None, plan_research=None):
+                personal_cp=None, plan_view=None, plan_research=None, kimi_plans=None):
     from .provider_view import PROVIDERS
     all_eligible=calculation.get('eligibility_policy')=='all-providers-v1'
     provider_name=PROVIDERS.get(provider)
     plan_section=_serving_plans(plan_view,plan_research)
+    kimi_section=_kimi_plans(kimi_plans)
+    kimi_nav='<a href="#kimi-plans">Kimi 方案研究</a>' if kimi_plans else ''
     plan_nav='<a href="#serving-plans">BytePlus 方案研究</a>' if plan_view else ''
     heading=f'{provider_name} 訂閱，<br>模型與檔位怎麼選？' if provider_name else '模型怎麼選？<br>先看這兩個入口。'
     if personal_cp and not provider_name:
@@ -284,7 +336,7 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
 <meta name="description" content="{description}">
 <title>模型效率前線｜模型怎麼選</title><style>{CSS}</style></head><body>
 <a class="skip" href="#recommendations">跳到推薦</a><main>
-<nav aria-label="頁面導覽"><a href="#recommendations">先看結論</a><a href="#ladder">推薦階梯</a><a href="#lookup">查模型</a>{plan_nav}<a href="#calculation">計算與來源</a></nav>
+<nav aria-label="頁面導覽"><a href="#recommendations">先看結論</a><a href="#ladder">推薦階梯</a><a href="#lookup">查模型</a>{kimi_nav}{plan_nav}<a href="#calculation">計算與來源</a></nav>
 <header><p class="eyebrow">MODEL EFFICIENCY FRONTIER</p><h1>{heading}</h1>
 <p class="intro">{directions}依照你的任務比較每一檔的差異。</p>
 <div class="stamp"><span>來源日期：{_html(', '.join(calculation['source_dates']))}</span><span>{_html(operation)} · {operation_note}</span></div>
@@ -300,6 +352,7 @@ def render_html(calculation, *, observations=(), links=(), provider_links=(), pr
 <p id="search-empty" hidden>本次來源沒有觀測到符合查詢的模型與 effort。這不代表模型太差、已退役或不存在；試試完整名稱，或查看其他 effort。</p>
 <details id="search-results"><summary>查看候選與來源狀態</summary><ul class="candidate-list">{''.join(_candidate(r) for r in calculation['candidate_statuses'])}{''.join(_observation(r) for r in observations)}</ul></details>
 <noscript><p>搜尋需要 JavaScript；你仍可展開全部候選、來源狀態及推薦細節。</p></noscript></section>
+{kimi_section}
 {plan_section}
 <details id="calculation" class="panel audit"><summary>計算與來源 · 全候選稽核、selection_trace、GRADE-B 與版本</summary>
 <div class="source-meta">{metadata}</div>{''.join(audit)}<section><h2>來源與限制</h2><ul>{context}</ul></section><ul>{downloads}</ul></details>

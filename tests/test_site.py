@@ -119,6 +119,56 @@ class SiteTests(unittest.TestCase):
             self.assertFalse((output/'bridge').exists())
         self.assertEqual(record,original)
 
+    def test_kimi_research_is_hash_bound_visible_in_all_five_scopes_and_not_ranked(self):
+        from bridge.kimi_plan import validate_kimi_research
+        root=Path(__file__).resolve().parents[1]
+        raw=(root/'bridge/kimi-plans.json').read_bytes()
+        study=validate_kimi_research(raw)
+        record=self.record()
+        original=deepcopy(record)
+        fixed=f'results/{record["envelope"]["request_id"]}/123-1/'
+        with tempfile.TemporaryDirectory() as d:
+            output=Path(d)/'site'
+            manifest=site.write_site([record],output,formal_parameters=PARAMETERS,
+                site_product_commit='d'*40,base_path='/demo/',kimi_research=raw)
+            entry=manifest['kimi_plans']
+            self.assertEqual(entry['research_id'],study['research_id'])
+            self.assertEqual(entry['research_sha256'],hashlib.sha256(raw).hexdigest())
+            self.assertEqual(entry['research_url'],'/demo/'+fixed+'kimi-plans.json')
+            self.assertEqual((output/'kimi-plans.json').read_bytes(),raw)
+            self.assertEqual((output/fixed/'kimi-plans.json').read_bytes(),raw)
+            self.assertEqual(manifest['parameters'],record['envelope']['parameters'])
+            for scope in ('all','gpt','gemini','claude','grok'):
+                prefix='' if scope=='all' else f'providers/{scope}/'
+                page=(output/prefix/'index.html').read_text()
+                self.assertIn('id="kimi-plans"',page)
+                self.assertIn('倍率未知，不進正式 LADDER',page)
+                self.assertIn('不能混入 2026-10-07 固定快照',page)
+                self.assertEqual(page.count('data-kimi-plan='),4)
+                self.assertEqual(page.count('data-provider='),5)
+                self.assertLess(page.index('id="kimi-plans"'),page.index('id="calculation"'))
+                scoped=json.loads((output/prefix/'manifest.json').read_bytes())
+                self.assertEqual(scoped['kimi_plans'],entry)
+            self.assertEqual((output/fixed/'result.json').read_bytes(),record['result_bytes'])
+            self.assertEqual((output/fixed/'report.html').read_bytes(),record['report_bytes'])
+            self.assertFalse((output/'bridge').exists())
+        self.assertEqual(record,original)
+
+    def test_invalid_kimi_research_fails_before_writing(self):
+        root=Path(__file__).resolve().parents[1]
+        raw=(root/'bridge/kimi-plans.json').read_bytes()
+        data=json.loads(raw);data['factor']=99
+        altered=(json.dumps(data)+'\n').encode()
+        for payload in (altered,b'not-json',b'{}',None):
+            if payload is None:
+                continue  # absence is explicitly optional for old offline fixtures
+            with tempfile.TemporaryDirectory() as d:
+                output=Path(d)/'site'
+                with self.assertRaises(ValueError):
+                    site.write_site([self.record()],output,formal_parameters=PARAMETERS,
+                        site_product_commit='d'*40,base_path='/demo/',kimi_research=payload)
+                self.assertFalse(output.exists())
+
     def test_invalid_serving_registry_or_research_fails_before_any_write(self):
         root=Path(__file__).resolve().parents[1]
         raw=(root/'bridge/serving-plans.json').read_bytes()

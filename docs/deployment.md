@@ -1,5 +1,7 @@
 # GitHub Pages 展示與交付契約
 
+**2026-10-24 Kimi 研究展示增量**：首次發布 Kimi 第一方方案研究時，站點在五個原 scope 加入 `#kimi-plans` 研究區，`manifest.kimi_plans` 鎖定 allowlisted `kimi-plans.json` 精確 SHA-256 與研究 ID；公開驗證須核對產品 checkout 原始 bytes，首頁／固定頁／四分頁及 360／390／1280px 顯示。新增 `--require-kimi-plans` 於正式 Pages 驗收，無效或缺 sidecar 不得宣稱部署完成。這不產生第 5 條模型家族階梯、不改 LADDER、原結果及正式倍率。
+
 2026-10-07 個人主力增量：已驗證成功結果可按明示選擇另發布 `personal-cp.json`，只在該固定結果目錄加入 allowlist，manifest 記 URL／SHA-256、五頁共用同一 view；不改原結果／報告／provider-ladder。選擇綁 result path／hash，不自動沿用至新計算。產品 CI／publication review／main-results consistency gates 維持。保存、Chat 操作與精確部署版本驗收見同版 [personal-cp.md](personal-cp.md)。
 
 **2026-10-07 產品發布與重跑修正**：正式 Pages 除成功計算外，也在同庫 main 的 Product CI（push）通過後自動建置部署；PR、fork、失敗或已落後 main 的 CI 不可觸發產品發布，產品 checkout 固定為通過 CI 的完整 SHA。Chat execution 仍核對獨立 request/run/attempt，產品 CI 不冒充新計算。build 產生 `github-pages-<run_id>-<build_attempt>` 名稱並以 job output 傳給官方 upload/deploy action；只重跑 deploy 仍使用成功 build 的原 artifact，重跑 build 則產生新名稱，避免同名歧義及 attempt 漂移；不刪舊 artifacts 或歷史證據。deploy 前另以 contents:read 讀回 main／results refs，必須等於成功 build 固定的產品／results tip；較舊 artifact 不可透過 deploy-only 重跑蓋掉新產品或結果。所有來源／結果驗證、其餘最小權限及正式情境門檻維持。

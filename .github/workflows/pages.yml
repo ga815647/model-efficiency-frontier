@@ -186,4 +186,4 @@ jobs:
             --expected-json "verified-results/$FORMAL_RESULT_PATH" \
             --expected-site-product "$SITE_PRODUCT" \
             --personal-policy bridge/personal-cp-policy.json --require-serving-plans \
-            --output "$RUNNER_TEMP/public-site-verification"
+            --require-kimi-plans --output "$RUNNER_TEMP/public-site-verification"
