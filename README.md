@@ -1,5 +1,7 @@
 # Model Efficiency Frontier
 
+**2026-10-24 Kimi 訂閱方案研究**：新增 [Kimi Plus／Pro／Max／Ultra 與 K3.1 Pro 的來源核對](docs/kimi-plans.md)，正式月費 USD19／39／99／199；官方 Agent credits 相對額度不可冒充本專案 API-equivalent 倍率，目前尚無獨立可驗的 Kimi 倍率。網站以獨立 hash-bound `kimi-plans.json` 在首頁與四家分頁展示研究，原四家 LADDER 與 `bridge/site-policy.json` 不變。K3.1 Pro 於 10/23 發布，未包含在 10/7 舊模型快照；未 refresh 不能把新 AA 分數混入。合併、正式部署與匿名驗收狀態另查 CI 與 Pages，不因文件更新宣稱已上線。
+
 **2026-10-16 BytePlus ModelArk 方案研究**：新增與模型原廠分開的代管供應商／方案／route registry，Lite／Pro 共用的可能快照候選只計一次。標準月費 USD10／USD50；目前沒有接受的 BytePlus 倍率，未通過精確身份、地區、用途及當期條款門檻前保留 API-only 成本，正式推薦與既有倍率不變。五個頁面都提供研究入口，manifest 綁定 registry、研究與獨立 view 的精確 SHA-256。[設計與操作契約](docs/serving-plans.md)；實際發布狀態另見驗收紀錄。
 
 **2026-10-07 能力與成本平衡推薦**：以本次選定標竿 − 容許倍數×score EPS 為共同能力門檻，達標的完整可用候選中選 CP_adj 最高；更高分可參選，四家無候選從缺。網站上方依序顯示能力最高、能力與成本平衡、情境成本最低；四家平衡摘要列出分數與每任務情境成本。同一模型可同時符合多個推薦方向。標竿／容許值逐次選擇並綁精確結果，與原客觀 LADDER 並列。這是個人容許分差，不是 AA 統計誤差；[操作與驗收契約](docs/personal-cp.md)。
