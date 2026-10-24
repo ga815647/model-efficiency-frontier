@@ -45,8 +45,23 @@ def validate_serving_payloads(manifest, expected, registry_raw, research_raw, vi
     return view
 
 
+def validate_kimi_payload(manifest, raw, *, trusted_raw=None):
+    """Reject coherent but untrusted changes to publicly published research."""
+    from bridge.kimi_plan import validate_kimi_research
+    if trusted_raw is None:
+        trusted_raw=(Path(__file__).resolve().parents[1]/'bridge/kimi-plans.json').read_bytes()
+    study=validate_kimi_research(trusted_raw)
+    assert raw==trusted_raw, 'trusted_kimi_research'
+    entry=manifest['kimi_plans']
+    assert set(entry)=={'research_id','research_url','research_sha256'}
+    assert entry['research_id']==study['research_id']
+    assert entry['research_url']==manifest['result_url']+'kimi-plans.json'
+    assert hashlib.sha256(raw).hexdigest()==entry['research_sha256']
+    return study
+
+
 def verify_site(url, expected, output, *, expected_site_product=None, personal_policy=None,
-                require_serving_plans=False):
+                require_serving_plans=False, require_kimi_plans=False):
     from playwright.sync_api import sync_playwright
     output=Path(output); output.mkdir(parents=True,exist_ok=True)
     root=url.rstrip('/')+'/'
@@ -65,6 +80,12 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
     assert hashlib.sha256(raw).hexdigest()==manifest['result_sha256']
     assert json.loads(urlopen(urljoin(fixed,'manifest.json')).read())==manifest
     assert not require_serving_plans or 'serving_plans' in manifest,'serving_plans_missing'
+    assert not require_kimi_plans or 'kimi_plans' in manifest,'kimi_plans_missing'
+    kimi=None
+    if 'kimi_plans' in manifest:
+        entry=manifest['kimi_plans']
+        kimi_raw=urlopen(urljoin(root,entry['research_url'])).read()
+        kimi=validate_kimi_payload(manifest,kimi_raw)
     serving=None
     if 'serving_plans' in manifest:
         entry=manifest['serving_plans']
@@ -139,6 +160,180 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
                     else:
                         assert '／任務' not in summary.inner_text()
 
+    def check_kimi_plans(page):
+        section=page.locator('#kimi-plans')
+        assert section.count()==int(kimi is not None),'kimi_section'
+        if kimi:
+            assert section.is_visible()
+            assert page.locator('nav [href="#kimi-plans"]').count()==1
+            assert section.locator('[data-kimi-plan]').count()==len(kimi['plans'])
+            assert '倍率未知，不進正式 LADDER' in section.text_content()
+            assert '不能混入 2026-10-07 固定快照' in section.text_content()
+            for plan in kimi['plans']:
+                card=section.locator(f'[data-kimi-plan="{plan["id"]}"]')
+                assert plan['label'] in card.inner_text()
+                assert '
+        section=page.locator('#serving-plans')
+        assert section.count()==int(serving is not None),'serving_section'
+        if serving:
+            assert section.is_visible()
+            assert page.locator('#provider-chooser a').count()==5
+            assert page.locator('nav [href="#serving-plans"]').count()==1
+            assert section.locator('[data-serving-plan]').count()==len(serving['plans'])
+            assert section.locator('[data-advertised-alias]').count()==len(serving['advertised_routes'])
+            assert section.locator('[data-plan-candidate]').count()==len(serving['candidates'])
+            text=section.text_content()
+            if not serving['numeric_benefit_applied']:
+                assert '尚未套用數值優惠' in text
+            for plan in serving['plans']:
+                card=section.locator(f'[data-serving-plan="{plan["id"]}"]')
+                assert plan['label'] in card.inner_text()
+                assert '$'+str(plan['monthly_price']) in card.inner_text()
+            for alias in serving['advertised_routes']:
+                assert alias['alias'] in text
+            assert research_check['research_id'] in text
+
+    research_check=json.loads(payloads[1]) if serving else None
+    evidence=[]
+    with sync_playwright() as p:
+        browser=p.chromium.launch()
+        browser_version=browser.version
+        for width in (360,390,1280):
+            page=browser.new_page(viewport={'width':width,'height':900})
+            errors=[]
+            page.on('pageerror',lambda e:errors.append(str(e)))
+            response=page.goto(root,wait_until='networkidle'); assert response.status==200
+            check_global_source_exits(page)
+            check_personal_cp(page)
+            check_serving_plans(page)
+            check_kimi_plans(page)
+            assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+            for key,row in expected['anchors'].items():
+                card=page.locator(f'[data-anchor="{key}"]')
+                if row:
+                    assert card.locator('.model-name').inner_text()==row['model']
+                    assert row['effort'] in card.locator('.effort').inner_text()
+                    assert card.locator('.metrics b').all_inner_texts()==[f'{row["score"]:.2f}',f'${row["cost_adj"]:.4f}']
+                else: assert '從缺' in card.inner_text()
+            formal=[r for r in expected['ladder'] if not r['comparison_only']]
+            rows=page.locator('#ladder > .table-wrap tbody tr')
+            assert rows.count()==len(formal)
+            for i,row in enumerate(formal):
+                assert rows.nth(i).locator('td strong').inner_text()==row['model']
+                assert rows.nth(i).locator('[data-label="能力分數"]').inner_text()==f'{row["score"]:.2f}'
+                assert rows.nth(i).locator('[data-label="情境成本"]').inner_text()==f'${row["cost_adj"]:.4f}'
+            page.screenshot(path=str(output/f'home-{width}.png'),full_page=True)
+            for query in ('Astra max','Sol max'):
+                page.locator('#model-search').fill(query)
+                assert page.locator('[data-search]:visible').count()>0,query
+                for candidate in page.locator('[data-search]:visible').all():
+                    assert all(t.lower() in candidate.get_attribute('data-search').lower() for t in query.split())
+            page.locator('#model-search').fill('unobserved-model-7c3c5')
+            assert page.locator('#search-empty').is_visible()
+            page.locator('#model-search').press('Escape');assert page.locator('#model-search').input_value()==''
+            summary=page.locator('#calculation > summary');summary.focus();summary.press('Enter')
+            assert page.locator('#calculation').get_attribute('open') is not None
+            assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+            assert not errors,errors
+            assert page.goto(fixed,wait_until='networkidle').status==200
+            check_global_source_exits(page)
+            check_personal_cp(page)
+            check_serving_plans(page)
+            check_kimi_plans(page)
+            highest=expected['anchors']['highest_retained_score']
+            assert page.locator('[data-anchor="highest_retained_score"] .model-name').inner_text()==(highest['model'] if highest else '從缺')
+            providers=[]
+            for key,entry in manifest.get('provider_views',{}).items():
+                view_raw=urlopen(urljoin(root,entry['view_url'])).read()
+                assert hashlib.sha256(view_raw).hexdigest()==entry['view_sha256']
+                view=json.loads(view_raw)
+                assert view['parent_result_sha256']==manifest['result_sha256']
+                assert view['parent_publication_commit']==manifest['publication_commit']
+                assert view['provider']==key and view['kind']=='provider-ladder'
+                for field in ('parameters','source_dates','request_id','run_id','run_attempt'):
+                    assert view['calculation'][field]==expected[field]
+                scoped_manifest=json.loads(urlopen(urljoin(root,entry['url']+'manifest.json')).read())
+                assert scoped_manifest['selection_scope']==key
+                assert scoped_manifest['provider_view_sha256']==entry['view_sha256']
+                if serving:
+                    assert scoped_manifest['serving_plans']==manifest['serving_plans']
+                if kimi:
+                    assert scoped_manifest['kimi_plans']==manifest['kimi_plans']
+                page.locator(f'#provider-chooser [data-provider="{key}"]').focus()
+                page.locator(f'#provider-chooser [data-provider="{key}"]').press('Enter')
+                page.wait_for_load_state('networkidle')
+                assert page.url==urljoin(root,entry['url'])
+                assert page.locator('#effort-filter').count()==0
+                assert page.locator('[data-selection-scope]').get_attribute('data-selection-scope')==key
+                check_provider_source_exits(page)
+                check_personal_cp(page,key)
+                check_serving_plans(page)
+                check_kimi_plans(page)
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+                for anchor,row in view['calculation']['anchors'].items():
+                    assert page.locator(f'[data-anchor="{anchor}"] .model-name').inner_text()==(row['model'] if row else '從缺')
+                page.screenshot(path=str(output/f'{key}-{width}.png'),full_page=True)
+                provider_url=page.url
+                assert page.goto(urljoin(root,f'providers/{key}/'),wait_until='networkidle').status==200
+                check_provider_source_exits(page)
+                check_personal_cp(page,key)
+                check_serving_plans(page)
+                check_kimi_plans(page)
+                providers.append(dict(provider=key,url=provider_url,view_sha256=entry['view_sha256'],anchors=True,overflow=False,source_exit_summary=False))
+            assert not errors,errors
+            evidence.append(dict(width=width,http_status=response.status,search=True,empty=True,keyboard=True,overflow=False,script_errors=errors,providers=providers,source_exits_at_end=True))
+            page.close()
+        for width in (360,390,1280):
+            page=browser.new_page(java_script_enabled=False,viewport={'width':width,'height':900})
+            errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+            assert page.goto(root).status==200
+            check_personal_cp(page);check_serving_plans(page);check_kimi_plans(page);check_global_source_exits(page)
+            assert page.locator('[data-anchor]').count()==2
+            assert page.locator('#ladder > .table-wrap tbody tr').count()==len(formal)
+            page.locator('#search-results > summary').click()
+            assert page.locator('[data-search]:visible').count()>=expected['candidate_count']
+            if serving:
+                page.locator('[data-plan-research] > summary').click()
+            assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+            for key in manifest.get('provider_views',{}):
+                assert page.goto(urljoin(root,f'providers/{key}/')).status==200
+                check_personal_cp(page,key);check_serving_plans(page);check_kimi_plans(page);check_provider_source_exits(page)
+                if serving:
+                    page.locator('[data-plan-research] > summary').click()
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+            assert not errors,errors
+            page.close()
+        browser.close()
+    result=dict(url=root,fixed_url=fixed,manifest=manifest,viewports=evidence,no_javascript=True,
+                personal_cp=personal,serving_plans=serving,kimi_plans=kimi,browser_version=browser_version,
+                manifest_sha256=hashlib.sha256(manifest_raw).hexdigest(),
+                site_product_commit=manifest['site_product_commit'],
+                publication_commit=manifest['publication_commit'],result_sha256=manifest['result_sha256'],
+                kimi_hash=(manifest['kimi_plans']['research_sha256'] if kimi else None),
+                serving_hashes=({key:manifest['serving_plans'][key] for key in
+                    ('registry_sha256','research_sha256','view_sha256')} if serving else None))
+    (output/'browser-evidence.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
+    return result
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--url',required=True)
+    parser.add_argument('--expected-json',type=Path,required=True)
+    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--expected-site-product')
+    parser.add_argument('--personal-policy',type=Path)
+    parser.add_argument('--require-serving-plans',action='store_true')
+    parser.add_argument('--require-kimi-plans',action='store_true')
+    args=parser.parse_args()
+    print(json.dumps(verify_site(args.url,json.loads(args.expected_json.read_bytes()),args.output,
+        expected_site_product=args.expected_site_product,
+        personal_policy=json.loads(args.personal_policy.read_bytes()) if args.personal_policy else None,
+        require_serving_plans=args.require_serving_plans,
+        require_kimi_plans=args.require_kimi_plans),ensure_ascii=False))
++str(plan['monthly_usd']) in card.inner_text()
+            assert kimi['research_id'] in section.text_content()
+
     def check_serving_plans(page):
         section=page.locator('#serving-plans')
         assert section.count()==int(serving is not None),'serving_section'
@@ -173,6 +368,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
             check_global_source_exits(page)
             check_personal_cp(page)
             check_serving_plans(page)
+            check_kimi_plans(page)
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
             for key,row in expected['anchors'].items():
                 card=page.locator(f'[data-anchor="{key}"]')
@@ -205,6 +401,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
             check_global_source_exits(page)
             check_personal_cp(page)
             check_serving_plans(page)
+            check_kimi_plans(page)
             highest=expected['anchors']['highest_retained_score']
             assert page.locator('[data-anchor="highest_retained_score"] .model-name').inner_text()==(highest['model'] if highest else '從缺')
             providers=[]
@@ -231,6 +428,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
                 check_provider_source_exits(page)
                 check_personal_cp(page,key)
                 check_serving_plans(page)
+                check_kimi_plans(page)
                 assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
                 for anchor,row in view['calculation']['anchors'].items():
                     assert page.locator(f'[data-anchor="{anchor}"] .model-name').inner_text()==(row['model'] if row else '從缺')
@@ -240,6 +438,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
                 check_provider_source_exits(page)
                 check_personal_cp(page,key)
                 check_serving_plans(page)
+                check_kimi_plans(page)
                 providers.append(dict(provider=key,url=provider_url,view_sha256=entry['view_sha256'],anchors=True,overflow=False,source_exit_summary=False))
             assert not errors,errors
             evidence.append(dict(width=width,http_status=response.status,search=True,empty=True,keyboard=True,overflow=False,script_errors=errors,providers=providers,source_exits_at_end=True))
@@ -248,7 +447,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
             page=browser.new_page(java_script_enabled=False,viewport={'width':width,'height':900})
             errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
             assert page.goto(root).status==200
-            check_personal_cp(page);check_serving_plans(page);check_global_source_exits(page)
+            check_personal_cp(page);check_serving_plans(page);check_kimi_plans(page);check_global_source_exits(page)
             assert page.locator('[data-anchor]').count()==2
             assert page.locator('#ladder > .table-wrap tbody tr').count()==len(formal)
             page.locator('#search-results > summary').click()
@@ -258,7 +457,7 @@ def verify_site(url, expected, output, *, expected_site_product=None, personal_p
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
             for key in manifest.get('provider_views',{}):
                 assert page.goto(urljoin(root,f'providers/{key}/')).status==200
-                check_personal_cp(page,key);check_serving_plans(page);check_provider_source_exits(page)
+                check_personal_cp(page,key);check_serving_plans(page);check_kimi_plans(page);check_provider_source_exits(page)
                 if serving:
                     page.locator('[data-plan-research] > summary').click()
                 assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
