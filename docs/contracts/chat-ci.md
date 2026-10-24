@@ -1,5 +1,7 @@
 # Chat → CI 契約（request v1/v2/v3；result v1/v2/v3/v4；2026-10-07）
 
+**2026-10-24 Kimi 方案研究增量**：使用者新增 Kimi 第一方訂閱研究，儲存至 `bridge/kimi-plans.json`，對外以獨立 hash-bound sidecar 呈現，細節見同版 `../kimi-plans.md`。Kimi 倍率未知 `null`，不將 Agent credits 相對額度換算成 API-equivalent 倍率，不加入現行四家 `bridge/site-policy.json` 七欄或 result v4；10/7 固定來源沒有 10/23 K3.1 Pro，研究新增不暗中觸發 source refresh／排名重算。
+
 **2026-10-07 個人主力增量**：每次新計算先選本次標竿 identity 與容許 EPS 倍數，成功後經產品 PR 保存精確結果 path／SHA 綁定選擇，再發布獨立 personal-cp view／manifest/hash。原 request v3／result v4、唯一 request transport 與來源／publication gates 不變；個人門檻不取代 LADDER min_score。完整操作、共同門檻、從缺與錯誤處理以同版 [../personal-cp.md](../personal-cp.md) 為準；同一 pending 續查或本次已接受 Sol XHIGH／1×EPS 不重問。
 
 **2026-10-07 最新來源退出呈現政策（優先於下方較早位置規則）**：依使用者要求，網站與新產生的 HTML 將完整「本次來源退出」清單原樣放在全部供應商頁的最後、計算與來源之後；四家供應商分頁不重複整批清單，也不在計算展開區重複。單一模型的缺值／退出狀態及來源理由仍保留，成功 JSON caveats、原始證據與已保存的歷史報告不改寫；無退出不造空區。此為展示更新，不變更算法、倍率或資料來源。
