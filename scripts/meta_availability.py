@@ -64,10 +64,13 @@ def parse_meta_models(html: str) -> dict:
     if len(matches) != 1 or matches[0]['strong'][:1] != ['Muse Spark 1.3']:
         raise SourceError('model_capability_drift', MODELS_URL, 'Muse Spark 1.3 model item/ID missing or ambiguous')
     text = ' '.join(' '.join(matches[0]['text']).split())
-    if text != MODEL_ITEM:
+    current_claim = CLAIM.replace('available on Standard tier only', 'not available with muse-spark-1.3-contributor ')
+    current_item = MODEL_ITEM.replace(CLAIM, current_claim)
+    if text not in (MODEL_ITEM, current_item):
         raise SourceError('model_capability_drift', MODELS_URL, 'Muse Spark 1.3 max plan claim changed')
     return {'source_url': MODELS_URL, 'model_id': 'muse-spark-1.3', 'max_plan': 'Standard',
-            'contributor_max_available': False, 'claim': CLAIM}
+            'contributor_max_available': False,
+            'claim': CLAIM if text == MODEL_ITEM else current_claim}
 
 
 def unavailable_reason(row: dict) -> str | None:

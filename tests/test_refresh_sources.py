@@ -135,6 +135,20 @@ class RefreshSourcesTest(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(SourceError):
                 parse_meta_models(change + '<footer>Muse Spark 1.3 muse-spark-1.3 max available on Standard tier only</footer>')
 
+    def test_current_models_wording_preserves_exact_contributor_exclusion(self):
+        html = (FIX / 'models.html').read_text()
+        old = 'available on Standard tier only'
+        new = 'not available with <code>muse-spark-1.3-contributor</code> '
+        current = html.replace(old, new)
+        self.assertNotEqual(current, html)
+        fact = parse_meta_models(current)
+        self.assertFalse(fact['contributor_max_available'])
+        self.assertIn('not available with muse-spark-1.3-contributor', fact['claim'])
+        for bad in ('available with <code>muse-spark-1.3-contributor</code> ',
+                    'not available with <code>muse-spark-1.2-contributor</code> '):
+            with self.subTest(bad=bad), self.assertRaises(SourceError):
+                parse_meta_models(current.replace(new, bad))
+
     def test_eligibility_is_exact_identity_not_family_or_rate_inference(self):
         bad = dict(model='Muse Spark 1.3', effort='max', pricing_plan='Contributor',
                    identity='Muse Spark 1.3 max Meta Contributor')
