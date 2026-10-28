@@ -1,0 +1,16 @@
+{
+  "schema_version": 3,
+  "request_id": "60e15dd7-6371-45f0-a0f6-b719bb39f1cc",
+  "created_at": "2026-10-28T20:01:49+08:00",
+  "product_sha": "856dfa0c553cfb0eb05bd66514dc65f9288d02d3",
+  "operation": "refresh",
+  "parameters": {
+    "gpt_factor": 17,
+    "grok_factor": 5.2,
+    "gemini_factor": 3.6,
+    "claude_factor": 40,
+    "min_score": 0,
+    "min_score_reason": "比較當前同版本全部有效付費候選",
+    "max_cost": null
+  }
+}
