@@ -1,13 +1,13 @@
 {
-  "request_id": "fd3651df-7eae-4ffe-8cd6-95ea5b885050",
-  "request_commit_sha": "414d4a42f9189b48d06d168d102f579e7cf7a728",
-  "run_id": "37602511953",
+  "request_id": "6207486f-dcc0-41ea-8aee-d28685ecbcbd",
+  "request_commit_sha": "02aaa9e5e437e56a137b79a49c8e7df0df12630b",
+  "run_id": "40683277187",
   "run_attempt": 1,
   "operation": "recompute",
   "status": "success",
   "source_dates": [
     "2026-10-07"
   ],
-  "created_at": "2026-10-07T17:42:35+08:00",
-  "result_path": "results/fd3651df-7eae-4ffe-8cd6-95ea5b885050/37602511953-1/result.json"
+  "created_at": "2026-10-28T19:51:52+08:00",
+  "result_path": "results/6207486f-dcc0-41ea-8aee-d28685ecbcbd/40683277187-1/result.json"
 }
